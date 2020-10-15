@@ -1,5 +1,5 @@
 using Turing
-include("julia/PartitionDistribution.jl")
+include("src/PartitionDistribution.jl")
 
 function compute_probs(samps)
 	n_samps, n_groups = size(samps)

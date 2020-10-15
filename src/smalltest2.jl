@@ -27,7 +27,7 @@ end
 	# k * τ .* ρ2 gives the precisions of each group
 	σ = 1 ./ sqrt.(k * τ .* ρ)
 
-	Turing.@addlogprob! multivariate_normal_likelihood_0(obs_mean, obs_mean_sq, μ, σ, n)
+	Turing.@addlogprob! multivariate_normal_likelihood_0(obs_mean, obs_mean_sq, μ, σ, n) # <- does not work
 	# for i in 1:n
 	# 	x[:, i] ~ MvNormal(μ, σ)
 	# end

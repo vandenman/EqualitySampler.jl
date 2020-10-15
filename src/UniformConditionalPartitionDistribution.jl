@@ -56,8 +56,6 @@ function get_conditional_counts(n::Int, known::Union{Vector{T}, TArray{T,1}} = [
 	idx = findall(i->known[i] == i, 1:n_known)
 	n_idx = length(idx)
 	res[idx] .= BN(n - n_known - 1, n_idx)
-	println(n - n_known - 1)
-	println(n_idx)
 	res[n_known + 1] = BN(n - n_known - 1, n_idx + 1)
 	res
 end

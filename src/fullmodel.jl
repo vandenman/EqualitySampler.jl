@@ -1,5 +1,5 @@
 using Turing # 0.14.1 last time I checked
-include("julia/loglikelihood.jl")
+include("src/loglikelihood.jl")
 #=
 
 	TODO:

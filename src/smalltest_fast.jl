@@ -1,5 +1,5 @@
 using Turing, StatsBase, DynamicPPL, FillArrays, Plots
-include("julia/loglikelihood.jl")
+include("src/loglikelihood.jl")
 get_eq_ind_nms(samples) = filter(x->startswith(string(x), "equal_indices"), samples.name_map.parameters)
 
 function compute_post_prob_eq(samples)

@@ -1,6 +1,6 @@
 using Turing, Plots#, StatsPlots, MCMCChains
-include("julia/UniformConditionalPartitionDistribution.jl")
-include("julia/loglikelihood.jl")
+include("src/UniformConditionalPartitionDistribution.jl")
+include("src/loglikelihood.jl")
 
 @model function bfvar_gamma(n::Vector{Float64}, b::Vector{Float64}, α::Vector{Float64}, ::Type{T} = Float64) where {T}
 

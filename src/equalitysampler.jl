@@ -1,5 +1,5 @@
 using Turing
-include("julia/PartitionDistribution.jl")
+include("src/PartitionDistribution.jl")
 
 @model function bfvar_gamma_eq(n::VecFloat, b::VecFloat, α::VecFloat, ::Type{T} = Float64) where {T}
 

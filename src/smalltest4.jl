@@ -1,7 +1,7 @@
 using Turing, StatsBase, DynamicPPL, FillArrays, Plots
-include("julia/UniformConditionalPartitionDistribution.jl")
-include("julia/loglikelihood.jl")
-include("julia/helperfunctions.jl")
+include("src/UniformConditionalPartitionDistribution.jl")
+include("src/loglikelihood.jl")
+include("src/helperfunctions.jl")
 
 @model function model(x, ::Type{T} = Float64) where {T}
 

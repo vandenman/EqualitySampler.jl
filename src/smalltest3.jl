@@ -5,7 +5,7 @@
 =#
 
 using Turing, StatsBase, DynamicPPL, FillArrays, Plots
-include("julia/helperfunctions.jl")
+include("src/helperfunctions.jl")
 
 @model function model(x, ::Type{T} = Float64) where {T}
 
