@@ -1,0 +1,174 @@
+\documentclass[]{article}
+
+%opening
+\title{The Model Space of Equality Constraints}
+\author{}
+\date{}
+
+\usepackage{amsmath,amsfonts,amssymb, bm}
+
+\usepackage{caption, subcaption}
+\usepackage{booktabs}
+\usepackage{float}
+
+\usepackage{todonotes}
+\newcommand{\DON}[1]{\todo[inline, color = white]{Don: #1}}
+
+
+\usepackage[style=apa,sortcites=true,sorting=nyt,backend=biber]{biblatex}
+\addbibresource{references.bib}
+
+
+\newcommand{\bindicator}{\gamma}% binary indicator
+\newcommand{\cindicator}{\kappa}% categorical indicator
+
+
+\newcommand{\stirling}[2]{\genfrac{\{}{\}}{0pt}{}{#1}{#2}} % https://tex.stackexchange.com/a/228111/115231
+
+\newcommand{\bellnum}[2]{B\left(#1, #2\right)}
+
+\newcommand{\density}[1]{\pi\left(#1\right)}
+\newcommand{\categorical}[1]{\text{Categorical}\left(#1\right)}
+\newcommand{\frequency}[1]{\text{Freq}\left(#1\right)}
+
+\begin{document}
+
+\maketitle
+
+Note, this is written chronologically from how I went from A to B. This is probably not a good way to present this to a journal.
+I'm not entirely sure whether we should frame the problem as a graph or as the counting of partitions.
+Viewing it as counting of partitions opens up much more relations to combinatorics, but I understand that perspective less well than that of a graphs.
+
+\subsection*{Problem Description}
+Given $K$ parameters, $\theta_1,\, \dots,\, \theta_K$, we are interested in exploring all possible equality constraints.
+This problem can be viewed as an undirected graph where the parameters are vertices and two parameters are equal if and only if there is an edge between them.
+For example for $K = 3$ we have:
+\begin{table}[!ht]
+	\centering
+	\begin{tabular}{l|rrr}
+					&	$\theta_1$	&	$\theta_2$	&	$\theta_3$	\\
+		\hline
+		$\theta_1$	&				&				&				\\
+		$\theta_2$	&	$\bindicator_1$	&				&				\\
+		$\theta_3$	&	$\bindicator_2$	&	$\bindicator_3$	&				\\
+	\end{tabular}
+\end{table}
+
+where $\bindicator_i \in \{0, 1\} \text{ for } i=1, 2, 3$.
+However, if we list all possible models, it becomes clear that this parametrization gives rise to duplicate models.
+For example, $\bm{\bindicator} = (1, 1, 1), \bm{\bindicator} = (1, 1, 0), \bm{\bindicator} = (1, 0, 1), \text{ and } \bm{\bindicator} = (0, 1, 1)$ all represent the same model where all parameters are equal.
+At the same time, no single $\bindicator_i$ is redundant but only certain combinations of the edges are.
+There are multiple ways to constrain the adjacency matrix such that duplicate models are impossible and we discuss one of these here.
+The first constraint that we impose is that the rows of the adjacency matrix sum to one.
+This makes the combination $\bm{\bindicator} = (0, 1, 1)$ impossible. 
+The second constraint asserts that there can only be one edge to a connected set of vertices, and that a connection can only be made with the `first' vertex of a connected set.
+For example, given $\bindicator_1 = 1$ it follows that $\bindicator_3 = 0$.
+
+To satisfy the first constraint, we reparametrize the binary indicator variables to categorical ones, that is, $\cindicator_1 = 1, \cindicator_2 \in \{1, 2\}, \cindicator_3 \in \{1, 2, 3\} $.\footnote{Note that although $\cindicator_1$ is redundant we use it to ease the notation.}
+Two parameters are equal whenever their indicator values are equal, for example, $\bm{\cindicator} = (1, 2, 2)$ implies $\theta_2 = \theta_3$. 
+The second constraint can be formulated as $\cindicator_2 \neq 2 \implies \cindicator_3 \neq 2$. 
+More generally, this means that $\cindicator_i \neq i \implies \cindicator_j \neq i $ for $j = i + 1, \,\dots,\,K$.
+
+For illustrative purposes we list all possible model for $K=3$ under both parametrizations and whether they violate any restrictions.
+\begin{table}[H]
+	\centering
+	\caption{All possible configurations for both sets of indicator variables and the whether the corresponding models violate any constraints.}
+	\label{tb:modelsk3}
+	\captionsetup[subtable]{position = top}
+	\captionsetup[table]{position=top}
+	\begin{subtable}{0.3\linewidth}
+		\centering
+		\caption*{Binary indicator}
+		\begin{tabular}{rrr}
+			\toprule
+			$\bm{\bindicator}$ 		& valid\\
+			\midrule
+			$0,0,0$					& $\checkmark$\\
+			$0,0,1$					& $\checkmark$\\
+			$0,1,0$					& $\checkmark$\\
+			$1,0,0$					& $\checkmark$\\
+			$0,1,1$					& violates constraint 1\\
+			$1,0,1$					& violates constraint 2\\
+			$1,1,0$					& $\checkmark$\\
+			$1,1,1$					& violates constraint 1\\
+			\bottomrule
+		\end{tabular}
+	\end{subtable}
+	\hspace*{4em}
+	\begin{subtable}{0.3\linewidth}
+		\centering
+		\caption*{Categorical indicator}
+		\begin{tabular}{rr}
+			\toprule
+			$\bm{\cindicator}$	 	& valid\\
+			\midrule
+			$1, 1, 1$				& $\checkmark$\\
+			$1, 1, 2$				& violates constraint 2\\
+			$1, 1, 1$				& $\checkmark$\\
+			$1, 2, 1$				& $\checkmark$\\
+			$1, 2, 2$				& $\checkmark$\\
+			$1, 2, 3$				& $\checkmark$\\
+			\bottomrule
+		\end{tabular}
+	\end{subtable}
+\end{table}
+
+From the table above we see there are in total 5 valid models.
+Counting the number of possible models is equivalent to counting the number of partitions into non-empty subsets of a set of size $K$.
+Therefore, given $K$ parameters the number of possible models is given by the $K^\text{th}$ Bell number, $B_K$.
+The model space grows exponentially in $K$, for example, $B_3 = 5,\, B_5 = 52,\, B_{10} = 115 \,975$.
+
+
+\subsection*{Sampling Models Uniformly}
+Here we construct a Gibbs sampler to sample uniformly from the model space.
+A naive approach is to sample from a uniform categorical distribution while satisfying constraint 2.
+However, this distribution is not uniform over the models space.
+From Table~\ref{tb:modelsk3} we can see that there are 5 valid models, and that there are 2 models where $\kappa_2 = 1$ and 3 models where $\kappa_2 = 2$.
+Adjusting the probabilities boils down to counting how often a particular outcome occurs conditional on the previous indicator variables.
+These counts can be obtained using the $r\text{-Bell numbers}$, which are defined as \parencite{mezo2011r}:
+\begin{align*}
+	\bellnum{n}{r} = 
+	\sum_{k=0}^{n} \stirling{n+r}{k+r}_r =
+	\sum_{k=0}^{n} \left(\sum_{i=0}^{n} \binom{n}{i} \stirling{i}{k} r^{n - i} \right)
+\end{align*}
+where $\stirling{n+r}{k+r}_r$ denotes the $r\text{-Stirling}$ number and $\stirling{i}{k}$ denotes the Stirling partition number.
+The left definition can be interpreted as the number of the partitions of a set with n + r element such that the first r elements are in distinct subsets in each partition.
+Let $s_i$ denote the number of active equality constraints, e.g., $s_i = \sum_{j = 1}^{i-1} I(\cindicator_j = j)$, where $I(\cdot)$ is an indicator function that returns 1 if its argument is true and 0 otherwise.
+Then, the frequency of each possible outcome for $\cindicator_i$ is given by
+\begin{align*}
+	\frequency{\cindicator_i = j} = \begin{cases}
+	\bellnum{K - i - 1}{s_i + 1} 		& \text{if } i = j					\\
+	\bellnum{K - i - 1}{s_i} 			& \text{if } \cindicator_j = j 		\\
+	0 									& \text{if } \cindicator_j \neq j
+	\end{cases}
+\end{align*}
+For example, for $K = 3$ we have $\frequency{\cindicator_2 = 1} = \bellnum{1}{1} = 2$ and $\frequency{\cindicator_2 = 2} = \bellnum{1}{2} = 3$, which matches Table~\ref{tb:modelsk3}.
+
+Using the frequencies we obtain the following scheme to sample uniformly from the model space:
+\begin{align*}
+\density{\cindicator_1} &= \categorical{1}\\
+\density{\cindicator_2 \mid \cindicator_1} 				  &= \categorical{\bellnum{K-2}{1},\,\bellnum{K-2}{2}}\\
+\density{\cindicator_3 \mid \cindicator_1, \cindicator_2} &= \categorical{\frequency{\cindicator_3 = 1}, \frequency{\cindicator_3 = 2}, \frequency{\cindicator_3 = 3}} \\
+&\vdots\\
+\density{\cindicator_K \mid \cindicator_1, \dots, \cindicator_{K-1}} &= \categorical{\frequency{\cindicator_K = 1}, \dots, \frequency{\cindicator_K = K}} 
+\end{align*}
+Here it is assumed that the probability vectors for the categorical distributions are normalized so they sum to 1.
+
+\DON{
+A possible problem here is that the sampler may have difficulties to transition between models that are intuitively close together.
+For example, given $K = 3$ and $\bm{\cindicator} = (1, 2, 2)$ (one equality constraint) it is not allowed to go to $(2, 2, 2)$  (two equality constraints).
+Instead we'd need to do $(1, 2, 3) \rightarrow (1, 1, 3) \rightarrow (1, 1, 1)$. 
+Note that $(1, 1, 2)$ is also an impossible state.
+A solution for this is to let $\cindicator_i \in \{1, \dots, K\} \forall i$.
+However, that introduces a large number of duplicate models we'd need to adjust for.
+So far I've not encountered any issues with this yet, but maybe we will when $K$ grows larger.
+}
+
+\subsection*{A Beta-Binomial Penalty}
+As in Linear regression, a uniform distribution over models is not uniform over the number of equality constraints.
+To achieve this, we implement a beta-binomial penalty.
+First, we need to count the number of models with $k$ number of equality constraints for $k=1,\,\dots,\,K$.
+
+\printbibliography
+
+\end{document}

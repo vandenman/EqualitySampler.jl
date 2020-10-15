@@ -1,0 +1,17 @@
+Manifest.toml
+
+# LaTeX files
+*.synctex.gz
+*.log
+*.blg
+*.bbl
+*.aux
+*.out
+*.bcf
+*.loc
+*.soc
+*.run.xml
+
+# Annoying OSX files
+*.DS_Store
+Thumbs.db
