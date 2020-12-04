@@ -1,5 +1,7 @@
 Manifest.toml
 
+.vscode
+
 # LaTeX files
 *.synctex.gz
 *.log

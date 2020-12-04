@@ -27,7 +27,7 @@ end
 """
 function compute_model_counts(chn)
 	eq_samples = get_eq_samples(chn)
-	return countmap(vec(mapslices(x->join(Int.(x)), eq_samples, dims = 2)))
+	return countmap(vec(mapslices(x->join(reduce_model(Int.(x))), eq_samples, dims = 2)))
 end
 
 """
@@ -96,4 +96,23 @@ function plottrace(mod, chn)
 		a
 	]
 	return plot(plots_sd..., plots_rho..., plots_tau, layout = l)
+end
+
+"""
+	reduce a model to a unique representation. For example, [2, 2, 2] -> [1, 1, 1]
+"""
+function reduce_model(x::Vector{T}) where T <: Integer
+
+	y = copy(x)
+	for i in eachindex(x)
+		if !any(==(x[i]), x[1:i - 1])
+			if x[i] > i
+				idx = findall(==(x[i]), x[i:end]) .+ i .- 1 
+				y[idx] .= i
+			elseif x[i] < i
+				y[i] = i
+			end
+		end
+	end
+	return y
 end
