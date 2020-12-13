@@ -1,3 +1,4 @@
+import Distributions
 get_eq_ind_nms(samples) = filter(x->startswith(string(x), "equal_indices"), samples.name_map.parameters)
 function get_eq_samples(samples)
 	eq_ind_nms = get_eq_ind_nms(samples)
@@ -27,7 +28,7 @@ end
 """
 function compute_model_counts(chn)
 	eq_samples = get_eq_samples(chn)
-	return countmap(vec(mapslices(x->join(reduce_model(Int.(x))), eq_samples, dims = 2)))
+	return sort(countmap(vec(mapslices(x->join(reduce_model(Int.(x))), eq_samples, dims = 2))))
 end
 
 """
@@ -40,7 +41,18 @@ function compute_model_probs(chn)
 	for (model, count) in count_models
 		probs_models[model] = count / total_visited
 	end
-	return probs_models
+	return sort(probs_models)
+end
+
+"""
+	compute the posterior probability of including 0, ..., k-1 equalities in the model
+"""
+function compute_incl_probs(chn)
+	eq_samples = get_eq_samples(chn)
+	k = size(eq_samples)[2]
+	inclusions_per_model = vec(mapslices(x->k - length(Set(x)), eq_samples, dims = 2))
+	count = countmap(inclusions_per_model)
+	return sort(counts2probs(count))
 end
 
 function get_posterior_means_mu_sigma(model, chn)
@@ -54,7 +66,7 @@ end
 """
 	plot true values vs posterior means
 """
-function plotresults(model, chain, D::MvNormal)
+function plotresults(model, chain, D::Distributions.MvNormal)
 	μ, σ = get_posterior_means_mu_sigma(model, chain)
 	plotresultshelper(μ, σ, D.μ, sqrt.(D.Σ.diag))
 end
@@ -98,21 +110,59 @@ function plottrace(mod, chn)
 	return plot(plots_sd..., plots_rho..., plots_tau, layout = l)
 end
 
-"""
-	reduce a model to a unique representation. For example, [2, 2, 2] -> [1, 1, 1]
-"""
-function reduce_model(x::Vector{T}) where T <: Integer
-
-	y = copy(x)
-	for i in eachindex(x)
-		if !any(==(x[i]), x[1:i - 1])
-			if x[i] > i
-				idx = findall(==(x[i]), x[i:end]) .+ i .- 1 
-				y[idx] .= i
-			elseif x[i] < i
-				y[i] = i
-			end
-		end
+function counts2probs(counts::Dict{T, Int}) where T
+	total_visited = sum(values(counts))
+	probs = Dict{T, Float64}()
+	for (model, count) in counts
+		probs[model] = count / total_visited
 	end
-	return y
+	return probs
+end
+
+function count_equalities(sampled_models)
+
+	k, n = size(sampled_models)
+	result = Vector{Int}(undef, n)
+	for i in axes(sampled_models, 2)
+		result[i] = k - length(unique(view(sampled_models, :, i)))
+	end
+	return result
+end
+
+function plot_modelspace(D, probs_models_by_incl)
+
+	k = length(D)
+	y = expected_model_probabilities(D)
+	incl_size = expected_inclusion_counts(k)
+	cumulative_sum = 0
+	xstart = 0
+	plt = bar(probs_models_by_incl, legend=false, yaxis=:log);
+	for i in 1:k
+		yval = y[cumulative_sum + incl_size[i]]
+		ycoords = [yval, yval]
+		if incl_size[i] == 1
+			xcoords = [xstart + 0.5, xstart + 0.5]
+			scatter!(plt, xcoords, ycoords, m = 4);
+		else
+			xcoords = [xstart, xstart + incl_size[i]]
+			plot!(plt, xcoords, ycoords, lw = 4);
+		end
+		cumulative_sum += incl_size[i]
+		xstart += incl_size[i]
+	end
+	return plt
+end
+
+function plot_inclusionprobabilities(D, probs_equalities)
+	k = length(D)
+	plt = bar(sort(probs_equalities), legend=false, yaxis=:log);
+	scatter!(plt, 0:k-1, expected_inclusion_probabilities(D), m = 4);
+	return plt
+end
+
+function plot_expected_vs_empirical(D, probs_models_by_incl)
+	x, y = expected_model_probabilities(D), collect(values(probs_models_by_incl))
+	ablinecoords = [extrema([extrema(x)..., extrema(y)...])...]
+	plt = plot(ablinecoords, ablinecoords, lw = 3, legend = false, yaxis=:log, xaxis=:log);
+	plot!(plt, x, y, seriestype = :scatter);
 end
