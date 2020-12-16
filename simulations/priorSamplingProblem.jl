@@ -1,25 +1,11 @@
 using Turing, Plots, StatsBase
 
 # Turing model
-@model function example_model(k, α = 1.0, β = 1.0, initialize_zero = true)
+@model function example_model(k, indicatorState, α = 1.0, β = 1.0, initialize_zero = true)
 
 	indicator = TArray(Int, k)
-	print(_model)
-	print(_varinfo)
-	print(_sampler)
-	if :indicator in fieldnames(typeof(_varinfo.metadata))
-		oldvalues = _varinfo.metadata.indicator.vals
-	else
-		oldvalues = -1
-	end
-	if all(x-> iszero(x) || isone(x), oldvalues)
-		println("indicator set to previous values")
-		println(oldvalues)
-		indicator .= oldvalues
-	else
-		println("indicator set to zeros")
-		indicator .= 0
-	end
+	indicator .= indicatorState
+	# println("indicator is $indicator")
 
 	# if initialize_zero
 	# 	# this biases the prior towards including no predictors
@@ -43,6 +29,9 @@ using Turing, Plots, StatsBase
 		prob = prob1 / (prob0 + prob1)
 		indicator[i] ~ Bernoulli(prob)
 	end
+
+	indicatorState .= indicator
+	# println("indicatorState is $indicatorState")
 end
 
 # manual version
@@ -76,39 +65,35 @@ function compute_incl_probs(samples)
 	return probs
 end
 
-k = 3               # no. predictors
-α = 5.0             # hyperparameter of BetaBinomial
-β = 1.0             # hyperparameter of BetaBinomial
-no_samples = 3      # no. samples
+k = 5               # no. predictors
+α = 3.0             # hyperparameter of BetaBinomial
+β = 9.0             # hyperparameter of BetaBinomial
+no_samples = 40_000      # no. samples
 D = BetaBinomial(k, α, β)
 
-# indicator_samples_manual = sample_manual(k, no_samples, α, β)
-# no_inclusions_manual = compute_incl_probs(indicator_samples_manual)
-# plot_manual = bar(no_inclusions_manual, legend = false);
-# scatter!(plot_manual, 0:k, pdf(D, 0:k));
+indicator_samples_manual = sample_manual(k, no_samples, α, β)
+no_inclusions_manual = compute_incl_probs(indicator_samples_manual)
+plot_manual = bar(no_inclusions_manual, legend = false);
+scatter!(plot_manual, 0:k, pdf(D, 0:k));
 
-mod = example_model(k, α, β)
+indicatorState = ones(Int, k)
+modd = example_model(k, indicatorState, α, β)
 spl = Prior()
-prior_chain = sample(mod, spl, no_samples);
-@edit AbstractMCMC.sample(Random.GLOBAL_RNG, mod, spl, no_samples)
-@edit AbstractMCMC.mcmcsample(Random.GLOBAL_RNG, mod, Turing.SampleFromPrior(), no_samples)
+prior_chain = sample(modd, spl, no_samples);
 
-ssample, sstate = AbstractMCMC.step(Random.GLOBAL_RNG, mod, Turing.SampleFromPrior())
-ssample.
+indicator_samples_Turing = reshape(prior_chain["indicator[" .* string.(1:k) .* "]"].value.data, no_samples, k)
+no_inclusions_Turing = compute_incl_probs(indicator_samples_Turing)
+plot_Turing = bar(no_inclusions_Turing, legend = false);
+scatter!(plot_Turing, 0:k, pdf(D, 0:k));
 
-# indicator_samples_Turing = reshape(prior_chain["indicator[" .* string.(1:k) .* "]"].value.data, no_samples, k)
-# no_inclusions_Turing = compute_incl_probs(indicator_samples_Turing)
-# plot_Turing = bar(no_inclusions_Turing, legend = false);
-# scatter!(plot_Turing, 0:k, pdf(D, 0:k));
+prior_chain = sample(example_model(k, α, β, false), Prior(), no_samples);
+indicator_samples_Turing = reshape(prior_chain["indicator[" .* string.(1:k) .* "]"].value.data, no_samples, k)
+no_inclusions_Turing = compute_incl_probs(indicator_samples_Turing)
+plot_Turing2 = bar(no_inclusions_Turing, legend = false);
+scatter!(plot_Turing2, 0:k, pdf(D, 0:k));
 
-# prior_chain = sample(example_model(k, α, β, false), Prior(), no_samples);
-# indicator_samples_Turing = reshape(prior_chain["indicator[" .* string.(1:k) .* "]"].value.data, no_samples, k)
-# no_inclusions_Turing = compute_incl_probs(indicator_samples_Turing)
-# plot_Turing2 = bar(no_inclusions_Turing, legend = false);
-# scatter!(plot_Turing2, 0:k, pdf(D, 0:k));
-
-# plot_joint = plot(plot_manual, plot_Turing, plot_Turing2, layout = grid(3, 1), title = ["manual sampling" "Turing initialized to zero" "Turing initialized to one"],
-# 		size = (600, 1200));
+plot_joint = plot(plot_manual, plot_Turing, plot_Turing2, layout = grid(3, 1), title = ["manual sampling" "Turing initialized to zero" "Turing initialized to one"],
+		size = (600, 1200));
 # png(plot_joint, "prior.png")
 
 

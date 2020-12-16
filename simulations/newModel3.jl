@@ -1,7 +1,8 @@
+
 using Turing, StatsBase, DynamicPPL, FillArrays, Plots
 include("src/loglikelihood.jl")
 include("src/helperfunctions.jl")
-include("src/newApproach2.jl")
+include("src/newApproach3.jl")
 
 function visualize_eq_samples(equalityPrior, empirical_model_probs, empirical_inclusion_probs)
 	p1 = plot_modelspace(equalityPrior, empirical_model_probs);
@@ -66,7 +67,7 @@ end
 	return (σ_c, ρ_c)
 end
 
-@model function model(x, indicatorState, uniform = true, ::Type{T} = Float64) where {T}
+@model function model(x, uniform = true, ::Type{T} = Float64) where {T}
 
 	n, k = size(x)
 
@@ -76,9 +77,7 @@ end
 
 	# sample equalities among the sds
 	equal_indices = TArray{Int}(k)
-	equal_indices .= indicatorState
-	# equal_indices .= rand(1:k, k) # mitigates bias
-	equal_indices .= vec(rand(UniformMvUrnDistribution(k), 1))
+	equal_indices .= 1
 	for i in eachindex(equal_indices)
 		if uniform
 			equal_indices[i] ~ UniformConditionalUrnDistribution(equal_indices, i)
@@ -105,7 +104,6 @@ end
 	for i in axes(x, 1)
 		x[i, :] ~ MvNormal(μ, σ_c)
 	end
-	indicatorState .= equal_indices
 	return (σ_c, ρ_c)
 end
 
@@ -158,11 +156,10 @@ x = permutedims(rand(D, n))
 # fit model -- MvNormal
 uniform_prior = false
 equalityPrior = uniform_prior ? UniformConditionalUrnDistribution(ones(Int, k), 1) : BetaBinomialConditionalUrnDistribution(ones(Int, k), 1)
-indicatorState = ones(Int, k)
-mod_eq = model(x, indicatorState, uniform_prior)
+mod_eq = model(x, uniform_prior)
 
 # study prior
-chn_eq_prior = sample(mod_eq, Prior(), 30_000);
+chn_eq_prior = sample(mod_eq, Prior(), 100_000);
 empirical_model_probs = compute_model_probs(chn_eq_prior)
 empirical_inclusion_probs = compute_incl_probs(chn_eq_prior)
 visualize_eq_samples(equalityPrior, empirical_model_probs, empirical_inclusion_probs)
@@ -174,50 +171,9 @@ chn_eq = sample(mod_eq, spl_eq, 2_000, n_adapts = 1_000, drop_warmup = true);
 plottrace(mod_eq, chn_eq)
 visualize_eq_samples(chn_eq_prior)
 
+# counts equal to x1
+foo(n) = Combinatorics.stirlings1.(n, 0:n) .* binomial.(n, 0:n)
 
-# examine results for parameters
-get_posterior_means_mu_sigma(mod_eq, chn_eq)
-plotresults(mod_eq, chn_eq, D)
-plotresults(mod_eq, chn_eq, x)
-
-compute_post_prob_eq(chn_eq)
-compute_model_probs(chn_eq)
-model_probs_eq = compute_model_probs(chn_eq)
-sort(model_probs_eq)
-
-# fit model -- fast logposterior
-obsmu  = vec(mean(x, dims = 1))
-obsmu2 = vec(mean(x->x^2, x, dims = 1))
-
-mod_eq_ss = model_suffstat(obsmu, obsmu2, n, k)
-
-# study prior
-chn_eq_ss_prior = sample(mod_eq_ss, Prior(), 50_000, n_adapts = 1_000, drop_warmup = true);
-compute_post_prob_eq(chn_eq_ss_prior)
-compute_model_probs(chn_eq_ss_prior)
-
-# study posterior
-spl_eq_ss = Gibbs(PG(20, :equal_indices), HMC(0.01, 10, :τ, :ρ, :μ))
-chn_eq_ss = sample(mod_eq_ss, spl_eq_ss, 5_000, n_adapts = 2_000, drop_warmup = true);
-
-plottrace(mod_eq_ss, chn_eq_ss)
-
-# examine results for parameters
-get_posterior_means_mu_sigma(mod_eq_ss, chn_eq_ss)
-plotresults(mod_eq_ss, chn_eq_ss, D)
-plotresults(mod_eq_ss, chn_eq_ss, x)
-
-compute_post_prob_eq(chn_eq_ss)
-compute_model_counts(chn_eq_ss)
-compute_model_probs(chn_eq_ss)
-
-
-# Multivariate prior
-equalityPrior = UniformMvUrnDistribution(k)
-mod_eq = model(x)
-
-# study prior
-chn_eq_prior = sample(mod_eq, Prior(), 50_000);
-empirical_model_probs = compute_model_probs(chn_eq_prior)
-empirical_inclusion_probs = compute_incl_probs(chn_eq_prior)
-visualize_eq_samples(equalityPrior, empirical_model_probs, empirical_inclusion_probs)
+opts = collect(Iterators.product(1:1, 1:1, 1:5, 1:5, 1:5))
+res = Dict{Int, Int}()
+count_equalities.(collect.(opts))

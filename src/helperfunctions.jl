@@ -166,3 +166,22 @@ function plot_expected_vs_empirical(D, probs_models_by_incl)
 	plt = plot(ablinecoords, ablinecoords, lw = 3, legend = false, yaxis=:log, xaxis=:log);
 	plot!(plt, x, y, seriestype = :scatter);
 end
+
+function counts2probs(counts::Dict{T, Int}) where T
+	total_visited = sum(values(counts))
+	probs = Dict{T, Float64}()
+	for (model, count) in counts
+		probs[model] = count / total_visited
+	end
+	return probs
+end
+
+function count_equalities(sampled_models)
+
+	k, n = size(sampled_models)
+	result = Vector{Int}(undef, n)
+	for i in axes(sampled_models, 2)
+		result[i] = k - length(unique(view(sampled_models, :, i)))
+	end
+	return result
+end
