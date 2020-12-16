@@ -171,9 +171,14 @@ chn_eq = sample(mod_eq, spl_eq, 2_000, n_adapts = 1_000, drop_warmup = true);
 plottrace(mod_eq, chn_eq)
 visualize_eq_samples(chn_eq_prior)
 
-# counts equal to x1
+# counts equal to x1 == x2
 foo(n) = Combinatorics.stirlings1.(n, 0:n) .* binomial.(n, 0:n)
 
-opts = collect(Iterators.product(1:1, 1:1, 1:5, 1:5, 1:5))
-res = Dict{Int, Int}()
-count_equalities.(collect.(opts))
+k = 6
+foo(k-1)
+opts = Iterators.product(vcat([1:1, 1:1], fill(1:k, k-2))...)
+res = sort(countmap(vec([count_equalities(collect(it)) for it in opts])))
+
+length(Iterators.product(fill(1:k, k)...))
+
+length(Iterators.product(fill(1:k, k-2)...))

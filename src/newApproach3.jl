@@ -110,20 +110,6 @@ function expected_inclusion_probabilities(k::Int)
 	return counts ./ sum(counts)
 end
 
-function brute_force_conditional_probs(target::Int, k::Int, known_indices::AbstractVector{T}, 
-	known_values::AbstractVector{T}, D::AbstractMvUrnDistribution) where T <: Integer
-
-	ranges = fill(one(T):k, k)
-	ranges[known_indices] .= UnitRange.(known_values, known_values)
-	It = Iterators.product(ranges...)
-	probs = zeros(Float64, k)
-	for it in It
-		arr = collect(it)
-		probs[arr[target]] += Distributions.pdf(D, arr)
-	end
-	return probs ./ sum(probs)
-end
-
 #endregion
 
 #region Abstract
@@ -286,17 +272,20 @@ function Distributions._rand!(rng::Random.AbstractRNG, d::AbstractMvUrnDistribut
 	x
 end
 
-function Distributions._rand!(::Random.AbstractRNG, d::UniformMvUrnDistribution, x::AbstractVector)
+function brute_force_conditional_probs(target::Int, k::Int, known_indices::AbstractVector{T}, 
+	known_values::AbstractVector{T}, D::AbstractMvUrnDistribution) where T <: Integer
 
-	k = d.k
-	x[1] = 1
-	for j in 2:k
-		count = get_conditional_counts(k, x[1:j-1])
-		x[j] = rand(Distributions.Categorical(count ./ sum(count)), 1)[1]
+	ranges = fill(one(T):k, k)
+	ranges[known_indices] .= UnitRange.(known_values, known_values)
+	It = Iterators.product(ranges...)
+	probs = zeros(Float64, k)
+	for it in It
+		arr = collect(it)
+		probs[arr[target]] += Distributions.pdf(D, arr)
 	end
-	_relabel!(x)
-	x
+	return probs ./ sum(probs)
 end
+
 #endregion
 
 #region Uniform Multivariate distribution
@@ -316,6 +305,18 @@ function Distributions._logpdf(d::UniformMvUrnDistribution{T}, x::AbstractVector
 	log_prob_of_model -= log(count_combinations(x))
 	return log_prob_of_model
 
+end
+
+function Distributions._rand!(::Random.AbstractRNG, d::UniformMvUrnDistribution, x::AbstractVector)
+
+	k = d.k
+	x[1] = 1
+	for j in 2:k
+		count = get_conditional_counts(k, x[1:j-1])
+		x[j] = rand(Distributions.Categorical(count ./ sum(count)), 1)[1]
+	end
+	_relabel!(x)
+	x
 end
 
 function _relabel!(x)
@@ -398,12 +399,12 @@ function Distributions._rand!(::Random.AbstractRNG, d::BetaBinomialMvUrnDistribu
 end
 #endregion
 
-k = 4
-It = Iterators.product(fill(1:k, k)...)
-D0 = UniformMvUrnDistribution(k)
-D1 = BetaBinomialMvUrnDistribution(k, 1, 1)
-prob0 = sum(x->Distributions.pdf(D0, collect(x)), It)
-prob1 = sum(x->Distributions.pdf(D1, collect(x)), It)
+# k = 4
+# It = Iterators.product(fill(1:k, k)...)
+# D0 = UniformMvUrnDistribution(k)
+# D1 = BetaBinomialMvUrnDistribution(k, 1, 1)
+# prob0 = sum(x->Distributions.pdf(D0, collect(x)), It)
+# prob1 = sum(x->Distributions.pdf(D1, collect(x)), It)
 
 #=
 function draw_test_bernoulli(s, k)
