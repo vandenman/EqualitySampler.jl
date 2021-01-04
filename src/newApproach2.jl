@@ -521,6 +521,7 @@ Distributions.pdf(Dall, tmp)
 
 # TODO: Distributions.pdf(UniformMvUrnDistribution) does not sum to one! Fix this!
 # actually.. it does?
+#=
 k = 4
 Dall = UniformMvUrnDistribution(k)
 it = Iterators.product(fill(1:k, k)...)
@@ -591,3 +592,4 @@ dd
 
 count_models_with_incl.(k, 0:k-1)
 
+=#

@@ -78,7 +78,7 @@ end
 	equal_indices = TArray{Int}(k)
 	equal_indices .= indicatorState
 	# equal_indices .= rand(1:k, k) # mitigates bias
-	equal_indices .= vec(rand(UniformMvUrnDistribution(k), 1))
+	# equal_indices .= vec(rand(UniformMvUrnDistribution(k), 1))
 	for i in eachindex(equal_indices)
 		if uniform
 			equal_indices[i] ~ UniformConditionalUrnDistribution(equal_indices, i)
@@ -86,6 +86,7 @@ end
 			equal_indices[i] ~ BetaBinomialConditionalUrnDistribution(equal_indices, i)
 		end
 	end
+	indicatorState .= equal_indices
 
 	# Method I: reassign rho to conform to the sampled equalities
 	ρ_c = Vector{T}(undef, k)
@@ -105,7 +106,6 @@ end
 	for i in axes(x, 1)
 		x[i, :] ~ MvNormal(μ, σ_c)
 	end
-	indicatorState .= equal_indices
 	return (σ_c, ρ_c)
 end
 
@@ -162,7 +162,7 @@ indicatorState = ones(Int, k)
 mod_eq = model(x, indicatorState, uniform_prior)
 
 # study prior
-chn_eq_prior = sample(mod_eq, Prior(), 30_000);
+chn_eq_prior = sample(mod_eq, Prior(), 50_000);
 empirical_model_probs = compute_model_probs(chn_eq_prior)
 empirical_inclusion_probs = compute_incl_probs(chn_eq_prior)
 visualize_eq_samples(equalityPrior, empirical_model_probs, empirical_inclusion_probs)
@@ -221,3 +221,18 @@ chn_eq_prior = sample(mod_eq, Prior(), 50_000);
 empirical_model_probs = compute_model_probs(chn_eq_prior)
 empirical_inclusion_probs = compute_incl_probs(chn_eq_prior)
 visualize_eq_samples(equalityPrior, empirical_model_probs, empirical_inclusion_probs)
+
+
+# target = generate_distinct_models(4)
+# It = Iterators.product(fill(1:4, 4)...)
+# s = Set(reduce_model(collect(it)) for it in It)
+# replica = similar(target)
+# for (i, ss) in enumerate(s)
+# 	@show i, ss
+# 	replica[:, i] .= ss
+# end
+# target
+# replica
+# o = sortperm(vec(mapslices(join, replica, dims = 1)))
+# replica[:, o]
+# target

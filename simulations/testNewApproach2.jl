@@ -5,7 +5,7 @@ include("src/newApproach2.jl")
 include("src/helperfunctions.jl")
 
 
-updateDistribution(D::UniformConditionalUrnDistribution, urns, j) = UniformConditionalUrnDistribution(urns, j)
+updateDistribution(::UniformConditionalUrnDistribution, urns, j) = UniformConditionalUrnDistribution(urns, j)
 updateDistribution(D::BetaBinomialConditionalUrnDistribution, urns, j) = BetaBinomialConditionalUrnDistribution(urns, j, D.α, D.β)
 
 function simulate_from_distribution(nrand, D)
@@ -55,9 +55,9 @@ pjoint = plot(p1, p2, p3, layout = grid(3, 1), title = ["log model probabilities
 png(pjoint, "modelspace uniform $k.png")
 
 # BetaBinomialConditionalUrnDistribution
-nrand = 20_000
+nrand = 50_000
 urns = collect(1:4)
-D = BetaBinomialConditionalUrnDistribution(urns, 1, 5, 3)
+D = BetaBinomialConditionalUrnDistribution(urns, 1, 1, 1)
 sampled_models = simulate_from_distribution(nrand, D)
 
 empirical_model_probs     = get_empirical_model_probabilities(sampled_models)
