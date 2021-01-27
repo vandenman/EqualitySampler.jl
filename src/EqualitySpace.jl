@@ -2,6 +2,7 @@ module EqualitySpace
 
 import Distributions, Random, LinearAlgebra, Memoize
 import StatsBase: countmap
+import OrderedCollections: OrderedDict
 
 export
 	NormalSuffStat,

@@ -105,11 +105,11 @@ end
 function empirical_model_probabilities(sampled_models::AbstractMatrix)
 	count_models = countmap(vec(mapslices(x->join(Int.(x)), sampled_models, dims = 1)))
 	probs_models = counts2probs(count_models)
-	return sort(probs_models, by=x->count_equalities(x))
+	return sort!(OrderedDict(probs_models), by=x->count_equalities(x))
 end
 
 function empirical_inclusion_probabilities(sampled_models::AbstractMatrix)
 	no_equalities = count_equalities(sampled_models)
 	counts_equalities = countmap(no_equalities)
-	return sort(counts2probs(counts_equalities))
+	return sort!(OrderedDict(counts2probs(counts_equalities)))
 end
