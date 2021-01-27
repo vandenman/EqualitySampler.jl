@@ -1,14 +1,5 @@
-using Test
 import Distributions: MvNormal, loglikelihood
 import Statistics: mean
-println(pwd())
-if endswith(pwd(), "bfvartest")
-	cd("julia")
-elseif endswith(pwd(), "test")
-	cd("../")
-end
-println(pwd())
-include(joinpath(pwd(), "loglikelihood.jl"))
 
 
 @testset "Multivariate normal likelihood" begin
@@ -26,7 +17,7 @@ include(joinpath(pwd(), "loglikelihood.jl"))
 		obs_var  = mean(x .^ 2, dims = 2)
 
 		refvalue	= loglikelihood(D, x)
-		testvalue	= _multivariate_normal_likelihood(obs_mean, obs_var, pop_mu, pop_sds, n)
+		testvalue	= EqualitySpace._multivariate_normal_likelihood(obs_mean, obs_var, pop_mu, pop_sds, n)
 		@test refvalue ≈ testvalue
 	end
 

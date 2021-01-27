@@ -1,5 +1,3 @@
-import Random, Distributions
-
 function myloglikelihood(n, b, ρ, τ)
 
 	prec = ρ .* (τ * length(n))
@@ -11,7 +9,7 @@ function myloglikelihood(n, b, ρ, τ)
 	return out
 end
 
-# function multivariate_normal_likelihood(obs_mean, obs_var, pop_mean, pop_sds, n)
+# function __multivariate_normal_likelihood(obs_mean, obs_var, pop_mean, pop_sds, n)
 # 	# efficient evaluation of log likelihood multivariate normal given sufficient statistics
 # 	pop_prec = 1 ./ (pop_sds .^2)
 # 	return - n / 2 * (
@@ -38,15 +36,35 @@ function _multivariate_normal_likelihood(obs_mean, obs_var, pop_mean, pop_sds, n
 	return - n / 2 * result
 end
 
+function _univariate_normal_likelihood(obs_mean, obs_var, pop_mean, pop_sds, n)
+
+	pop_prec = 1.0 / (pop_sds * pop_sds)
+	result = 
+		log(2 * float(pi)) +
+		2 * log(pop_sds) +
+		obs_var * pop_prec +
+		(pop_mean - 2 * obs_mean) * pop_mean * pop_prec
+
+	return - n / 2 * result
+end
+
 # MvNormal Distribution parametrized with sufficient statistics for a diagonal covariance matrix
 struct MvNormalSuffStat <: Distributions.AbstractMvNormal
-	obs_var::AbstractVector
-	pop_mean::AbstractVector
-	pop_var::AbstractVector
+	obs_var::AbstractVector{<:Real}
+	pop_mean::AbstractVector{<:Real}
+	pop_var::AbstractVector{<:Real}
 	n::Int
 end
 Distributions.logpdf(D::MvNormalSuffStat, obs_mean::AbstractVector) = _multivariate_normal_likelihood(obs_mean, D.obs_var, D.pop_mean, D.pop_var, D.n)
-# this method probably isn't necessary
-Distributions.rand(rng::Random.AbstractRNG, D::MvNormalSuffStat) = rand(rng, MvNormal(D.pop_mean, D.pop_var ./ D.n))
+# this method isn't necessary for observe statements in Turing
+# Distributions.rand(rng::Random.AbstractRNG, D::MvNormalSuffStat) = rand(rng, MvNormal(D.pop_mean, D.pop_var ./ D.n))
 
-# TODO: check if we can use Distribution.suffstats instead of this. It is lacking a logpdf method though
+struct NormalSuffStat <: Distributions.ContinuousUnivariateDistribution
+	obs_var::Real
+	pop_mean::Real
+	pop_var::Real
+	n::Int
+end
+Distributions.logpdf(D::NormalSuffStat, obs_mean::T) where T<:Real = _univariate_normal_likelihood(obs_mean, D.obs_var, D.pop_mean, D.pop_var, D.n)
+
+

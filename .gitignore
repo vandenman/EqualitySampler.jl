@@ -17,3 +17,6 @@ Manifest.toml
 # Annoying OSX files
 *.DS_Store
 Thumbs.db
+
+# old stuff
+old_files/*
