@@ -45,7 +45,7 @@ StatsFuns = "0.9"
 StatsModels = "0.6"
 StatsPlots = "0.14"
 Turing = "0.15.0 - 0.15.8"
-Zygote = "0.6 - 0.6.2"
+Zygote = "0.1 - 0.6"
 
 [extras]
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
