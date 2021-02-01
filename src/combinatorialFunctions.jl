@@ -34,6 +34,9 @@ Memoize.@memoize function stirlings2r(n::T, k::T, r::T) where T <: Integer
 	iszero(n) || iszero(k) && return zero(T)
 	n == r && return one(T)
 	k == r && return r^(n - r)
+
+	# TODO: more simplifications
+
 	return k * stirlings2r(n - 1, k, r) + stirlings2r(n - 1, k - 1, r) 
 
 end
@@ -93,3 +96,30 @@ returns the n-th bell number, which representats the total number of unique mode
 """
 count_distinct_models(k::Int) = bellnumr(k, 0)
 count_models_with_incl(k, no_equalities) = stirlings2(k, k - no_equalities) .* count_combinations.(k, k - no_equalities)
+
+"""
+	generate_distinct_models(k::Int)
+
+Generates all distinct models that represent equalities.
+"""
+function generate_distinct_models(k::Int)
+	# based on https://stackoverflow.com/a/30898130/4917834
+	# TODO: return a generator rather than directly all results
+	current = ones(Int, k)
+	no_models = count_distinct_models(k)
+	result = Matrix{Int}(undef, k, no_models)
+	result[:, 1] .= current
+	isone(k) && return result
+	range = k:-1:2
+	for i in 2:no_models
+
+		idx = findfirst(i->current[i] < k && any(==(current[i]), current[1:i-1]), range)
+		rightmost_incrementable = range[idx]
+		current[rightmost_incrementable] += 1
+		current[rightmost_incrementable + 1 : end] .= 1
+		result[:, i] .= current
+
+	end
+	return result
+end
+

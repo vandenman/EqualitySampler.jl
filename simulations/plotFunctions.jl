@@ -1,4 +1,5 @@
 using Plots
+import Distributions
 
 """
 	plot true values vs posterior means

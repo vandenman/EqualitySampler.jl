@@ -66,5 +66,3 @@ struct NormalSuffStat <: Distributions.ContinuousUnivariateDistribution
 	n::Int
 end
 Distributions.logpdf(D::NormalSuffStat, obs_mean::T) where T<:Real = _univariate_normal_likelihood(obs_mean, D.obs_var, D.pop_mean, D.pop_var, D.n)
-
-

@@ -24,8 +24,9 @@ updateDistribution(D::BetaBinomialConditionalUrnDistribution, urns, j) = BetaBin
 			empirical_inclusion_probs = collect(values(empirical_inclusion_probabilities(samples)))
 			expected_model_probs      = expected_model_probabilities(D)
 			expected_inclusion_probs  = expected_inclusion_probabilities(D)
-			rtol = 0.15 + 0.02k
+			rtol = 0.15 + 0.02k # TODO: something better than this.
 			@testset "Distribution: $D" begin
+				# correlations fail for uniform model because the theoretical values have 0 variance.
 				# @test cor(empirical_model_probs, expected_model_probs) > 0.95
 				# @test cor(empirical_inclusion_probs, expected_inclusion_probs) > 0.95
 				@test isapprox(empirical_model_probs, expected_model_probs, rtol = rtol)

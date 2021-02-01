@@ -17,7 +17,7 @@ import Statistics: mean
 		obs_var  = mean(x .^ 2, dims = 2)
 
 		refvalue	= loglikelihood(D, x)
-		testvalue	= EqualitySpace._multivariate_normal_likelihood(obs_mean, obs_var, pop_mu, pop_sds, n)
+		testvalue	= EqualitySampler._multivariate_normal_likelihood(obs_mean, obs_var, pop_mu, pop_sds, n)
 		@test refvalue ≈ testvalue
 	end
 

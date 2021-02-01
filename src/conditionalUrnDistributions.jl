@@ -1,5 +1,3 @@
-import Distributions, Random
-
 """
 	reduce a model to a unique representation. For example, [2, 2, 2] -> [1, 1, 1]
 """
@@ -64,8 +62,9 @@ Distributions.rand(::Random.AbstractRNG, d::AbstractConditionalUrnDistribution) 
 
 count_distinct_models(d::AbstractConditionalUrnDistribution) = count_distinct_models(length(d))
 
-Distributions.mean(d::AbstractConditionalUrnDistribution) = sum(_pdf(d) .* d.urns)
-Distributions.var(d::AbstractConditionalUrnDistribution) = sum(_pdf(d) .* d.urns .^2) - Distributions.mean(d)^2
+outcomes(d::AbstractConditionalUrnDistribution) = eachindex(d.urns)
+Distributions.mean(d::AbstractConditionalUrnDistribution) = sum(_pdf(d) .* outcomes(d))
+Distributions.var(d::AbstractConditionalUrnDistribution) = sum(_pdf(d) .* outcomes(d) .^2) - Distributions.mean(d)^2
 
 #endregion 
 
@@ -105,6 +104,7 @@ struct BetaBinomialConditionalUrnDistribution{T<:Integer} <: AbstractConditional
 	index::T
 	α::Float64
 	β::Float64
+	# logpdf::Vector{Float64}
 	function BetaBinomialConditionalUrnDistribution(urns::AbstractVector{T}, index::T = 1, α::Float64 = 1.0, β::Float64 = 1.0) where T <: Integer
 		n = length(urns)
 		all(x-> one(T) <= x <= n, urns) || throw(DomainError(urns, "condition: 0 < urns[i] < length(urns) ∀i is violated"))
@@ -133,7 +133,7 @@ function _pdf(d::BetaBinomialConditionalUrnDistribution)
 	n0 = k
 	
 	# no_duplicated = count_equalities(view(urns, index_already_sampled))
-	v_known_urns = view(urns, index_already_sampled) 
+	v_known_urns = view(urns, index_already_sampled)
 	r = length(Set(v_known_urns))
 	n = n0 - (index - r - 1)
 
@@ -159,7 +159,7 @@ function _pdf(d::BetaBinomialConditionalUrnDistribution)
 	if !Distributions.isprobvec(probs)
 		@show d, probs
 	end
-	return probs# / sum(probs)
+	return probs
 
 end
 #endregion
