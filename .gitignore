@@ -20,3 +20,4 @@ Thumbs.db
 
 # old stuff
 old_files/*
+*.code-workspace

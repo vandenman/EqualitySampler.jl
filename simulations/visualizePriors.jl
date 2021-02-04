@@ -41,8 +41,8 @@ empirical_inclusion_probs = empirical_inclusion_probabilities(sampled_models)
 
 pjoint = visualize_eq_samples(D, empirical_model_probs, empirical_inclusion_probs)
 
-# pretty theoretical Plots
-function model_pmf(D, yaxis = :log)
+# Theoretical Plots
+function model_pmf(D; yaxis = :log, legend = true, xrotation = 45)
 
 	k = length(D)
 	allmodels = generate_distinct_models(k)
@@ -52,7 +52,8 @@ function model_pmf(D, yaxis = :log)
 	cumulative_sum = 0
 	xstart = 0
 	transparent = Colors.RGBA(0, 0, 0, 0)
-	plt = plot(almodels_str, fill(maximum(y), length(y)), label = nothing, color = transparent, yaxis = yaxis)
+	plt = plot(almodels_str, fill(maximum(y), length(y)), label = nothing, color = transparent,
+				yaxis = yaxis, legend = legend, xrotation = xrotation)
 	for i in 1:k
 		yval = y[cumulative_sum + incl_size[i]]
 		ycoords = [yval, yval]
@@ -69,21 +70,27 @@ function model_pmf(D, yaxis = :log)
 	return plt
 end
 
+function incl_pmf(D::AbstractConditionalUrnDistribution; yaxis = :log)
+	k = length(D)
+	plt = scatter(0:k-1, expected_inclusion_probabilities(D), m = 4, yaxis = yaxis, legend = false);
+	return plt
+end
+
 k = 4
 Duniform = UniformConditionalUrnDistribution(ones(Int, k))
 DBetaBinom = BetaBinomialConditionalUrnDistribution(ones(Int, k), 1, 1, 1)
-model_pmf(Duniform)
-model_pmf(DBetaBinom)
-model_pmf(BetaBinomialConditionalUrnDistribution(ones(Int, 6), 1, 3, 1))
-model_pmf(BetaBinomialConditionalUrnDistribution(ones(Int, 12), 1, 1, 1))
 
-model_probs = expected_model_probabilities(Duniform)
-incl_probs  = expected_inclusion_probabilities(Duniform)
+yaxis_scale = :none
+p1 = model_pmf(Duniform, legend = false, yaxis = yaxis_scale);
+p2 = model_pmf(DBetaBinom, legend = false, yaxis = yaxis_scale);
+plot!(p1, title = "Uniform", ylab = "Probabilty", xlab = "Model");
+plot!(p2, title = "Beta-binomial (α = $(DBetaBinom.α), β = $(DBetaBinom.β))", xlab = "Model");
 
-model_size = [count_equalities(col) for col in eachcol(allmodels)]
-p = plot(almodels_str, model_probs, legend = false)
-fo
-p = scatter(almodels_str[1], model_probs[1])
+p3 = incl_pmf(Duniform, yaxis = yaxis_scale);
+p4 = incl_pmf(DBetaBinom, yaxis = yaxis_scale);
+plot!(p3, xlab = "No. inequalities", ylab = "Probabilty")
+plot!(p4, xlab = "No. inequalities")
 
-
-foo(Duniform, almodels_str)
+w = 360
+joint = plot(p1, p2, p3, p4, layout = (2, 2), size = (2w, 2w))
+savefig(joint, joinpath("figures", "prior.pdf"))

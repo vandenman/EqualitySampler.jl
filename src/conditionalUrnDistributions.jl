@@ -66,17 +66,17 @@ outcomes(d::AbstractConditionalUrnDistribution) = eachindex(d.urns)
 Distributions.mean(d::AbstractConditionalUrnDistribution) = sum(_pdf(d) .* outcomes(d))
 Distributions.var(d::AbstractConditionalUrnDistribution) = sum(_pdf(d) .* outcomes(d) .^2) - Distributions.mean(d)^2
 
-#endregion 
+#endregion
 
 #region UniformConditionalUrnDistribution
-struct UniformConditionalUrnDistribution{T<:Integer} <: AbstractConditionalUrnDistribution{T}
-	urns::AbstractVector{T}
+struct UniformConditionalUrnDistribution{T, U<:AbstractVector{T}} <: AbstractConditionalUrnDistribution{T}
+	urns::U
 	index::T
-	function UniformConditionalUrnDistribution(urns::AbstractVector{T}, index::T = 1) where T <: Integer
+	function UniformConditionalUrnDistribution(urns::U, index::T = 1) where {T <: Integer, U <: AbstractVector{T}}
 		n = length(urns)
 		all(x-> one(T) <= x <= n, urns) || throw(DomainError(urns, "condition: 0 < urns[i] < length(urns) ∀i is violated"))
 		one(T) <= index <= n || throw(DomainError(urns, "condition: 0 < index < length(urns) is violated"))
-		return new{T}(urns, index)
+		return new{T, U}(urns, index)
 	end
 end
 
@@ -99,19 +99,19 @@ end
 
 #endregion
 #region BetaBinomialConditionalUrnDistribution
-struct BetaBinomialConditionalUrnDistribution{T<:Integer} <: AbstractConditionalUrnDistribution{T}
-	urns::AbstractVector{T}
+struct BetaBinomialConditionalUrnDistribution{T, U<:AbstractVector{T}} <: AbstractConditionalUrnDistribution{T}
+	urns::U
 	index::T
 	α::Float64
 	β::Float64
 	# logpdf::Vector{Float64}
-	function BetaBinomialConditionalUrnDistribution(urns::AbstractVector{T}, index::T = 1, α::Float64 = 1.0, β::Float64 = 1.0) where T <: Integer
+	function BetaBinomialConditionalUrnDistribution(urns::U, index::T = 1, α::Float64 = 1.0, β::Float64 = 1.0) where {T <: Integer, U <: AbstractVector{T}}
 		n = length(urns)
 		all(x-> one(T) <= x <= n, urns) || throw(DomainError(urns, "condition: 0 < urns[i] < length(urns) ∀i is violated"))
 		one(T) <= index <= n || throw(DomainError(urns, "condition: 0 < index < length(urns) is violated"))
 		0.0 <= α || throw(DomainError(α, "condition: 0 <= α is violated"))
 		0.0 <= β || throw(DomainError(β, "condition: 0 <= β is violated"))
-		new{T}(urns, index, α, β)
+		new{T, U}(urns, index, α, β)
 	end
 end
 
@@ -131,7 +131,7 @@ function _pdf(d::BetaBinomialConditionalUrnDistribution)
 	urns = d.urns
 	index_already_sampled = 1:index - 1
 	n0 = k
-	
+
 	# no_duplicated = count_equalities(view(urns, index_already_sampled))
 	v_known_urns = view(urns, index_already_sampled)
 	r = length(Set(v_known_urns))
@@ -184,17 +184,25 @@ function expected_inclusion_probabilities(d::BetaBinomialConditionalUrnDistribut
 	return Distributions.pdf.(Distributions.BetaBinomial(k, d.α, d.β), 0:k)
 end
 
-function expected_model_probabilities(d::BetaBinomialConditionalUrnDistribution)
+function expected_model_probabilities(d::BetaBinomialConditionalUrnDistribution, compact::Bool = false)
 	incl_probs  = expected_inclusion_probabilities(d)
 	no_models_with_incl = expected_inclusion_counts(length(d))
-	
-	# probability of j equalities for j in 1...k
 	probs = incl_probs ./ no_models_with_incl
-	result = Vector{Float64}(undef, sum(no_models_with_incl))
-	index = 1
-	for i in eachindex(probs)
-		result[index:index + no_models_with_incl[i] - 1] .= probs[i]
-		index += no_models_with_incl[i]
+
+	# TODO: this compact creates type instabilities!
+	if compact
+
+		result = hcat(0:length(d)-1, no_models_with_incl, probs)
+
+	else
+
+		# probability of j equalities for j in 1...k
+		result = Vector{Float64}(undef, sum(no_models_with_incl))
+		index = 1
+		for i in eachindex(probs)
+			result[index:index + no_models_with_incl[i] - 1] .= probs[i]
+			index += no_models_with_incl[i]
+		end
 	end
 	return result
 end

@@ -1,6 +1,6 @@
 module EqualitySampler
 
-import Distributions, Random, LinearAlgebra, Memoize
+import Distributions, Random, LinearAlgebra, Memoize, SpecialFunctions
 import StatsBase: countmap
 import OrderedCollections: OrderedDict
 
@@ -11,6 +11,13 @@ export
 	BetaBinomialConditionalUrnDistribution,
 	stirlings2,
 	stirlings2r,
+	logstirlings2,
+	logstirlings2r,
+
+	StirlingStrategy,
+	ExplicitStrategy,
+	RecursiveStrategy,
+
 	bellnumr,
 	count_combinations,
 	count_distinct_models,
