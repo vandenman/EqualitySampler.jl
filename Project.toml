@@ -45,7 +45,7 @@ StatsBase = "0.33"
 StatsFuns = "0.9"
 StatsModels = "0.6"
 StatsPlots = "0.14"
-Turing = "0.15.0 - 0.15.8"
+Turing = "0.15.0 - 0.15.8, 0.15"
 Zygote = "0.1 - 0.6"
 
 [extras]
