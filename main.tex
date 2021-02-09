@@ -146,7 +146,17 @@ where $\phi$ are nuisance parameters (in case they exist), such as the variances
 % I think it makes sense to first explain why we use partitions
 
 \subsection{Partitions}
-The space of possible equality constraints for some parameter vector $\mathbf{\theta} = (\theta_1, \ldots, \theta_k)$ of size $k$ is equivalent to the partitions of that vector. For example, if $k = 3$ then the model that states $\theta_1 = \theta_2 \neq \theta_3$ is equivalent to the partition $\{\{\theta_1, \theta_2\}, \{\theta_3\}\}$. This equivalence is useful as partitions have been studied extensively in combinatorics. Given $k$ parameters, the number of partitions of size $j$ is given by the Stirling numbers of the second kind, denoted $\stirling{k}{j}$. The total number of partitions is given by the $k$\textsuperscript{th}-Bell number, which is defined as a sum over the Stirling numbers:
+The space of possible equality constraints for some parameter vector $\mathbf{\theta} = (\theta_1, \ldots, \theta_k)$ of size $k$ is equivalent to the partitions of that vector. For example, if $k = 3$ then the model that states $\theta_1 = \theta_2 \neq \theta_3$ is equivalent to the partition $\{\{\theta_1, \theta_2\}, \{\theta_3\}\}$. The space of possible models for $k = 4$ is shown in Figure~\ref{fig:partitions}.
+
+\begin{figure}
+    \centering
+    \includegraphics[height = 6cm, keepaspectratio]{figures/modelspace_4.pdf}
+    \caption{All possible models given $k = 4$, represented as partitions. Circles represent individual parameters and shaded regions indicate which parameters are equal.}
+    \label{fig:partitions}
+\end{figure}
+\DB{Do we want to follow APA7?}
+
+This equivalence is useful as partitions have been studied extensively in combinatorics. Given $k$ parameters, the number of partitions of size $j$ is given by the Stirling numbers of the second kind, denoted $\stirling{k}{j}$. The total number of partitions is given by the $k$\textsuperscript{th}-Bell number, which is defined as a sum over the Stirling numbers:
 \begin{equation}
     \bellnum{k} = \sum_{i = 0}^k \stirling{k}{j} \enspace .
 \end{equation}
@@ -160,7 +170,7 @@ The Stirling numbers and Bell numbers can be generalized to the $r$-Stirling \pa
 Note that $\rstirling{k}{j}{1} = \stirling{k}{j}$ and that $\rbellnum{k}{0} = \bellnum{k}$. Both the $r$-Stirling and $r$-Bell are defined through recurrence relations, although explicit expressions exist which are easier to compute for large values. See \textcite{broder1984r} and \textcite{mezo2011r} for details.
 
 \subsection{Urn Schemes}
-Statistically, we represent the different partitions using an urn with $K$ different balls labeled 1 through $K$. For each parameter $\theta_i$, a ball $b_i$ is drawn from the urn with $b_i \in \{1,K\}$. If two drawn balls are equal then, $b_i = b_j$, then the two parameters are assigned to the same subset of the partition, i.e., the two parameters, $\theta_i$ and $\theta_j$, are equal if $b_i = b_j$. Note that different draws from an urn can represent the same partition. For example, the draws $(1, 1, 2)$ and $(3, 3, 1)$ both represent the partition $\{\{\theta_1, \theta_2\}, \{\theta_3\}, \{\}\}$. The prior distributions introduced in the next sections assign probabilities to the unique partitions. The prior probability for a particular draw can be obtained by dividing the probability of the corresponding partition by the total number of draws that correspond to that partition. The total number of draws that represent the same partition is given by $d!\binom{k}{d}$ where $d$ is the number of non-empty subsets of a particular draw. 
+Statistically, we represent the different partitions using an urn with $K$ different balls labeled 1 through $K$. For each parameter $\theta_i$, a ball $b_i$ is drawn from the urn with $b_i \in \{1,K\}$. If two drawn balls are equal, $b_i = b_j$, then the two parameters are assigned to the same subset of the partition, i.e., the two parameters, $\theta_i$ and $\theta_j$, are equal if $b_i = b_j$. Note that different draws from an urn can represent the same partition. For example, the draws $(1, 1, 2)$ and $(3, 3, 1)$ both represent the partition $\{\{\theta_1, \theta_2\}, \{\theta_3\}\}$. The prior distributions introduced in the next sections assign probabilities to the unique partitions. The prior probability for a particular draw can be obtained by dividing the probability of the corresponding partition by the total number of draws that correspond to that partition. The total number of draws that represent the same partition is given by $d!\binom{k}{d}$ where $d$ is the number of non-empty subsets of a particular draw. 
 
 % not sure how to bring this up
 Although the urn consists of $K$ different balls, the event of interest is the whether the next ball drawn equals one of the balls already drawn. In other words, whether an equality or inequality is introduced. This event reduces the urn to a P\'{o}lya urn. All prior distributions discussed below are related to the P\'{o}lya urn.
@@ -176,7 +186,6 @@ Specifically, the joint prior distribution on $(\theta_1, \ldots, \theta_K)$ is 
 
 where $\zeta_i$ denotes a new value for $\theta_i$ and $\theta_1 = \zeta_1$; and $\theta_i^{\star}$ denotes a value equal to any previously observed value. We characterize the priors we discuss in the next section in terms of (\ref{eq:prediction-rule}), which is known as a \textit{prediction rule} \parencite[e.g.,][]{ishwaran2001gibbs}; in terms of the expected number of clusters; and, most importantly, in terms of their penalty for multiplicity.
 
-\DB{Bring up Polya urns here. Mention that all priors are related to these urns. }
 \FD{\textcite{ishwaran2001gibbs} might be useful, they use Polya Urns to derive a Gibbs sampler. They say it can be used for the Dirichlet process, but also for \textit{any} prior with known \textit{prediction rule}, which is defined as $P(Y_{n+1} \mid Y_1, \ldots, Y_n)$. I think this is a useful description which allows us to distinguish between several priors (Dirichlet, Pittman-Yor, Beta-binomial, etc.). Maybe note this here and then we refer to the next sections, in which we discuss the priors in slightly more detail?}
 % We want to make inference over all possible partitions of some population parameter vector $\mathbf{\theta} = (\theta_1, \ldots, \theta_k)$ of size $k$. Each such partition corresponds do one particular hypothesis. The number of partitions $k$ is given by the Bell number
 
