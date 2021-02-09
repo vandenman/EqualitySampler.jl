@@ -10,15 +10,17 @@
 \usepackage{caption, subcaption}
 \usepackage{booktabs}
 \usepackage{float}
+\usepackage{nicefrac}
+\usepackage[colorlinks=true, allcolors=blue, bookmarks=false]{hyperref}
 
 \usepackage{todonotes}
 \newcommand{\DON}[1]{\todo[inline, color = white]{Don: #1}}
 
 
 \usepackage[style=apa,sortcites=true,sorting=nyt,backend=biber]{biblatex}
-\addbibresource{references.bib}
+\addbibresource{../references.bib}
 
-
+    
 \newcommand{\bindicator}{\gamma}% binary indicator
 \newcommand{\cindicator}{\kappa}% categorical indicator
 
@@ -34,6 +36,63 @@
 \begin{document}
 
 \maketitle
+
+\section{Outline}
+
+\begin{itemize}
+    \item Motivation: Multiple comparison, more elegant to look at all partitions (question of probability spreading out); but could also implement only pairwise comparisons (compare the two to show it is more elegant; explore paradoxical situations)
+    \item Compare to Dirichlet Process Prior \parencite{gopalan1998bayesian}
+    \item Section on the beta-binomial prior (literature on shrinkage)
+    \item Apply it to ANOVA
+\end{itemize}
+
+\section{Todo}
+\begin{itemize}
+    \item Don creates Scott and Berger plots
+    \item Don drafts methods section
+    \item Fabian drafts introduction
+    \item Fabian fixes Gopalan and Berry implementation (in R or Julia)
+    \item Don fixes ANOVA implementation \checkmark
+    \item Don fixes beta-binomial prior in Turing \checkmark
+    \item Fabian puts bfvartest on CRAN
+    \item Don and Fabian read Gibbs sampler \textcite{gopalan1998bayesian} \checkmark
+    \item Don implements the uniform prior \checkmark
+    \item Fabian looks into relationship between Dirichlet Process prior and beta-binomial prior \checkmark
+    \begin{itemize}
+        \item Figured out how to count the number of equalities, see bottom of this document
+        \item One interesting thing: the beta-binomial treats the models $(\mu_1 = \mu_2, \mu_3 = \mu_4)$ as the same as $(\mu_1 = \mu_2 = \mu_3, \mu_4$), while the Dirichlet process prior puts more prior mass on the latter model.
+    \end{itemize}
+    \item Don adjusts prior so that it is uniform over all equalities. Also, how does the induced prior on the number of equalities look like when the prior on the models is uniform? \checkmark
+    \item Fabian reads up on subsequent work that cites \textcite{gopalan1998bayesian} \checkmark
+\end{itemize}
+
+\section{Comments}
+\begin{itemize}
+    \item If we want to use regression, then the predictors are likely correlated, which would probably merit a different approach compared to, say, ANOVA, where we randomly assign groups
+    \item It would be good to think about how would one go about doing multiple pairwise tests without our method, and whether there are any paradoxes lurking (for example, one can reject the full model but find no evidence of any pairwise differences --- this could be a another selling point of our method)
+    \item A uniform prior over the model space does not lead to multiplicity control \parencite{de2019bayesian, scott2010bayes}.
+    \item So \textcite{de2019bayesian} looked at multiplicity control in his thesis. From a glance, it seems that he implemented a null control method (ala Jeffreys and West, similar to Bonferroni), but failed to apply the idea from \textcite{scott2006exploration} to the case of ANOVA. So what is implemented in JASP right now?
+    \item Tim is only looking at pairwise comparisons, probably because these can be efficiently computed, that is, there is no explosion of possibilities that we have by looking at all partitions. However, for small number of groups, say $k = 5$ or $k = 6$, the Bell numbers are 15 and 52, respectively, and so one could compute the marginal likelihood of all partitions. Using a particular model prior, one would then adjust for multiplicity. So maybe our use case is not particularly strong, actually. It seems that we're solving the $20 > k > 6$ problem. Is that so groundbreaking? \textcite{kang2017objective} seem to tackle the small $k$ case for multiple comparisons on variances using a fractional Bayes factor
+\end{itemize}
+
+\section{Literature}
+\begin{itemize}
+    \item \textcite{rao2009multiple} provides an extensive bibliography of the multiple comparison literature; distinguishes between MCA (all-pairwise comparisons), MCB (multiple comparisons with the best), MCC (multiple comparisons with a control), and MCM (multiple comparisons with the mean)
+    \item \textcite{gutierrez2019bayesian} implement a non-parametric test for the MCC case
+    \item \textcite{gopalan1998bayesian} study the \textit{exact} same problem we have, in the context of the comparison of population means. They use a Dirichlet Process prior and Gibbs sampling. We need to read this paper!
+    \begin{itemize}
+        \item I think this is very elegant. However, the prior is fully determined by two parameters: the number of groups $k$ and a concentration parameter $M$. As $M \rightarrow 0$, we have that $P(\mathcal{H}_0) \rightarrow 1$, and that as $M \rightarrow \infty$, we have that $P(\mathcal{H}_N) \rightarrow 1$. Similarly, all partitions have equal prior probability (e.g., $\mu_1 = \mu_2$ is equally likely as $\mu_3 = \mu_4$) --- but we have that as well currently.
+        \item Their method is also quite straightforward, and a Gibbs sampler is easily developed. The probability that $\mu_i$ is equal to any of the previous means is given by $\nicefrac{M}{M + k - 1}$.
+        \item How is our approach related to theirs? It seems we must be able to transform our prior into theirs, and then get equivalent results. I think it makes sense to study their prior for various combinations of $k$ and $M$ and to see how our beta-binomial prior matches this. It seems that ours is more flexible? We should explore this and see if our approach is still valuable. What about computational feasibility? Maybe it is better to find some generalization of the Dirichlet Process prior that is more flexible, but can be efficiently implemented? For example the \href{https://en.wikipedia.org/wiki/Pitman\%E2\%80\%93Yor\_process}{Pitman-Yor process}.
+    \end{itemize}
+    \item \textcite{berry1999bayesian} provide an overview of Bayesian methods for adjusting for multiplicity, also discussing \textcite{gopalan1998bayesian}. Seems important for context, and it looks like their paper is more accessible than \textcite{gopalan1998bayesian}.
+    \item \textcite{kim2009spiked} use a Dirichlet Process prior for random effects models.
+    \item \textcite{curtis2011bayesian} also use a Dirichlet Process prior to cluster highly correlated predictors in linear regression. (``In our model highly correlated predictors can be grouped together by setting their corresponding coefficients exactly equal.'')
+    \item \textcite{dunson2008bayesian} use a Dirichlet process prior for clustering in the context of genetics.
+    \item \textcite{castillo2020spike} show that spike-and-slab variable selection has good frequentist multiple testing properties (they only study inclusion, not pairwise equality; however, inclusion in the case of ANOVA under dummy coding would translate into non-equivalence of groups; let's think about various codings)
+    \item \textcite{canale2017pitman} discuss the Pitman-Yor process instead of the Dirichlet Process
+\end{itemize}
+
 
 Note, this is written chronologically from how I went from A to B. This is probably not a good way to present this to a journal.
 I'm not entirely sure whether we should frame the problem as a graph or as the counting of partitions.
@@ -168,6 +227,19 @@ So far I've not encountered any issues with this yet, but maybe we will when $K$
 As in Linear regression, a uniform distribution over models is not uniform over the number of equality constraints.
 To achieve this, we implement a beta-binomial penalty.
 First, we need to count the number of models with $k$ number of equality constraints for $k=1,\,\dots,\,K$.
+
+\subsection*{Dirichlet Process Prior}
+For the DPP, not only the number of equalities but also their position matters. For example, while the beta-binomial treats the models $(\mu_1 = \mu_2, \mu_3 = \mu_4)$ as the same as $(\mu_1 = \mu_2 = \mu_3, \mu_4$), the Dirichlet process prior puts more prior mass on the latter model.
+
+Following \textcite{gopalan1998bayesian}, we write $(\mu_1, \ldots, \mu_k) \in C(m_1, \ldots, m_k)$ if there are $m_1$ distinct values of $\mu$ that occur exactly once, $m_2$ distinct values of $\mu$ that occur exactly twice, $\ldots$, and $m_k$ distinct values of $\mu$ that occur exactly $k$ times. The number of models with $k$ number of equality constraints is then given by:
+
+\begin{equation}
+    \prod_{j = 1}^K \frac{1}{C[j]}{K - j + 1 \choose C[j]} \enspace .
+\end{equation}
+
+The reasoning is as follows. Suppose that we have 2 equality constraints in a group of five, which could look like this $(\mu_1 = \mu_2, \mu_3 = \mu_4, \mu_5) \in C(1, 2, 0, 0, 0)$. How many models such as this are there? There are ${5 \choose 1} = 5$ possible parameters that could be different from the rest. Once this parameter is fixed, we need to count possibilities for the four others; hence we continue as if we only had 4 parameters left. There are ${4 \choose 2} = 6$ ways in which two parameters can be equal, but this overcounts by a factor of two since $(\mu_1 = \mu_2, \mu_3 = \mu_4)$ is the same as $(\mu_3 = \mu_4, \mu_1 = \mu_2$). Hence we have ${5 \choose 1} \times {4 \choose 2} \times \frac{1}{2} = 15$ models that have 2 equality constraints in five groups.
+
+
 
 \printbibliography
 
