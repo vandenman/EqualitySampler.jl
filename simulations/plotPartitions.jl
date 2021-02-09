@@ -101,7 +101,7 @@ function make_shape(model, k, x, y, no_points = 32, pointscale = .15)
 end
 
 
-function make_grid(k; max_per_row = 5)
+function make_grid(k, vertical::Bool = true; max_per_row = 5)
 
 	incl = reverse!(EqualitySampler.expected_inclusion_counts(k))
 	total = sum(incl)
@@ -132,14 +132,24 @@ function make_grid(k; max_per_row = 5)
 		# @show i, no_cols, currentInclValue, currentInclIdx
 	end
 
-	g = Plots.GridLayout(total_no_rows, 1)
-	for i in 1:total_no_rows
-		g[i, 1] = Plots.GridLayout(1, no_cols[i])
+	if vertical
+		g = Plots.GridLayout(total_no_rows, 1)
+		for i in 1:total_no_rows
+			g[i, 1] = Plots.GridLayout(1, no_cols[i])
+		end
+
+		max_no_cols = maximum(no_cols)
+		return g, total_no_rows, max_no_cols
+	else
+
+		g = Plots.GridLayout(1, total_no_rows)
+		for i in 1:total_no_rows
+			g[1, i] = Plots.GridLayout(no_cols[i], 1)
+		end
+
+		max_no_cols = maximum(no_cols)
+		return g, max_no_cols, total_no_rows
 	end
-
-	max_no_cols = maximum(no_cols)
-	return g, total_no_rows, max_no_cols
-
 end
 
 function ordering(x)
@@ -155,12 +165,12 @@ function ordering(x)
 	return res
 end
 
-function plot_modelspace(k::Integer, save::Bool = true)
+function plot_modelspace(k::Integer, save::Bool = true, vertical::Bool = true)
 
 	models = generate_distinct_models(k)
 	order = sortperm(ordering.(eachcol(models)), lt = !isless)
 	plots = [plot_model(view(models, :, i)) for i in order]
-	layout, max_rows, max_cols = make_grid(k)
+	layout, max_rows, max_cols = make_grid(k, vertical)
 	w = 100
 	plt = plot(plots..., layout = layout, size = (max_cols*w, max_rows*w))
 	save && savefig(plt, "figures/modelspace_$k.pdf")
