@@ -133,10 +133,12 @@ function model_pmf(D; yaxis = :log, legend = true, xrotation = 45, xfontsize = 8
 		ycoords = [yval, yval]
 		if isone(incl_size[i])
 			xcoords = [xstart + 0.5, xstart + 0.5]
-			scatter!(plt, xcoords, ycoords, m = 4, label = string(incl_size[i]), yaxis = yaxis, color = i);
+			scatter!(plt, xcoords, ycoords, m = 4, label = string(incl_size[i]), yaxis = yaxis,
+					 color = i, markerstrokecolor = i);
 		else
 			xcoords = [xstart, xstart + incl_size[i]]
-			plot!(plt, xcoords, ycoords, lw = 4, label = string(incl_size[i]), yaxis = yaxis, color = i);
+			plot!(plt, xcoords, ycoords, lw = 4, label = string(incl_size[i]), yaxis = yaxis,
+				  color = i);
 		end
 		cumulative_sum += incl_size[i]
 		xstart += incl_size[i]
@@ -146,8 +148,8 @@ end
 
 function incl_pmf(D::AbstractConditionalUrnDistribution; yaxis = :log, palette = :default)
 	k = length(D)
-	plt = scatter(0:k-1, expected_inclusion_probabilities(D), m = 4, yaxis = yaxis, legend = false, color = 1:k,
-					palette = palette);
+	plt = scatter(0:k-1, expected_inclusion_probabilities(D), m = 4, yaxis = yaxis, legend = false,
+				  color = 1:k, markerstrokecolor = 1:k, palette = palette);
 	return plt
 end
 
