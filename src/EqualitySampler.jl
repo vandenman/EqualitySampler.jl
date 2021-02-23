@@ -27,6 +27,7 @@ export
 	expected_model_probabilities,
 	expected_inclusion_counts,
 	expected_inclusion_probabilities,
+	log_expected_inclusion_counts,
 	empirical_model_probabilities,
 	empirical_inclusion_probabilities,
 	generate_distinct_models

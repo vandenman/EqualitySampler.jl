@@ -173,12 +173,16 @@ function plot_modelspace(k::Integer, save::Bool = true, vertical::Bool = true)
 	layout, max_rows, max_cols = make_grid(k, vertical)
 	w = 100
 	plt = plot(plots..., layout = layout, size = (max_cols*w, max_rows*w))
-	save && savefig(plt, "figures/modelspace_$k.pdf")
+	if save
+		orientation = vertical ? "vertical" : "horizontal"
+		name = "figures/modelspace_$(k)_$(orientation).pdf"
+		savefig(plt, name)
+	end
 	return plt
 end
 
-plot_modelspace(5, false)
+plot_modelspace(5, false, false)
 
 for k in 3:6
-	plot_modelspace(k)
+	plot_modelspace(k, true, false)
 end

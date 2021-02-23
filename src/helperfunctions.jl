@@ -1,3 +1,4 @@
+import OrderedCollections: OrderedDict
 get_eq_ind_nms(samples) = filter(x->startswith(string(x), "equal_indices"), samples.name_map.parameters)
 function get_eq_samples(samples)
 	eq_ind_nms = get_eq_ind_nms(samples)
@@ -53,7 +54,7 @@ function compute_model_probs(chn, add_missing_models::Bool = true)
 	for (model, count) in count_models
 		probs_models[model] = count / total_visited
 	end
-	return sort(probs_models, by=x->count_equalities(x))
+	return sort!(OrderedDict(probs_models), by=x->count_equalities(x))
 end
 
 """
@@ -92,7 +93,7 @@ function counts2probs(counts::Dict{T, Int}) where T
 	return probs
 end
 
-function count_equalities(sampled_models)
+function count_equalities(sampled_models::AbstractMatrix)
 
 	k, n = size(sampled_models)
 	result = Vector{Int}(undef, n)
