@@ -162,9 +162,9 @@ function _pdf(d::BetaBinomialConditionalUrnDistribution)
 	model_probs_by_incl = exp.(d._log_model_probs_by_incl)
 	# model_probs_by_incl = exp.(Distributions.logpdf.(Distributions.BetaBinomial(n0 - 1, d.α, d.β), 0:n0 - 1) .- log.(expected_inclusion_counts(n0)))
 
-	num = sum(model_probs_by_incl[k] * stirlings2r(n - 1, n0 - k + 1, r    ) for k in 1:n0)
-	den = sum(model_probs_by_incl[k] * stirlings2r(n    , n0 - k + 1, r + 1) for k in 1:n0)
-	probEquality = r*num / (r*num + den)
+	num = r * sum(model_probs_by_incl[k] * stirlings2r(n - 1, n0 - k + 1, r    ) for k in 1:n0)
+	den =     sum(model_probs_by_incl[k] * stirlings2r(n    , n0 - k + 1, r + 1) for k in 1:n0)
+	probEquality = num / (num + den)
 
 	probs = Vector{Float64}(undef, n0)
 
