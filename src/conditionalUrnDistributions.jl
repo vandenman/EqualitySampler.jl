@@ -20,18 +20,38 @@ function get_conditional_counts(n::Int, known::AbstractVector{T} = [1], include_
 	# TODO: just pass d.partitions and d.index to this function! (or just d itself)
 	# then we can get rid of the include_new and use dispatch, although it might duplicate some code
 	# or maybe not?
-	known = reduce_model(known) # TODO: I don't think this is necessary!
+	# NOTE: profiling shows that reduce_model is by far the most expensive function here
+
+	# known = reduce_model(known) # TODO: double check that this is unnecessary!
 	refinement = length(unique(known))
 	n_known = length(known)
 
 	res = zeros(Int, n_known + (include_new ? 1 : 0))
-	idx = findall(i->known[i] == i, 1:n_known)
+	# idx = findall(i->known[i] == i, 1:n_known) # This step fails when not doing reduce_model
+	idx = get_idx_for_conditional_counts(known)
+
 	n_idx = length(idx)
 	res[idx] .= bellnumr(n - n_known - 1, n_idx)
 	if include_new
 		res[n_known + 1] = bellnumr(n - n_known - 1, n_idx + 1)
 	end
 	res
+end
+
+function get_idx_for_conditional_counts(known)
+
+	idx = Vector{Int}(undef, length(Set(known)))
+	s = Set{Int}()
+	count = 1
+	for i in eachindex(known)
+		if known[i] ∉ s
+			idx[count] = i
+			count += 1
+			push!(s, known[i])
+		end
+	end
+	idx
+
 end
 
 count_equalities(urns::AbstractVector{T}) where T <: Integer = length(urns) - length(Set(urns))
@@ -104,14 +124,15 @@ struct BetaBinomialConditionalUrnDistribution{T, U<:AbstractVector{T}} <: Abstra
 	index::T
 	α::Float64
 	β::Float64
-	# logpdf::Vector{Float64}
+	_log_model_probs_by_incl::Vector{Float64}
 	function BetaBinomialConditionalUrnDistribution(urns::U, index::T = 1, α::Float64 = 1.0, β::Float64 = 1.0) where {T <: Integer, U <: AbstractVector{T}}
 		n = length(urns)
 		all(x-> one(T) <= x <= n, urns) || throw(DomainError(urns, "condition: 0 < urns[i] < length(urns) ∀i is violated"))
 		one(T) <= index <= n || throw(DomainError(urns, "condition: 0 < index < length(urns) is violated"))
 		0.0 <= α || throw(DomainError(α, "condition: 0 <= α is violated"))
 		0.0 <= β || throw(DomainError(β, "condition: 0 <= β is violated"))
-		new{T, U}(urns, index, α, β)
+		log_model_probs_by_incl = Distributions.logpdf.(Distributions.BetaBinomial(n - 1, α, β), 0:n - 1) .- log_expected_inclusion_counts(n)
+		new{T, U}(urns, index, α, β, log_model_probs_by_incl)
 	end
 end
 
@@ -138,7 +159,8 @@ function _pdf(d::BetaBinomialConditionalUrnDistribution)
 	n = n0 - (index - r - 1)
 
 	# TODO: this could also be stored inside d...
-	model_probs_by_incl = exp.(Distributions.logpdf.(Distributions.BetaBinomial(n0 - 1, d.α, d.β), 0:n0 - 1) .- log.(expected_inclusion_counts(n0)))
+	model_probs_by_incl = exp.(d._log_model_probs_by_incl)
+	# model_probs_by_incl = exp.(Distributions.logpdf.(Distributions.BetaBinomial(n0 - 1, d.α, d.β), 0:n0 - 1) .- log.(expected_inclusion_counts(n0)))
 
 	num = sum(model_probs_by_incl[k] * stirlings2r(n - 1, n0 - k + 1, r    ) for k in 1:n0)
 	den = sum(model_probs_by_incl[k] * stirlings2r(n    , n0 - k + 1, r + 1) for k in 1:n0)
@@ -156,9 +178,9 @@ function _pdf(d::BetaBinomialConditionalUrnDistribution)
 	inequality_options = setdiff(1:n0, v_known_urns)
 	probs[inequality_options] .= (1 - probEquality) ./ length(inequality_options)
 
-	if !Distributions.isprobvec(probs)
-		@show d, probs
-	end
+	# if !Distributions.isprobvec(probs)
+	# 	@show d, probs
+	# end
 	return probs
 
 end
@@ -174,10 +196,12 @@ function expected_inclusion_probabilities(k::Integer)
 	counts = expected_inclusion_counts(k)
 	return counts ./ sum(counts)
 end
+log_expected_inclusion_counts(k::Integer) = logstirlings2.(k, k:-1:1)
 
 expected_model_probabilities(d::UniformConditionalUrnDistribution) = expected_model_probabilities(length(d))
 expected_inclusion_counts(d::UniformConditionalUrnDistribution) = expected_inclusion_counts(length(d))
 expected_inclusion_probabilities(d::UniformConditionalUrnDistribution) = expected_inclusion_probabilities(length(d))
+log_expected_inclusion_counts(d::UniformConditionalUrnDistribution) = log_expected_inclusion_counts(length(d))
 
 function expected_inclusion_probabilities(d::BetaBinomialConditionalUrnDistribution)
 	k = length(d) - 1
