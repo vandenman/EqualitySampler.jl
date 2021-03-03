@@ -94,7 +94,7 @@
         \item Introduce priors and classify them according to prediction rule and prior over partitions
         \item Priors are
         \begin{itemize}
-            \item Pitman-Yor Process \parencite{ishwaran2001bayesian, pitman1996some}, which simplifies to Dirichlet Process Prior \parencite{gopalan1998bayesian}. The problem with this prior is that it is not consistent \parencite{miller2013simple, miller2018mixture}
+            \item Dirichlet Process Prior \parencite{gopalan1998bayesian}. The problem with this prior is that it is not consistent \parencite{miller2013simple, miller2018mixture}
             \item Uniform Process \parencite{wallach2010alternative}. The problem is that this does not lead to an exchangeable partition.
             \item Beta-Binomial prior. Motivate through analogy with regression \parencite{scott2006exploration, scott2010bayes}.
         \end{itemize}
@@ -124,29 +124,29 @@ Assessing the equality or inequality of groups is a key problem in science and a
 
 If a confirmatory hypothesis is lacking, a standard approach is to first test whether all groups are equal, and if not, engage in multiple post-hoc comparisons. A large swathe of multiple comparisons techniques to guard against inflated false positive errors exist in classical statistics dating back to the work of John Tukey and others \parencite[][]{rao2009multiple, benjamini2002john}. From a Bayesian perspective, the problem of multiple comparisons can be addressed by changing the model prior \parencite{jeffreys1961theory, westfall1997bayesian, berry1999bayesian}, which has found prominent application in variable selection for regression \parencite[e.g.,][]{scott2006exploration, scott2010bayes}. Here, we focus on a Bayesian multiplicity adjustment for testing the (in)equality of a set of groups by proposing a prior distribution over all possible partitions. This allows the researcher to explore the set of all possible equality and inequality relations among the groups while penalizing for multiple comparisons, a feat that is difficult to solve in a principled manner in classical statistics.
 
-The paper is structured as follows. In Section 1, we briefly review the Bayesian literature on multiple comparison and specify the setup. In Section 2, we describe the Polya urn scheme from which a number of priors can be derived that account for multiplicity. We focus on four such priors in Section 3, and present a simulation study comparing them. In Section 4, we illustrate our method on practical examples related to the comparison of means, variances, and proportions. Our method is available in the Julia package \textit{EqualitySelection}.
+The first to propose a prior over all partitions to adjust for multiple hypotheses testing were, to our knowledge, \textcite{gopalan1998bayesian}, who suggested the Dirichlet Process (DP). As the authors admit this prior --- being governed by a single parameter --- lacks flexibility. Additionally, \textcite{miller2013simple} recently showed that the DP is inconsistent in selecting the correct number of partitions. The Pitman-Yor (PY) process is a generalization of the DP that increases flexibility \parencite{pitman1997two}. The PY yields similarly inconsistent inferences, however \parencite{miller2014inconsistency}. Moreover, both the DP and the PY assume a ``rich-get-richer'' structure which may be undesirable in the context of multiple comparisons.
+
+To overcome these issues we propose a class of flexible Beta-binomial priors for Bayesian multiple comparison adjustment, inspired by recent work on variable selection in regression \parencite{scott2006exploration, scott2010bayes}. The paper is structured as follows. In Section \ref{sec:methodology}, we briefly review the Bayesian literature on multiple comparison, setup the problem we tackle, and describe the Polya urn scheme from which a number of priors can be derived that account for multiplicity. We characterize four such priors --- the DP, the PY, a uniform prior, and the Beta-binomial prior --- in Section \ref{sec:priors}. In Section \ref{sec:simulation-study} we present a simulation study comparing them. In Section \ref{sec:applications}, we illustrate our method on practical examples related to the comparison of means, variances, and proportions. Our method is available in the Julia package \textit{EqualitySelection}.
 
 
-\section{Problem Setup}
+\section{Methodology} \label{sec:methodology}
+\subsection{Problem Setup}
 Our goal is to adjust for multiple comparisons in a flexible manner. Multiple comparisons are not a problem if a researcher wishes to compare only two hypothesis, denote them as $\mathcal{H}_0$ and $\mathcal{H}_1$. They way to do this is through use of the Bayes factor \parencite[e.g.,][]{kass1995bayes, ly2016harold}, which is given by:
 
 \begin{equation}
-    BF_{10} \equiv \frac{p(\mathcal{D} \mid \mathcal{H}_1)}{p(\mathcal{D} \mid \mathcal{H}_0)} \enspace ,
+    \text{BF}_{10} \equiv \frac{p(\mathcal{D} \mid \mathcal{H}_1)}{p(\mathcal{D} \mid \mathcal{H}_0)} \enspace ,
 \end{equation}
 
 where $\mathcal{D} = (Y_1, \ldots, Y_n)$ is the data. The Bayes factor does not depend on the number of hypotheses a researcher wishes to test. It is the same regardless of whether the researcher, say, is a neuroscientist and tests whether there is activity in one voxel or in $10,000$. A principled way to account for multiplicity is by adjusting the prior probability of the hypotheses \parencite[e.g.,][]{jeffreys1961theory, westfall1997bayesian}.
 
-Suppose the researcher is interested in comparing $K$ groups, parameterized by $\theta = (\theta_1, \ldots, \theta_K)$. She is not only interested in whether all parameters are equal ($\mathcal{H}_0$) or whether they are unequal ($\mathcal{H}_1$), but also which pairs of parameters are equal or not. In the language of classical statistics, she is interested in post-hoc comparisons. We focus on a Bayesian solution to this problem in this paper. More specifically, going beyond classical tests, we consider the problem of assessing all possible equalities and inequalities between the groups. In general terms, the inference problem is:
+Suppose the researcher is interested in comparing $k$ groups, parameterized by $\theta = (\theta_1, \ldots, \theta_k)$. She is not only interested in whether all parameters are equal ($\mathcal{H}_0$) or whether they are unequal ($\mathcal{H}_1$), but also which pairs of parameters are equal or not. In the language of classical statistics, she is interested in post-hoc comparisons. We focus on a Bayesian solution to this problem in this paper. More specifically, going beyond classical tests, we consider the problem of assessing all possible equalities and inequalities between the groups. In general terms, the inference problem is:
 \begin{align*}
     \theta &\sim \pi_{\theta}(.) \\
     \phi &\sim \pi_{\phi}(.) \\
     Y_i &\overset{i.i.d.}{\sim} P(Y_i \mid \theta, \phi)  \enspace ,
 \end{align*}
-where $\phi$ are nuisance parameters (in case they exist), such as the variances in an ANOVA, and $P$ is the likelihood. Using the posterior distribution of $\theta$, we can restate $\mathcal{H}_0$ as $p(\theta_1 = \theta_2 = \ldots = \theta_K \mid \mathcal{D})$ and $\mathcal{H}_1$ as $p(\theta_1 \neq \theta_2 \neq \ldots \neq \theta_K \mid \mathcal{D})$, but there are many more possible hypotheses, depending on the combination of equalities and inequalities. In the next section, we discuss and compare priors $\pi_{\theta}$ that allow for flexible multiplicity adjustment.
+where $\phi$ are nuisance parameters (in case they exist), such as the variances in an ANOVA, and $P$ is the likelihood. Using the posterior distribution of $\theta$, we can restate $\mathcal{H}_0$ as $p(\theta_1 = \theta_2 = \ldots = \theta_K \mid \mathcal{D})$ and $\mathcal{H}_1$ as $p(\theta_1 \neq \theta_2 \neq \ldots \neq \theta_k \mid \mathcal{D})$, but there are many more possible hypotheses, depending on the combination of equalities and inequalities. In the next section, we discuss and compare priors $\pi_{\theta}$ that allow for flexible multiplicity adjustment.
 
-
-\section{Methodology}
-% I think it makes sense to first explain why we use partitions
 
 \subsection{Partitions}
 The space of possible equality constraints for some parameter vector $\mathbf{\theta} = (\theta_1, \ldots, \theta_k)$ of size $k$ is equivalent to the partitions of that vector. For example, if $k = 3$ then the model that states $\theta_1 = \theta_2 \neq \theta_3$ is equivalent to the partition $\{\{\theta_1, \theta_2\}, \{\theta_3\}\}$. The space of possible models for $k = 5$ is shown in Figure~\ref{fig:partitions}.
@@ -158,8 +158,8 @@ The space of possible equality constraints for some parameter vector $\mathbf{\t
     % I know the ordering on wikipedia is better, but I didn't quite figure out how they did that
     \label{fig:partitions}
 \end{figure}
-\DB{Do we want to follow APA7?}
-\FD{Only if it's nice. We're submitting to a statistics journal anyway.}
+%\DB{Do we want to follow APA7?}
+%\FD{Only if it's nice. We're submitting to a statistics journal anyway.}
 
 This equivalence is useful as partitions have been studied extensively in combinatorics. Given $k$ parameters, the number of partitions of size $j$ is given by the Stirling numbers of the second kind, denoted $\stirling{k}{j}$. The total number of partitions is given by the $k$\textsuperscript{th}-Bell number, which is defined as a sum over the Stirling numbers:
 \begin{equation}
@@ -178,20 +178,18 @@ Note that $\rstirling{k}{j}{1} = \stirling{k}{j}$ and that $\rbellnum{k}{0} = \b
 Statistically, we represent the different partitions using an urn with $K$ different balls labeled 1 through $K$. For each parameter $\theta_i$, a ball $b_i$ is drawn from the urn with $b_i \in \{1,K\}$. If two drawn balls are equal, $b_i = b_j$, then the two parameters are assigned to the same subset of the partition, i.e., the two parameters, $\theta_i$ and $\theta_j$, are equal if $b_i = b_j$. Note that different draws from an urn can represent the same partition. For example, the draws $(1, 1, 2)$ and $(3, 3, 1)$ both represent the partition $\{\{\theta_1, \theta_2\}, \{\theta_3\}\}$. The prior distributions introduced in the next sections assign probabilities to the unique partitions. The prior probability for a particular draw can be obtained by dividing the probability of the corresponding partition by the total number of draws that correspond to that partition. The total number of draws that represent the same partition is given by $d!\binom{k}{d}$ where $d$ is the number of non-empty subsets of a particular draw. 
 
 % not sure how to bring this up
-Although the urn consists of $K$ different balls, the event of interest is the whether the next ball drawn equals one of the balls already drawn. In other words, whether an equality or inequality is introduced. This event reduces the urn to a P\'{o}lya urn. All prior distributions discussed below are related to the P\'{o}lya urn.
-
-Specifically, the joint prior distribution on $(\theta_1, \ldots, \theta_K)$ is characterized by a (generalized) P\'{o}lya urn such that:
+Although the urn consists of $K$ different balls, the event of interest is the whether the next ball drawn equals one of the balls already drawn. In other words, whether an equality or inequality is introduced. This event reduces the urn to a P\'{o}lya urn. All prior distributions discussed below are related to the P\'{o}lya urn. Specifically, the joint prior distribution on $(\theta_1, \ldots, \theta_k)$ is characterized by a (generalized) P\'{o}lya urn such that:
 
 \begin{equation} \label{eq:prediction-rule}
-    P(\theta_i \mid \theta_1, \ldots, \theta_{i - 1}) = \begin{cases}
+    P(\theta_k \mid \theta_1, \ldots, \theta_{k - 1}) = \begin{cases}
     \zeta_i & \text{with probability } P_{\pi} \\
     \theta_i^{\star} & \text{with probability }  1- P_{\pi} \enspace ,
     \end{cases} \numberthis
 \end{equation}
 
-where $\zeta_i$ denotes a new value for $\theta_i$ and $\theta_1 = \zeta_1$; and $\theta_i^{\star}$ denotes a value equal to any previously observed value. We characterize the priors we discuss in the next section in terms of (\ref{eq:prediction-rule}), which is known as a \textit{prediction rule} \parencite[e.g.,][]{ishwaran2001gibbs}; in terms of the expected number of clusters; and, most importantly, in terms of their penalty for multiplicity.
+where $\zeta_i$ denotes a new value for $\theta_i$ and $\theta_1 = \zeta_1$; and $\theta_i^{\star}$ denotes a value equal to any previously observed value. We characterize the priors we discuss in the next section in terms of (\ref{eq:prediction-rule}), which is known as a \textit{prediction rule} \parencite[e.g.,][]{ishwaran2001gibbs}; in terms of the induced prior over partitions; and in terms of their penalty for multiplicity.
 
-\FD{\textcite{ishwaran2001gibbs} might be useful, they use Polya Urns to derive a Gibbs sampler. They say it can be used for the Dirichlet process, but also for \textit{any} prior with known \textit{prediction rule}, which is defined as $P(Y_{n+1} \mid Y_1, \ldots, Y_n)$. I think this is a useful description which allows us to distinguish between several priors (Dirichlet, Pittman-Yor, Beta-binomial, etc.). Maybe note this here and then we refer to the next sections, in which we discuss the priors in slightly more detail?}
+%\FD{\textcite{ishwaran2001gibbs} might be useful, they use Polya Urns to derive a Gibbs sampler. They say it can be used for the Dirichlet process, but also for \textit{any} prior with known \textit{prediction rule}, which is defined as $P(Y_{n+1} \mid Y_1, \ldots, Y_n)$. I think this is a useful description which allows us to distinguish between several priors (Dirichlet, Pittman-Yor, Beta-binomial, etc.). Maybe note this here and then we refer to the next sections, in which we discuss the priors in slightly more detail?}
 % We want to make inference over all possible partitions of some population parameter vector $\mathbf{\theta} = (\theta_1, \ldots, \theta_k)$ of size $k$. Each such partition corresponds do one particular hypothesis. The number of partitions $k$ is given by the Bell number
 
 % \begin{equation}
@@ -200,115 +198,44 @@ where $\zeta_i$ denotes a new value for $\theta_i$ and $\theta_1 = \zeta_1$; and
 
 % The Bell numbers grow very quickly, with the number of partitions for a vector $\mathbf{\theta}$ of size 10 being 21147.
 
-\subsection{Parametric or Nonparametric?}
-\textcite{quintana2006predictive} reviews \textit{product partition models} (PPM) and \textit{species sampling models} (SSM) \parencite{ishwaran2003generalized, pitman1996some}. Let $\rho = \{S_1, \ldots, S_K\}$ denote a partition. PPMs can be written as:
 
-\begin{equation}
-    p(\theta_1, \ldots, \theta_K \mid \rho) = \prod_{i=1}^K p_{S_i}(\theta_{S_i}) \enspace ,
-\end{equation}
-
-where $p_{S_i}(\theta_{S_i})$ depends only on $S_i$ and not on other subsets in the partition $\rho$. We have further:
-
-\begin{equation}
-    p(\rho) = \mathcal{Z} \prod_{i=1}^k c(S_i) \enspace ,
-\end{equation}
-
-where $\mathcal{Z}$ is a normalizing constant and $c(S_i) \geq 0$. Exchangeability holds if $c(S_i)$ depends only on $S_i$. This setup also yields a prediction rule, see \textcite[][Eq (7)]{quintana2006predictive}.
-
-The sequence $\{\theta_k\}$ is called a \textit{species sampling sequence} (SSS) if it is exchangeable and and satisfies:
-
-\begin{align}
-    \theta_1 &\sim \mathcal{G}_0 \\
-    \theta_{j + 1} \mid \theta_1, \ldots, \theta_j  &\sim \mathcal{G}_i \equiv \mathcal{G}_0 + \sum_{j=1}^k \delta_{\theta^{\star}_{j, k}}(.) \enspace ,
-\end{align}
-
-where the notation needs to be cleaned up. An important result is that the prior over partitions does only depend on the size of the partitions $|S_i|$ \parencite{quintana2006predictive}. $\mathcal{G}$ can be represented using a stick-breaking process, which unifies many priors (such as the DP, PY, etc.).
-
-It turns out that the nonparametric SSM above, when integrating out the infinite-dimensional object $\mathcal{G}$, leads to a parametric model for the partitions. For a large class of models, including all we discuss below, if $\theta$ is exchangeable, the parametric and nonparametric models imply the same model for the partitions \parencite{quintana2006predictive}. Some priors we discuss below, such as the DP and the PY, lead to nonparametric models while others, such as the BB and the U, lead to parametric models. Yet viewed from the perspective of partitions, both lead to parametric models. This is more suited to our problem because, in our case, the number of groups $K$ are fixed. Kingman's representation theorem says that every exchangeable random partition can be obtained by a SSS \parencite[e.g.,][]{lee2013defining}.
-
-\textcite{lee2013defining} provide three characterisations of the SSM in terms of (a) the prediction rule (which directly corresponds to the Urn scheme); (b) the implied prior over partitions; and (c) the construction of $\mathcal{G}$. They provide inference for a large class of SSM that generalize beyond the DP and have desirable properties.
-
-\textcite{muller2013bayesian} say that random partition model are called nonparametric due to mostly historical reasons.
-
-
-\subsection{Pitman-Yor Process}
-\subsubsection{Prediction Rule}
-Let $(\theta^{\star}_{1, i}, \ldots, \theta^{\star}_{m_i, i})$ be the unique set of values in $(\theta_1, \ldots, \theta_{i-1})$, each occuring with frequency $n^{\star}_{j, i}$ for $j = \{1, \ldots, m_i\}$. The Pitman-Yor process $\mathcal{PY}(a, b)$ has a prediction rule given by:
-
-\begin{equation}
-    P(\theta_K \mid \theta_1, \ldots, \theta_{K - 1}) = \frac{b + a m_K}{b + K - 1} \mathcal{G}_0 + \sum^{m_K}_{j = 1} \frac{n^{\star}_{j, K} - a}{b + K - 1} \delta_{\theta^{\star}_{j, K}}(.) \enspace ,
-\end{equation}
-
-where $\mathcal{G}_0$ is the base distribution \parencite{ishwaran2001gibbs, pitman1997two}.
-
-\subsubsection{Distribution over Partitions}
-Let $m$ be the number of clusters among $K$ groups. Under the Pitman-Yor process, we have that as $K \rightarrow \infty$, the expected number of unique clusters $m$ in a partition is given by \parencite[e.g.,][]{wallach2010alternative}:
-
-\begin{equation}
-    \mathbb{E}[m \mid K] \approx \frac{\Gamma\left(1 + b\right)}{a\Gamma\left(a + b\right)}K^a \enspace .
-\end{equation}
-
-\FD{Are these asymptotic results useful for our max $K = 15$ setting? It seems that it might make more sense to calculate them exactly through simulations.}
-
-\FD{\textcite{wallach2010alternative} show what the priors imply (asymptotically) in terms of the expected number of clusters of size $M$. So basically, what we force to be a Beta-binomial in our prior. I think it makes again sense to contrast this for the PY and the DP --- computed exactly through simulation --- with out beta-binomial.}
+\section{Priors} \label{sec:priors}
+Let $\mathbf{\theta^{\star}} = (\theta^{\star}_1, \ldots, \theta^{\star}_m)$ denote the vector of unique population parameters out of $\theta = (\theta_1, \ldots, \theta_k)$ and denote the number of repeats of $\theta^{\star}_j$ as $n^{\star}_j$. Let $\rho$ denote a partition and $|\rho|$ its size. For example, if $\rho = \{\{\theta_1, \theta_2\}, \{\theta_3\}\}$, then $|\rho| = 2$. In the next sections, we discuss and contrast a number of priors.
 
 \subsection{Dirichlet Process Prior}
-\subsubsection{Prediction Rule}
+The Dirichlet Process is a stochastic process whose sample paths are distributions \parencite{ferguson1973bayesian}. It can be understood as the infinite-dimensional generalization of the Dirichlet distribution \parencite[e.g.,][]{teh2010dirichlet}, which makes it popular for mixture modeling \parencite{rasmussen1999infinite}. Our modeling approach is similar to mixture modeling, except that we do not cluster data but parameters; a cluster corresponds to a partition. The prediction rule of the DP is given by \parencite[e.g.,][]{ishwaran2001gibbs, blackwell1973ferguson}:
 
-The Dirichlet Process prior is a Pitman-Yor process with $a = 0$ and $b = \alpha$, that is, $\mathcal{PY}(0, \alpha)$. The prediction rule is given by \parencite[e.g.,][]{ishwaran2001gibbs, blackwell1973ferguson}:
-
+\iffalse
 \begin{equation}
     P(\theta_K \mid \theta_1, \ldots, \theta_{K - 1}) = \frac{\alpha}{\alpha + K - 1} \mathcal{G}_0 + \sum^{m_K}_{j = 1} \frac{n^{\star}_{j, K}}{\alpha + K - 1} \delta_{\theta^{\star}_{j, K}}(.) \enspace .
-\end{equation}.
+\end{equation}
+\fi
 
-\subsubsection{Distribution over Partitions}
-The Dirichlet process prior results in the so-called \textit{Chinese Restaurant Process} distribution for the partitions. Let $\rho$ denote a partition and $|\rho|$ its size, then we have:
-
-\begin{equation}
-    P(\rho \mid \alpha) = \frac{\alpha^{|\rho|}\Gamma(\alpha)}{\Gamma(n + \alpha)} \prod_{c \in \rho} \Gamma(|c|)
+\begin{equation} \label{eq:prediction-rule}
+    \theta_k \mid \theta_1, \ldots, \theta_{k - 1} \sim \begin{cases}
+    \mathcal{G} & \text{with probability } \frac{\alpha}{\alpha + k - 1} \\
+    \text{Categorical}\left(\theta_1^{\star}, \ldots, \theta_m^{\star} \mid n^{\star}_1, \ldots, n^{\star}_m\right) & \text{else} \enspace .
+    \end{cases} \numberthis
 \end{equation}
 
+In other words, we draw a new value for $\theta_k$ from the Dirichlet process with probability $\nicefrac{\alpha}{\alpha + k - 1}$, or else set it to a previously observed value. The particular value $\theta^{\star}_j$ the parameter $\theta_k$ is set to is proportional to the number of times $\theta^{\star}_j$ was observed previously, given by $n^{\star}_j$, resulting in the well-known ``rich-get-richer'' property \parencite[e.g.,][]{teh2010dirichlet}.
 
-Under the Dirichlet Process prior, we have that, as $K \rightarrow \infty$, the expected number of unique clusters $m$ in a partition is given by:
-\begin{equation}
-    \mathbb{E}[m \mid K] \approx \alpha \text{log}\left(1 + \frac{K}{\alpha}\right) \enspace ,
-\end{equation}
-see for example \textcite[][p. 8]{teh2010dirichlet}.
-\FD{This seems to ignore that we learn about $\theta$ through observations $\mathcal{D}$ by means of a likelihood ... or not?}
-\DB{I think this is the prior expectation.}
-
-
-\color{red}
-\subsection{Dirichlet Process Prior}
-\textcite{gopalan1998bayesian} suggest a Dirichlet process (DP) prior for this problem. A DP is a prior over probability distributions, first developed by \textcite{ferguson1973bayesian}. Let $H$ be a base distribution over a parameters $\Theta$ and $A_1, \ldots, A_r$ be a finite partition of $\Theta$. We have that if $G \sim DP(\alpha, H)$ then
+We can integrate out $\mathcal{G}$ to get a prior distribution over partitions --- the so-called \textit{Chinese Restaurant Process} \parencite[e.g.,][]{teh2010dirichlet}. The prior on the partitions $\rho$ is:
 
 \begin{equation}
-    G(A_1), \ldots, G(A_r) \sim \text{Dir}(\alpha H(A_1), \ldots, \alpha H(A_r)) \enspace .
+    \pi(\rho \mid \alpha) = \frac{\alpha^{|\rho|}\Gamma(\alpha)}{\Gamma(n + \alpha)} \prod_{c \in \rho} \Gamma(|c|) \enspace ,
 \end{equation}
 
-In other words, a random distribution $G$ follows a Dirichlet process when its marginal distribution is a Dirichlet distribution. Let $(\theta_1, \ldots, \theta_n)$ be $n$ draws from $G$, and define $(\theta^{\star}_1, \ldots, \theta^{\star}_k)$ as the unique values of $(\theta_1, \ldots, \theta_n)$ and $n_j$ as the number of repeats of $\theta^{\star}_j$. Then
+where $c$ is an element of $\rho$, and $|c|$ is its size.
 
-\begin{equation}
-    G \mid \theta_1, \ldots, \theta_n \sim DP\left(\alpha + n, \frac{\alpha}{\alpha + n}H + \frac{1}{\alpha + n} \sum_{j=1}^k n_j \delta_{\theta^{\star}_j}\right) \enspace ,
-\end{equation}
+Observe that while the prediction rule features the infinite-dimensional object $\mathcal{G}$, the prior over partitions results from integrating it out. Hence the nonparametric model (in which the number of parameters is not fixed) implies a parametric model (in which the number of parameters is fixed) for the partitions \parencite{quintana2006predictive}. This makes it usable for our purposes, where we have a fixed number of parameters.
 
-that is, the posterior of $G$ is another Dirichlet process. Suppose we observe a new population parameter $\theta_{n + 1}$. We have that:
-
-\begin{equation}
-    \theta_{n + 1} \mid \theta_1, \ldots, \theta_n \sim \frac{1}{\alpha + n} \left(\alpha H + \sum_{j=1}^k n_j \delta_{\theta^{\star}_j}\right) \enspace .
-\end{equation}
-
-In other words, the probability that $\theta_{n + 1}$ takes a new value is proportional to $\nicefrac{\alpha}{\alpha + n}$, and the probability that it equals one of the already observed population parameters is proportional to $\nicefrac{n}{\alpha + n}$; in particular, it is drawn proportional to the number of already observed values $\theta^{\star}_j$, $n_j$.
-
-The unique values of $(\theta_1, \ldots, \theta_n)$ induce a partitioning of the set $[n] = \{1, \ldots, n\}$ into clusters $(\theta^{\star}_1, \ldots, \theta^{\star}_k)$ such that, within each cluster $j$, we find $n_j$ number of $\theta_i$'s with value $\theta^{\star}_j$. This distribution over partitions is known as the \textit{Chinese Restaurant Process}.
-
-In the settings we consider, $\mathbf{\theta}$ is a population parameter vector which we infer from data. \textcite{antoniak1974mixtures} showed that the posterior over $G$ is a mixture of Dirichlet processes when we learn about $\theta$ not directly but through data.
-\color{black}
+The Dirichlet process has a single parameter $\alpha$, which renders it inflexible \parencite{gopalan1998bayesian}. The Pitman-Yor process generalizes the DP \parencite{pitman1997two}, but it, too, assumes a ``rich-get-richer'' structure which may be undesirable. Both the DP and the PY are instances of so-called \textit{species-sampling models} (SSM), which are a general class of nonparametric models \parencite[e.g.,][]{lee2013defining, ishwaran2003generalized, pitman1996some}. To keep this paper contained, however, we focus on the DP as the only example of a nonparametric model.
 
 \subsection{Uniform Prior}
 \FD{The paper by \textcite{wallach2010alternative} seems extremely relevant here. The define the uniform process as having a prediction rule that is uniform over the already existing partitions ... so not quite the same. How is it related to what we do here? Actually, they show that the expected number of clusters of size $M$ is a constant, so it seems to be exactly what we do. Interestingly, the uniform process is not exchangeable. Also, it seems to me that it will not penalize multiplicity.}
 For completion, we derive a prior that is uniform over the space of partitions. The probability mass function is straightforward. All valid configurations of size $k$ have probability $1 / \bellnum{k}$.
-\DB{I could give the conditional distributions here, as well as the prior probability of equating $j$ out of $k$ parameters. That could then come back at the Beta-Binomial part. Do we want that though?}
+
 
 % \begin{align*}
 %     \prior{b_1 = k} &= \frac{1}{k}, \\
@@ -338,6 +265,7 @@ Here we briefly introduce the Beta-Binomial model prior, its properties, and how
 where $\alpha$ and $\beta$ are hyperparameters. The prior probability of a particular model is obtained by dividing by the number of ways $j$ out of $k$ predictors can be included: $\BetaBinom{j}{k}{\alpha}{\beta} / \binom{k}{j}$. The advantage of the Beta-Binomial distribution is that it introduce a penalty for including additional predictors and in that way introduces a correction for multiplicity \parencite{scott2010bayes}.
 
 In the space of equality constraints, we consider the number of inequality constraints and use the Beta-Binomial prior to introduce a penalty for each additional inequality among the variables considered. This yields the following prior distribution over the number of included inequalities: $\BetaBinom{j}{k-1}{\alpha}{\beta}$. To obtain the prior probability for a particular model, divide by the number of ways we can choose $j$ out of $k-1$ inequalities and obtain $\BetaBinom{j}{k-1}{\alpha}{\beta} / \stirling{k}{k-j}$.
+% TODO DB: rewrite this in terms of a partition 
 
 
 The probability for the prediction rule for the Beta-Binomial prior is given by:
@@ -346,18 +274,22 @@ The probability for the prediction rule for the Beta-Binomial prior is given by:
     P(\zeta_i) = \frac{
         \sum_{j=1}^k \BetaBinom{j}{k}{\alpha}{\beta} \rstirling{k-j-s_i-1}{k-j+1}{s_i + 1}
     }{
-        r \sum_{j=1}^k \BetaBinom{j}{k}{\alpha}{\beta} \rstirling{k-j-s_i-2}{k-j+1}{s_i    } +
+        s_i \sum_{j=1}^k \BetaBinom{j}{k}{\alpha}{\beta} \rstirling{k-j-s_i-2}{k-j+1}{s_i    } +
           \sum_{j=1}^k \BetaBinom{j}{k}{\alpha}{\beta} \rstirling{k-j-s_i-1}{k-j+1}{s_i + 1}
     }
 \end{equation}
 The $r$-Stirling number in the numerator counts the number of models with $j$ equalities if $\theta_i$ is a new value. Next, this is multiplied by the probability of including $j$ equalities. This is summed for all possible numbers of equalities. 
 The first sum in the denominator does the same, assuming that $theta_i$ is a value in $\{\theta_1, \dots, \theta_{i-1}\}$. With probability $1 - P(\zeta_i)$ we have that $\theta_i$ is equal to one of the previously drawn parameters. This draw is uniform over the possible models, that is, conditional on drawing a previous value the probability of $\theta_i = \theta_j$ is proportional to $\bellnum{k-j-1}{s_i}$.
 
-
-
-\begin{itemize}
-    \item \textcolor{red}{NEED A PLOT THAT SHOWS PRIOR OVER PARTITIONS + INCLUSION PROBABILITIES FOR UNIFORM AND BETA-BINOMIAL}
-\end{itemize}
+\begin{figure}
+    \centering
+    \includegraphics[width = \textwidth]{figures/prior_5.pdf}
+    \caption{%
+    Properties of the uniform prior (left column) and beta-binomial prior (right column) for $k = 5$. The top row shows the prior model probabilities whereas the bottom row shows the prior probability of a particular number of inequalities. While the uniform prior is uniform over the models, it is not uniform over the number of inequalities. In contrast, the beta-binomial prior is uniform over the number of inequalities but not uniform over the models. In all figures, colors correspond to the number of inequalities in the model. The x-axis in the top row displays the models with an indicator notation, for example, `11111' denotes the model where all parameters are equal.
+    }
+    \label{fig:my_label}
+\end{figure}
+\FD{Looks great! Maybe we can make the dots bigger so one sees the colour better? We also need to show the DP. Change x-axis to have images from Figure 1.}
 
 \subsection{Comparison of Priors}
 
@@ -368,13 +300,19 @@ The first sum in the denominator does the same, assuming that $theta_i$ is a val
 
 
 
-\section{Simulation Study}
+\section{Simulation Study} \label{sec:simulation-study}
 \subsection{Convergence Rate}
+\FD{Plot: For each prior, simulate from true model and plot posterior probability as sample size increases. Ideally, we see that DP is not consistent.}
 \textcite{chen1995optimal} showed that the optimal rate of convergence in the finite mixture problem when the number of components are unknown is $n^{-\frac{1}{4}}$ (with knowledge of the components, the rate can be $\sqrt{n}$). \textcite{ishwaran2001bayesian} show that a Bayesian estimation method is consistent and achieves the $n^{-\frac{1}{4}}$ convergence rate in finite mixtures with the number of components unknown.
 
 \textcite{miller2014inconsistency} argue that nonparametric clustering using a large class of models is inconsistent; see also \textcite{miller2013simple}, for an example. \textcite{miller2018mixture} therefore suggest mixture models with a prior on the number of components with support $\mathbb{N}$ instead of using a nonparametric approach. See also \textcite{green2001modelling} for a comparison of the two approaches.
 
-\section{Discussion}
+\section{Application} \label{sec:applications}
+\subsection{Testing Proportions}
+\subsection{Testing Means}
+\subsection{Testing Variances}
+
+\section{Discussion} \label{sec:discussion}
 \textcite{kim2009spiked} combine a spike at zero with a DPP. \textcite{curtis2011bayesian} also use a DPP to combine clustering o highly correlated predictors in linear regression with variable selection. \textcite{canale2017pitman} focus on the Pitman-Yor process, which is a generalization of the DPP. \textcite{lu2018reducing} study a powered Chinese restaurant process. \textcite{miller2015microclustering} study a microclustering property, for which the number of data points in a cluster does not grow linearly with the total number of data points (which is assumed by the DP, PY, etc.)
 
 We focused on independent groups, but one could model dependencies using the distance CRP \parencite{blei2011distance}.
