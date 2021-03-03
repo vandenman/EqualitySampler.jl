@@ -1,7 +1,7 @@
-using Turing, StatsBase, DynamicPPL, FillArrays, Plots, DataFrames
-include("src/loglikelihood.jl")
-include("src/helperfunctions.jl")
-include("src/newApproach4.jl")
+using EqualitySampler, Turing, StatsBase, DynamicPPL, FillArrays, Plots
+include("simulations/plotFunctions.jl")
+include("simulations/helpersTuring.jl")
+# include("src/newApproach4.jl")
 
 function apply_equality_constraints(ρ::AbstractVector{<:Real}, equal_indices::AbstractVector{<:Integer})
 	ρ_c = similar(ρ)

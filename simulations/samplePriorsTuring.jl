@@ -53,6 +53,7 @@ end
 		nk = Vector{Int}(map(k -> sum(z .== k), 1:K))
 
 		# Draw the latent assignment.
+		# z[i] ~ StickBreakingProcess(rpm)
 		z[i] ~ ChineseRestaurantProcess(rpm, nk)
 
 	end
@@ -86,7 +87,7 @@ function _sample_process_turing(model; no_samples::Int = 100_000)
 	nc = size(samples)[2]
 	sampled_models = Matrix{Int}(undef, nc - 1, no_samples)
 	for i in 1:no_samples
-		sampled_models[:, i] .= Int.(samples.value.data[i, 2:nc])
+		sampled_models[:, i] .= reduce_model(Int.(samples.value.data[i, 2:nc]))
 	end
 	empirical_model_probs     = empirical_model_probabilities(sampled_models)
 	empirical_inclusion_probs = empirical_inclusion_probabilities(sampled_models)
@@ -109,8 +110,36 @@ end
 function sample_and_compute_Turing(k::Int; no_samples::Int = 100_000, uniform_prior::Bool, α::Float64 = 1.0, β::Float64 = 1.0)
 	model = small_model(k, uniform_prior, α, β)
 	samples = sample(model, Prior(), no_samples)
-	empirical_model_probs = EqualitySampler.compute_model_probs(samples)
-	empirical_inclusion_probs = EqualitySampler.compute_incl_probs(samples)
+	empirical_model_probs = compute_model_probs(samples)
+	empirical_inclusion_probs = compute_incl_probs(samples)
 	D = uniform_prior ? D = UniformConditionalUrnDistribution(1:k, 1) : BetaBinomialConditionalUrnDistribution(1:k, 1, α, β)
 	return D, empirical_model_probs, empirical_inclusion_probs, samples
 end
+
+
+# k = 4
+# nsamples = 100_000
+# rpm = DirichletProcess(1.0)
+# samps = zeros(Int, k, nsamples)
+
+# for j in 1:nsamples
+
+# 	z = view(samps, :, j)
+
+# 	for i in 1:k
+
+# 		# Number of clusters.
+# 		K = maximum(z)
+# 		nk = Vector{Int}(map(k -> sum(z .== k), 1:K))
+# 		z[i] = rand(ChineseRestaurantProcess(rpm, nk))
+
+# 	end
+# 	z .= reduce_model(z)
+# end
+
+# ref = UniformConditionalUrnDistribution(ones(Int, k), 1)
+
+# empirical_model_probs     = empirical_model_probabilities(samps)
+# empirical_inclusion_probs = empirical_inclusion_probabilities(samps)
+
+# pjoint = visualize_eq_samples(ref, empirical_model_probs, empirical_inclusion_probs)
