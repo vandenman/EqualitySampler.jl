@@ -240,6 +240,88 @@ Following \textcite{gopalan1998bayesian}, we write $(\mu_1, \ldots, \mu_k) \in C
 The reasoning is as follows. Suppose that we have 2 equality constraints in a group of five, which could look like this $(\mu_1 = \mu_2, \mu_3 = \mu_4, \mu_5) \in C(1, 2, 0, 0, 0)$. How many models such as this are there? There are ${5 \choose 1} = 5$ possible parameters that could be different from the rest. Once this parameter is fixed, we need to count possibilities for the four others; hence we continue as if we only had 4 parameters left. There are ${4 \choose 2} = 6$ ways in which two parameters can be equal, but this overcounts by a factor of two since $(\mu_1 = \mu_2, \mu_3 = \mu_4)$ is the same as $(\mu_3 = \mu_4, \mu_1 = \mu_2$). Hence we have ${5 \choose 1} \times {4 \choose 2} \times \frac{1}{2} = 15$ models that have 2 equality constraints in five groups.
 
 
+\color{red}
+\subsection{Dirichlet Process Prior}
+\textcite{gopalan1998bayesian} suggest a Dirichlet process (DP) prior for this problem. A DP is a prior over probability distributions, first developed by \textcite{ferguson1973bayesian}. Let $H$ be a base distribution over a parameters $\Theta$ and $A_1, \ldots, A_r$ be a finite partition of $\Theta$. We have that if $G \sim DP(\alpha, H)$ then
+
+\begin{equation}
+    G(A_1), \ldots, G(A_r) \sim \text{Dir}(\alpha H(A_1), \ldots, \alpha H(A_r)) \enspace .
+\end{equation}
+
+In other words, a random distribution $G$ follows a Dirichlet process when its marginal distribution is a Dirichlet distribution. Let $(\theta_1, \ldots, \theta_n)$ be $n$ draws from $G$, and define $(\theta^{\star}_1, \ldots, \theta^{\star}_k)$ as the unique values of $(\theta_1, \ldots, \theta_n)$ and $n_j$ as the number of repeats of $\theta^{\star}_j$. Then
+
+\begin{equation}
+    G \mid \theta_1, \ldots, \theta_n \sim DP\left(\alpha + n, \frac{\alpha}{\alpha + n}H + \frac{1}{\alpha + n} \sum_{j=1}^k n_j \delta_{\theta^{\star}_j}\right) \enspace ,
+\end{equation}
+
+that is, the posterior of $G$ is another Dirichlet process. Suppose we observe a new population parameter $\theta_{n + 1}$. We have that:
+
+\begin{equation}
+    \theta_{n + 1} \mid \theta_1, \ldots, \theta_n \sim \frac{1}{\alpha + n} \left(\alpha H + \sum_{j=1}^k n_j \delta_{\theta^{\star}_j}\right) \enspace .
+\end{equation}
+
+In other words, the probability that $\theta_{n + 1}$ takes a new value is proportional to $\nicefrac{\alpha}{\alpha + n}$, and the probability that it equals one of the already observed population parameters is proportional to $\nicefrac{n}{\alpha + n}$; in particular, it is drawn proportional to the number of already observed values $\theta^{\star}_j$, $n_j$.
+
+The unique values of $(\theta_1, \ldots, \theta_n)$ induce a partitioning of the set $[n] = \{1, \ldots, n\}$ into clusters $(\theta^{\star}_1, \ldots, \theta^{\star}_k)$ such that, within each cluster $j$, we find $n_j$ number of $\theta_i$'s with value $\theta^{\star}_j$. This distribution over partitions is known as the \textit{Chinese Restaurant Process}.
+
+In the settings we consider, $\mathbf{\theta}$ is a population parameter vector which we infer from data. \textcite{antoniak1974mixtures} showed that the posterior over $G$ is a mixture of Dirichlet processes when we learn about $\theta$ not directly but through data.
+\color{black}
+
+\subsection{Pitman-Yor Process}
+\subsubsection{Prediction Rule}
+Let $(\theta^{\star}_{1, i}, \ldots, \theta^{\star}_{m_i, i})$ be the unique set of values in $(\theta_1, \ldots, \theta_{i-1})$, each occuring with frequency $n^{\star}_{j, i}$ for $j = \{1, \ldots, m_i\}$. The Pitman-Yor process $\mathcal{PY}(a, b)$ has a prediction rule given by:
+
+\begin{equation}
+    P(\theta_K \mid \theta_1, \ldots, \theta_{K - 1}) = \frac{b + a m_K}{b + K - 1} \mathcal{G}_0 + \sum^{m_K}_{j = 1} \frac{n^{\star}_{j, K} - a}{b + K - 1} \delta_{\theta^{\star}_{j, K}}(.) \enspace ,
+\end{equation}
+
+where $\mathcal{G}_0$ is the base distribution \parencite{ishwaran2001gibbs, pitman1997two}.
+
+\subsubsection{Distribution over Partitions}
+Let $m$ be the number of clusters among $K$ groups. Under the Pitman-Yor process, we have that as $K \rightarrow \infty$, the expected number of unique clusters $m$ in a partition is given by \parencite[e.g.,][]{wallach2010alternative}:
+
+\begin{equation}
+    \mathbb{E}[m \mid K] \approx \frac{\Gamma\left(1 + b\right)}{a\Gamma\left(a + b\right)}K^a \enspace .
+\end{equation}
+
+\FD{Are these asymptotic results useful for our max $K = 15$ setting? It seems that it might make more sense to calculate them exactly through simulations.}
+
+\FD{\textcite{wallach2010alternative} show what the priors imply (asymptotically) in terms of the expected number of clusters of size $M$. So basically, what we force to be a Beta-binomial in our prior. I think it makes again sense to contrast this for the PY and the DP --- computed exactly through simulation --- with out beta-binomial.}
+
+\subsection{Parametric or Nonparametric?}
+\textcite{quintana2006predictive} reviews \textit{product partition models} (PPM) and \textit{species sampling models} (SSM) \parencite{ishwaran2003generalized, pitman1996some}. Let $\rho = \{S_1, \ldots, S_K\}$ denote a partition. PPMs can be written as:
+
+\begin{equation}
+    p(\theta_1, \ldots, \theta_K \mid \rho) = \prod_{i=1}^K p_{S_i}(\theta_{S_i}) \enspace ,
+\end{equation}
+
+where $p_{S_i}(\theta_{S_i})$ depends only on $S_i$ and not on other subsets in the partition $\rho$. We have further:
+
+\begin{equation}
+    p(\rho) = \mathcal{Z} \prod_{i=1}^k c(S_i) \enspace ,
+\end{equation}
+
+where $\mathcal{Z}$ is a normalizing constant and $c(S_i) \geq 0$. Exchangeability holds if $c(S_i)$ depends only on $S_i$. This setup also yields a prediction rule, see \textcite[][Eq (7)]{quintana2006predictive}.
+
+The sequence $\{\theta_k\}$ is called a \textit{species sampling sequence} (SSS) if it is exchangeable and satisfies:
+
+\begin{align}
+    \theta_1 &\sim \mathcal{G}_0 \\
+    \theta_{j + 1} \mid \theta_1, \ldots, \theta_j  &\sim \mathcal{G}_i \equiv \mathcal{G}_0 + \sum_{j=1}^k \delta_{\theta^{\star}_{j, k}}(.) \enspace ,
+\end{align}
+
+where the notation needs to be cleaned up. An important result is that the prior over partitions does only depend on the size of the partitions $|S_i|$ \parencite{quintana2006predictive}. $\mathcal{G}$ can be represented using a stick-breaking process, which unifies many priors (such as the DP, PY, etc.).
+
+It turns out that the nonparametric SSM above, when integrating out the infinite-dimensional object $\mathcal{G}$, leads to a parametric model for the partitions. For a large class of models, including all we discuss below, if $\theta$ is exchangeable, the parametric and nonparametric models imply the same model for the partitions \parencite{quintana2006predictive}. Some priors we discuss below, such as the DP and the PY, lead to nonparametric models while others, such as the BB and the U, lead to parametric models. Yet viewed from the perspective of partitions, both lead to parametric models. This is more suited to our problem because, in our case, the number of groups $K$ are fixed. Kingman's representation theorem says that every exchangeable random partition can be obtained by a SSS \parencite[e.g.,][]{lee2013defining}.
+
+\textcite{lee2013defining} provide three characterisations of the SSM in terms of (a) the prediction rule (which directly corresponds to the Urn scheme); (b) the implied prior over partitions; and (c) the construction of $\mathcal{G}$. They provide inference for a large class of SSM that generalize beyond the DP and have desirable properties.
+
+\textcite{muller2013bayesian} say that random partition model are called nonparametric due to mostly historical reasons.
+
+Under the Dirichlet Process prior, we have that, as $K \rightarrow \infty$, the expected number of unique clusters $m$ in a partition is given by:
+\begin{equation}
+    \mathbb{E}[m \mid K] \approx \alpha \text{log}\left(1 + \frac{K}{\alpha}\right) \enspace .
+\end{equation}
 
 \printbibliography
 
