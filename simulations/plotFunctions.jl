@@ -1,5 +1,5 @@
 using Plots
-import Distributions
+import Distributions, LinearAlgebra
 
 """
 	plot true values vs posterior means
@@ -83,7 +83,7 @@ function plot_expected_vs_empirical(D, probs_models_by_incl)
 	x, y = expected_model_probabilities(D), collect(values(probs_models_by_incl))
 	ablinecoords = [extrema([extrema(x)..., extrema(y)...])...]
 	axistype = any(<=(1e-8), y) ? :none : :log
-	
+
 	plt = plot(ablinecoords, ablinecoords, lw = 3, legend = false, yaxis=axistype, xaxis=axistype);
 	plot!(plt, x, y, seriestype = :scatter);
 end

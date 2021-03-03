@@ -77,10 +77,11 @@ for (i, p) in enumerate(pos_included)
 	end
 end
 
-fig2 = plot(pos_included, result', label = permutedims(["$p included" for p in variables_added]), legend = :topleft);
+fig2 = plot(pos_included, exp.(result)', label = permutedims(["$p included" for p in variables_added]), legend = :topleft);
 title!(fig2, "Figure 2 of Scott & Berger (2010)");
 
-plot(fig1, fig2, layout = (2, 1))
+w = 500
+plot(fig1, fig2, layout = (2, 1), size = (w, w))
 
 
 #endregion
