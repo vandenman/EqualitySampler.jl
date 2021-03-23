@@ -123,8 +123,11 @@ end
 
 #region r-Stirling numbers of the second kind
 
-stirlings2rExplLogTerm(n::T, k::T, r::T, j::T) where T <: Integer = logbinomial(n - r, j) + logstirlings2(j, k - r) + (n - r - j) * log(r)
-stirlings2rExplTerm(n::T, k::T, r::T, j::T) where T <: Integer = binomial(n - r, j) * stirlings2(j, k - r) * r^(n - r - j)
+stirlings2rExplLogTerm(n::T, k::T, r::T, j::T)   where T <: Integer = logbinomial(n - r, j) + logstirlings2(j, k - r) + log(r) * (n - r - j)
+stirlings2rExplLogTermr0(n::T, k::T, r::T, j::T) where T <: Integer = logbinomial(n - r, j) + logstirlings2(j, k - r)
+stirlings2rExplTerm(n::T, k::T, r::T, j::T)      where T <: Integer =    binomial(n - r, j) *    stirlings2(j, k - r) *     r  ^ (n - r - j)
+
+
 """
 	stirlings2r(n::T, k::T, r::T) where T <: Integer
 	stirlings2r(n::T, k::T, r::T, ::Type{ExplicitStrategy})  where T <: Integer
@@ -140,11 +143,12 @@ function stirlings2r(n::T, k::T, r::T, ::Type{ExplicitStrategy}) where T <: Inte
 	succes, value = stirlings2r_base_cases(n, k, r)
 	succes && return value
 
-	result = 0.0
-	for j in 1:n-r
-		result += stirlings2rExplTerm(n, k, r, j)
-	end
-	return result
+	sum(j->stirlings2rExplTerm(n, k, r, j), 1:n-r)
+	# result = zero(T)
+	# for j in 1:n-r
+	# 	result += stirlings2rExplTerm(n, k, r, j)
+	# end
+	# return result
 end
 
 stirlings2r(n::T, k::T, r::T, ::Type{RecursiveStrategy}) where T <: Integer = stirlings2r_recursive(n, k, r)
@@ -163,12 +167,13 @@ Base cases for stirlings2r. Should return a tuple of (base_case_found::Bool, val
 """
 function stirlings2r_base_cases(n::T, k::T, r::T) where T <: Integer
 
-	n < r && return (true, zero(T))
-	(k > n || k < r) && return (true, zero(T))
-	n == k && return (true, one(T))
-	iszero(n) || iszero(k) && return (true, zero(T))
-	n == r && return (true, one(T))
-	k == r && return (true, r^(n - r))
+	n < r							&& return (true, zero(T))
+	(k > n || k < r)				&& return (true, zero(T))
+	n == k							&& return (true, one(T))
+	iszero(n) || iszero(k)			&& return (true, zero(T))
+	n == r							&& return (true, one(T))
+	k == r							&& return (true, r^(n - r))
+	iszero(r) 						&& return (true, stirlings2(n, k))
 
 	return (false, zero(T))
 end
@@ -180,21 +185,21 @@ Computes the logarithm of the r-stirling numbers with an explicit formula.
 """
 function logstirlings2r(n::T, k::T, r::T) where T <: Integer
 
+	iszero(r) && return logstirlings2(n, k)
+
 	succes, value = stirlings2r_base_cases(n, k, r)
 	succes && value >= zero(T) && return log(Float64(value))
 
-	values = Vector{Float64}(undef, n-r)
-	for j in eachindex(values)
-		values[j] = stirlings2rExplLogTerm(n, k, r, j)
-	end
-	return logsumexp_batch(values)
+	return logsumexp_batch(map(j->stirlings2rExplLogTerm(n, k, r, j), 1:n-r))
+
 end
 
-"""
-	stirlings2r_recursive(n::T, k::T, r::T) where T <: Integer
+# TODO: did the definition get deleted?
+# """
+# 	stirlings2r_recursive(n::T, k::T, r::T) where T <: Integer
 
-Computes the r-stirling numbers with a recursive method. Uses memoization for efficiency.
-"""
+# Computes the r-stirling numbers with a recursive method. Uses memoization for efficiency.
+# """
 #endregion
 
 
@@ -203,20 +208,35 @@ Computes the r-stirling numbers with a recursive method. Uses memoization for ef
 
 	Computes the r-Bell numbers.
 """
-Memoize.@memoize function bellnumr(n::T, r::T) where T <: Integer
+function bellnumr(n::T, r::T) where T <: Integer
 	#=
 		TODO: this could also use stirlings2r(n, k, 1), or just sum over them!
 
 	=#
 	res = zero(T)
-	for k in 0:n, i in 0:n
-		res +=
-			binomial(n, i) *
-			stirlings2(i, k) *
-			r^(n - i)
+	for k in 0:n
+		res += stirlings2r(n+r, k+r, r)
 	end
+	# for k in 0:n, i in 0:n
+	# 	res +=
+			# binomial(n, i) *
+			# stirlings2(i, k) *
+			# r^(n - i)
+	# end
 	return res
 end
+bellnumr(n::T, r::U) where {T <: Integer, U <: Integer} = bellnumr(promote(n, r)...)
+
+function logbellnumr(n::T, r::T) where T <: Integer
+	values = Vector{Float64}(undef, n + 1)
+	for k in 0:n
+		values[k+1] = logstirlings2r(n+r, k+r, r)
+	end
+	return logsumexp_batch(values)
+end
+logbellnumr(n::T, r::U) where {T <: Integer, U <: Integer} = logbellnumr(promote(n, r)...)
+
+
 #endregion
 
 #region combinatorial functions over the model space
@@ -252,7 +272,11 @@ count_combinations(x::AbstractVector) = count_combinations(length(x), length(uni
 returns the n-th bell number, which representats the total number of unique models.
 """
 count_distinct_models(k::Int) = bellnumr(k, 0)
-count_models_with_incl(k, no_equalities) = stirlings2(k, k - no_equalities) .* count_combinations.(k, k - no_equalities)
+
+count_distinct_models_with_incl(k, no_equalities) = stirlings2(k, k - no_equalities)
+count_models_with_incl(k, no_equalities) = count_distinct_models_with_incl(k, no_equalities) * count_combinations(k, k - no_equalities)
+
+log_count_distinct_models_with_incl(k, no_equalities) = logstirlings2(k, k - no_equalities)
 
 """
 	generate_distinct_models(k::Int)
@@ -281,3 +305,64 @@ function generate_distinct_models(k::Int)
 end
 
 
+unsignedstirlings1(n::T, k::T) where T <: Integer = unsignedstirlings1(n, k, ExplicitStrategy)
+unsignedstirlings1(n::T, k::U) where {T<:Integer, U<:Integer} = unsignedstirlings1(promote(n, k)...)
+logunsignedstirlings1(n::T, k::U) where {T<:Integer, U<:Integer} = logunsignedstirlings1(promote(n, k)...)
+
+function unsignedstirlings1_base_cases(n::T, k::T) where T <: Integer
+
+	# adapted from Combinatorics.stirlings1
+	n < 0 || k > n						&& return (true, zero(T))
+	n == k == zero(T)					&& return (true, one(T))
+	n == zero(T) || k == zero(T)		&& return (true, zero(T))
+	n == k								&& return (true, one(T))
+	k == one(T)							&& return (true, factorial(n - 1))
+	k == 2								&& return (true, round(Int, factorial(n - 1) * sum(i->1/i, 1:n-1)))
+	k == n - 1							&& return (true, binomial(n, 2))
+	k == n - 2							&& return (true, div((3 * n - 1) * binomial(n, 3), 4))
+	k == n - 3							&& return (true, binomial(n, 2) * binomial(n, 4))
+
+	return(false, zero(T))
+end
+
+unsignedstirlings1(n::T, k::T, ::Type{RecursiveStrategy}) where T <: Integer = unsignedstirlings1_recursive(n, k)
+
+Memoize.@memoize function unsignedstirlings1_recursive(n::T, k::T) where T <: Integer
+
+	succes, value = unsignedstirlings1_base_cases(n, k)
+	succes && return value
+	return (n - 1) * unsignedstirlings1_recursive(n - 1, k) + unsignedstirlings1_recursive(n - 1, k - 1)
+
+end
+
+function unsignedstirlings1(n::T, k::T, ::Type{ExplicitStrategy}) where T <: Integer
+
+	# 8.20 of  Charalambides, C. A. (2018). Enumerative combinatorics. CRC Press.
+
+	succes, value = unsignedstirlings1_base_cases(n, k)
+	succes && return value
+
+	sign = (-1)^(n - k)
+	result = zero(T)
+	for r in 0:n-k
+		result += sign * stirlings1ExplTerm(n, k, r)
+		sign *= -1
+	end
+	return result
+end
+
+stirlings1ExplTerm(n::T, k::T, r::T)    where T <: Integer =    binomial(n + r - 1, k - 1) *    binomial(2n - k, n - k - r) *    stirlings2(n - k + r, r)
+stirlings1ExplLogTerm(n::T, k::T, r::T) where T <: Integer = logbinomial(n + r - 1, k - 1) + logbinomial(2n - k, n - k - r) + logstirlings2(n - k + r, r)
+
+function logunsignedstirlings1(n::T, k::T) where T <: Integer
+
+	# avoids an explicit factorial in unsignedstirlings1_base_cases
+	n != zero(T) && k == 1		&& return SpecialFunctions.logfactorial(n - 1)
+	k == 2						&& return SpecialFunctions.logfactorial(n - 1) + log(sum(i->1/i, 1:n-1))
+
+	succes, value = unsignedstirlings1_base_cases(n, k)
+	succes && value >= zero(T) && return log(Float64(value))
+
+	terms = map(r->stirlings1ExplLogTerm(n, k, r), 0:n-k)
+	return alternating_logsumexp_batch(terms)
+end

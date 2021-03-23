@@ -3,10 +3,18 @@
 """
 function reduce_model(x::AbstractVector{T}) where T <: Integer
 
+	#= TODO:
+
+		It would be nice if the result is identical to something that the DirichletProcesses expect
+
+	=#
+
 	y = copy(x)
+	# reduce_model!(y)
+	# return y
 	for i in eachindex(x)
-		if !any(==(x[i]), x[1:i - 1])
-			if x[i] != i
+		if x[i] != i
+			if !any(==(x[i]), x[1:i - 1])
 				idx = findall(==(x[i]), x[i:end]) .+ (i - 1)
 				y[idx] .= i
 			end
@@ -14,6 +22,45 @@ function reduce_model(x::AbstractVector{T}) where T <: Integer
 	end
 	return y
 end
+
+function reduce_model_dpp(x::AbstractVector{<:Integer})
+
+	y = similar(x)
+	currentMax = 0
+	visited = Set{Int}()
+	for i in eachindex(y)
+		if x[i] ∉ visited
+			currentMax += 1
+			y[i] = currentMax
+			for j in i+1:length(x)
+				if x[i] == x[j]
+					y[j] = currentMax
+				end
+			end
+			push!(visited, x[i])
+		end
+	end
+	return y
+end
+
+# function reduce_model!(x::AbstractVector{T}) where T <: Integer
+# 	# TODO: this is less efficient than just copying x first
+# 	for i in eachindex(x)
+# 		if x[i] != i
+# 			if !any(==(x[i]), x[1:i - 1])
+# 				idx = findall(==(x[i]), x[i:end]) .+ (i - 1)
+
+# 				otherIdx = findall(==(i), x[i:end]) .+ (i - 1)
+# 				v = x[i]
+# 				x[idx] .= i
+# 				x[otherIdx] .= v
+
+# 			end
+# 		end
+# 	end
+# 	return x
+# end
+
 
 function get_conditional_counts(n::Int, known::AbstractVector{T} = [1], include_new::Bool = true) where T <: Integer
 
@@ -101,21 +148,72 @@ struct UniformConditionalUrnDistribution{T, U<:AbstractVector{T}} <: AbstractCon
 end
 
 
-function _pdf(d::UniformConditionalUrnDistribution)
+# function _pdf(d::UniformConditionalUrnDistribution)
 
-	index, k = d.index, length(d.urns)
-	isone(index) && return fill(1 / k, k)
-	urns = view(d.urns, 1:index - 1)
+# 	index, k = d.index, length(d.urns)
+# 	isone(index) && return fill(1 / k, k)
+# 	urns = view(d.urns, 1:index - 1)
+
+# 	count = get_conditional_counts(k, urns)
+# 	result = zeros(Float64, k)
+# 	idx_nonzero = findall(!iszero, view(count, 1:length(urns)))
+# 	result[view(urns, idx_nonzero)] .= count[idx_nonzero]
+# 	other = setdiff(1:k, urns)
+# 	result[other] .= count[length(urns) + 1] ./ length(other)
+# 	return result ./ sum(result)
+
+# end
+_pdf(d::UniformConditionalUrnDistribution) = _pdf_helper(d, d.index, d.urns)
+
+# _pdf_uniform_helper exists so that it can also be reused by the multivariate distribution without explicitly creating a UniformConditionalUrnDistribution
+function _pdf_helper(d::Union{AbstractConditionalUrnDistribution, AbstractMvUrnDistribution}, index, complete_urns)
+
+	k = length(complete_urns)
+	result = zeros(Float64, length(complete_urns))
+	_pdf_helper!(result, d, index, complete_urns)
+	return result
+
+end
+
+function _pdf_helper!(result, ::Union{UniformConditionalUrnDistribution, UniformMvUrnDistribution}, index, complete_urns)
+
+	k = length(result)
+	if isone(index)
+		fill!(result, 1 / k)
+		return
+	end
+
+	urns = view(complete_urns, 1:index - 1)
 
 	count = get_conditional_counts(k, urns)
-	result = zeros(Float64, k)
+
 	idx_nonzero = findall(!iszero, view(count, 1:length(urns)))
 	result[view(urns, idx_nonzero)] .= count[idx_nonzero]
 	other = setdiff(1:k, urns)
 	result[other] .= count[length(urns) + 1] ./ length(other)
-	return result ./ sum(result)
-
+	result ./= sum(result)
+	return
 end
+
+# function _pdf_helper!(result, d::Union{BetaBinomialConditionalUrnDistribution, BetaBinomialMvUrnDistribution}, index, complete_urns)
+
+# 	k = length(result)
+# 	if isone(index)
+# 		fill!(result, 1 / k)
+# 		return nothing
+# 	end
+
+# 	urns = view(complete_urns, 1:index - 1)
+
+# 	count = get_conditional_counts(k, urns)
+
+# 	idx_nonzero = findall(!iszero, view(count, 1:length(urns)))
+# 	result[view(urns, idx_nonzero)] .= count[idx_nonzero]
+# 	other = setdiff(1:k, urns)
+# 	result[other] .= count[length(urns) + 1] ./ length(other)
+# 	result ./= sum(result)
+# 	return nothing
+# end
 
 #endregion
 #region BetaBinomialConditionalUrnDistribution
@@ -144,44 +242,42 @@ function BetaBinomialConditionalUrnDistribution(k::T, α::Real = 1.0, β::Real =
 	BetaBinomialConditionalUrnDistribution(T[one(T)], k, convert(Float64, α), convert(Float64, β))
 end
 
-function _pdf(d::BetaBinomialConditionalUrnDistribution)
+_pdf(d::BetaBinomialConditionalUrnDistribution) = _pdf_helper(d, d.index, d.urns)
 
-	index, k = d.index, length(d.urns)
-	isone(index) && return fill(1 / k, k)
+log_model_probs_by_incl(d::BetaBinomialConditionalUrnDistribution) = d._log_model_probs_by_incl
+function _pdf_helper!(result, d::T, index, complete_urns) where T<:Union{BetaBinomialConditionalUrnDistribution, BetaBinomialMvUrnDistribution}
 
-	urns = d.urns
+	k = length(result)
+	if isone(index)
+		fill!(result, 1 / k)
+		return
+	end
+
 	index_already_sampled = 1:index - 1
 	n0 = k
 
 	# no_duplicated = count_equalities(view(urns, index_already_sampled))
-	v_known_urns = view(urns, index_already_sampled)
+	v_known_urns = view(complete_urns, index_already_sampled)
 	r = length(Set(v_known_urns))
 	n = n0 - (index - r - 1)
 
-	# TODO: this could also be stored inside d...
-	model_probs_by_incl = exp.(d._log_model_probs_by_incl)
-	# model_probs_by_incl = exp.(Distributions.logpdf.(Distributions.BetaBinomial(n0 - 1, d.α, d.β), 0:n0 - 1) .- log.(expected_inclusion_counts(n0)))
+	model_probs_by_incl = exp.(log_model_probs_by_incl(d))
 
 	num = r * sum(model_probs_by_incl[k] * stirlings2r(n - 1, n0 - k + 1, r    ) for k in 1:n0)
 	den =     sum(model_probs_by_incl[k] * stirlings2r(n    , n0 - k + 1, r + 1) for k in 1:n0)
 	probEquality = num / (num + den)
 
-	probs = Vector{Float64}(undef, n0)
-
 	# probability of an equality
 	known = reduce_model(v_known_urns)
 	counts = get_conditional_counts(k, known, false)
 	idx_nonzero = findall(!iszero, counts)
-	probs[v_known_urns[idx_nonzero]] .= probEquality .* (counts[idx_nonzero] ./ sum(counts[idx_nonzero]))
+	result[v_known_urns[idx_nonzero]] .= probEquality .* (counts[idx_nonzero] ./ sum(counts[idx_nonzero]))
 
 	# probability of an inequality
 	inequality_options = setdiff(1:n0, v_known_urns)
-	probs[inequality_options] .= (1 - probEquality) ./ length(inequality_options)
+	result[inequality_options] .= (1 - probEquality) ./ length(inequality_options)
 
-	# if !Distributions.isprobvec(probs)
-	# 	@show d, probs
-	# end
-	return probs
+	return
 
 end
 #endregion
@@ -198,17 +294,31 @@ function expected_inclusion_probabilities(k::Integer)
 end
 log_expected_inclusion_counts(k::Integer) = logstirlings2.(k, k:-1:1)
 
-expected_model_probabilities(d::UniformConditionalUrnDistribution) = expected_model_probabilities(length(d))
-expected_inclusion_counts(d::UniformConditionalUrnDistribution) = expected_inclusion_counts(length(d))
-expected_inclusion_probabilities(d::UniformConditionalUrnDistribution) = expected_inclusion_probabilities(length(d))
-log_expected_inclusion_counts(d::UniformConditionalUrnDistribution) = log_expected_inclusion_counts(length(d))
 
-function expected_inclusion_probabilities(d::BetaBinomialConditionalUrnDistribution)
+const UniformUrnDists = Union{UniformConditionalUrnDistribution, UniformMvUrnDistribution}
+expected_model_probabilities(d::UniformUrnDists) = expected_model_probabilities(length(d))
+expected_inclusion_counts(d::UniformUrnDists) = expected_inclusion_counts(length(d))
+expected_inclusion_probabilities(d::UniformUrnDists) = expected_inclusion_probabilities(length(d))
+log_expected_inclusion_counts(d::UniformUrnDists) = log_expected_inclusion_counts(length(d))
+function log_expected_inclusion_probabilities(d::UniformUrnDists)
+	vals = log_expected_inclusion_counts(length(d))
+	z = logsumexp_batch(vals)
+	return vals .- z
+end
+
+function expected_inclusion_probabilities(d::T) where T<:Union{BetaBinomialConditionalUrnDistribution, BetaBinomialMvUrnDistribution}
+	# return exp.(d._log_model_probs_by_incl)
 	k = length(d) - 1
 	return Distributions.pdf.(Distributions.BetaBinomial(k, d.α, d.β), 0:k)
 end
 
-function expected_model_probabilities(d::BetaBinomialConditionalUrnDistribution, compact::Bool = false)
+function log_expected_inclusion_probabilities(d::T) where T<:Union{BetaBinomialConditionalUrnDistribution, BetaBinomialMvUrnDistribution}
+	k = length(d) - 1
+	return Distributions.logpdf.(Distributions.BetaBinomial(k, d.α, d.β), 0:k)
+end
+
+
+function expected_model_probabilities(d::T, compact::Bool = false) where T<:Union{BetaBinomialConditionalUrnDistribution, BetaBinomialMvUrnDistribution}
 	incl_probs  = expected_inclusion_probabilities(d)
 	no_models_with_incl = expected_inclusion_counts(length(d))
 	probs = incl_probs ./ no_models_with_incl

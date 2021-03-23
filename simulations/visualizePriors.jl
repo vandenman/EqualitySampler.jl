@@ -1,103 +1,54 @@
+#=
+
+	This file visualizes the priors over partitions by their
+		- probability of individual models
+		- probability of including x (in)equalities
+
+	Distributions:
+
+		UniformConditionalUrnDistribution
+		BetaBinomialConditionalUrnDistribution
+		DirichletProcessDistribution (Chinese restaurant)
+
+=#
+
 using EqualitySampler, Plots, Turing
 import StatsBase: countmap
 include("simulations/samplePriorsTuring.jl")
 include("simulations/plotFunctions.jl")
-# include("simulations/helperfunctions.jl")
 
-updateDistribution(::UniformConditionalUrnDistribution, urns, j) = UniformConditionalUrnDistribution(urns, j)
-updateDistribution(D::BetaBinomialConditionalUrnDistribution, urns, j) = BetaBinomialConditionalUrnDistribution(urns, j, D.α, D.β)
+function linear_interpolation(new_x, known_y::AbstractVector{T}, known_x) where T
+	# assumes new_x and known_x is sorted from small to large
+	!issorted(new_x)	&& throw(DomainError(new_x,		"new_x should be sorted"))
+	!issorted(known_x)	&& throw(DomainError(known_x,	"known_x should be sorted"))
 
-function simulate_from_distribution(nrand, D)
-	println("Drawing $nrand draws from $(typeof(D).name)")
-	k = length(D)
-	urns = copy(D.urns)
-	sampled_models = Matrix{Int}(undef, k, nrand)
-	for i in 1:nrand
-		urns = ones(Int, k)
-		for j in 1:k
-			D = updateDistribution(D, urns, j)
-			urns[j] = rand(D, 1)[1]
+	result = Vector{T}(undef, length(new_x))
+	j0 = 1
+	for i in eachindex(new_x)
+
+		# find the index of the largest value in new_x smaller than new_x[i]
+		for j in j0:length(known_x)
+			if known_x[j] > new_x[i]
+				j0 = j - 1
+				break
+			end
 		end
-		sampled_models[:, i] .= reduce_model(urns)
+
+		if j0 == length(known_x)
+			i1 = j0 - 1
+			i2 = j0
+		else
+			i1 = j0
+			i2 = i1 + 1
+		end
+
+		w = (new_x[i] - known_x[i1]) / (known_x[i2] - known_x[i1])
+		result[i] = known_y[i1] * (1 - w) + known_y[i2] * w
+
 	end
-	return sampled_models
+	result
 end
 
-k = 4
-nrand = 100_000
-urns = collect(1:k)
-D = UniformConditionalUrnDistribution(urns, 1)
-sampled_models = simulate_from_distribution(nrand, D)
-
-empirical_model_probs     = empirical_model_probabilities(sampled_models)
-empirical_inclusion_probs = empirical_inclusion_probabilities(sampled_models)
-
-pjoint = visualize_eq_samples(D, empirical_model_probs, empirical_inclusion_probs)
-# png(pjoint, "modelspace uniform $k.png")
-
-nrand = 100_000
-urns = collect(1:k)
-D = BetaBinomialConditionalUrnDistribution(urns, 1, 1, 1)
-sampled_models = simulate_from_distribution(nrand, D)
-
-empirical_model_probs     = empirical_model_probabilities(sampled_models)
-empirical_inclusion_probs = empirical_inclusion_probabilities(sampled_models)
-
-pjoint = visualize_eq_samples(D, empirical_model_probs, empirical_inclusion_probs)
-
-#region Turing UniformConditionalUrnDistribution
-k = 4
-uniform_reference_dist = UniformConditionalUrnDistribution(1:k)
-equality_prior, empirical_model_probs, empirical_inclusion_probs, _ = sample_and_compute_Turing(k, uniform_prior = true)
-visualize_eq_samples(equality_prior, empirical_model_probs, empirical_inclusion_probs)
-
-equality_prior, empirical_model_probs, empirical_inclusion_probs, _ = sample_and_compute_Turing(k, uniform_prior = false)
-visualize_eq_samples(equality_prior, empirical_model_probs, empirical_inclusion_probs)
-
-# Note that this prior  puts different weight on 1221 than on 1222
-empirical_model_probs, empirical_inclusion_probs, _ = sample_process_turing(k, Turing.RandomMeasures.DirichletProcess(1.0))
-visualize_eq_samples(uniform_reference_dist, empirical_model_probs, empirical_inclusion_probs)
-
-empirical_model_probs, empirical_inclusion_probs, _ = sample_process_turing(k, Turing.RandomMeasures.DirichletProcess(3.0))
-visualize_eq_samples(uniform_reference_dist, empirical_model_probs, empirical_inclusion_probs)
-
-empirical_model_probs, empirical_inclusion_probs, _ = sample_process_turing(k, Turing.RandomMeasures.PitmanYorProcess(0.5, 0.5, 1))
-visualize_eq_samples(uniform_reference_dist, empirical_model_probs, empirical_inclusion_probs)
-
-# using Profile
-# using ProfileView
-
-# model = small_model(k, true, 1.0, 1.0)
-# samples = sample(model, Prior(), 10_000)
-# ProfileView.@profview sample_and_compute_Turing(k, uniform_prior = true, no_samples = 100)
-
-# samples = sample(model, Prior(), 10_000)
-# ProfileView.@profview sample(model, Prior(), 10_000)
-
-
-# model = small_model(k, true, 1.0, 1.0)
-# @code_warntype model.f(
-#     Random.GLOBAL_RNG,
-#     model,
-#     Turing.VarInfo(model),
-#     Turing.SampleFromPrior(),
-#     Turing.DefaultContext(),
-#     model.args...,
-# )
-
-# m2 = TuringDirichletProcess(k, 1.0)
-# @code_warntype m2.f(
-#     Random.GLOBAL_RNG,
-#     m2,
-#     Turing.VarInfo(m2),
-#     Turing.SampleFromPrior(),
-#     Turing.DefaultContext(),
-#     m2.args...,
-# )
-
-#endregion
-
-#region Theoretical Plots
 function ordering(x)
 	# TODO: ensure this is the actual ordering like on wikipedia
 	d = countmap(x)
@@ -160,8 +111,16 @@ end
 
 function incl_pmf!(plt, D; yaxis = :log, palette = :default, color = 1:length(D), label = fill("", length(D)))
 	k = length(D)
-	scatter!(plt, 0:k-1, expected_inclusion_probabilities(D), m = 4, yaxis = yaxis, legend = false,
+	incl_probs = expected_inclusion_probabilities(D)
+	scatter!(plt, 0:k-1, incl_probs, m = 4, yaxis = yaxis, legend = false,
 				  color = color, markerstrokecolor = color, palette = palette, label = label);
+
+	xx = [i + j for i in 0:k-2 for j in (0.05, 0.95)]
+	yy = linear_interpolation(xx, incl_probs, collect(0:k-1))
+	xm = reshape(xx, (2, k-1))
+	ym = reshape(yy, (2, k-1))
+	plot!(plt, xm, ym, color = color, palette = palette, label = label, yaxis = yaxis, legend = false)
+	# plot!(plt, 0:k-1, incl_probs, color = color, palette = palette, label = label, yaxis = yaxis, legend = false)
 end
 
 k = 5
@@ -179,7 +138,8 @@ colorpalet  = :seaborn_colorblind
 palette(colorpalet);
 
 # TODO: this could just be a loop over distributions with parameter vectors
-αβ = ((.5, 2), (2, 2), (1, 1), (.5, .5)) # Beta Binomial parameters
+# αβ = ((.5, 2), (2, 2), (1, 1), (.5, .5)) # Beta Binomial parameters
+αβ = ((.75, 1.5), (1, 1), (.5, .5)) # Beta Binomial parameters
 αs = (1.887, 1.0, 3.0) # Dirichlet Process parameters
 # plt row, column
 plt11 = empty_plot(k, legend = false, yaxis = yaxis_scale, xrotation = xrotation, xfontsize = xfontsize, palette = colorpalet);
@@ -199,6 +159,7 @@ for i in eachindex(αβ)
 	model_pmf!(plt12, BetaBinomialConditionalUrnDistribution(ones(Int, k), 1, α, β), fill(i, k), labels);
 end
 plot!(plt12, title = "Beta-binomial", xlab = "Model", ylims = ylimsModel);
+plot!(plt12, yformatter=_->"");
 
 # plt12 = empty_plot(k, legend = false, yaxis = yaxis_scale, xrotation = xrotation, xfontsize = xfontsize, palette = colorpalet);
 # model_pmf!(plt12, DBetaBinom);
@@ -213,27 +174,34 @@ for i in eachindex(αs)
 	model_pmf!(plt13, DP, fill(i, k), labels);
 end
 plot!(plt13, title = "Dirichlet Process", xlab = "Model", ylims = ylimsModel);
+plot!(plt13, yformatter=_->"");
 
 # plt13 = empty_plot(k, legend = false, yaxis = yaxis_scale, xrotation = xrotation, xfontsize = xfontsize, palette = colorpalet);
 # model_pmf!(plt13, DDirichletProcess);
 # plot!(plt13, title = "DirichletProcess (α = $(DDirichletProcess.rpm.α))", xlab = "Model", ylims = ylimsModel);
 
-setAxis!(plt) = plot!(plt, xlab = "No. inequalities", ylab = "Probabilty", ylims = ylimsIncl);
+function setAxis!(plt, addLabels = false)
+	if addLabels
+		plot!(plt, xlab = "No. inequalities", ylab = "Probabilty", ylims = ylimsIncl);
+	else
+		plot!(plt, ylims = ylimsIncl, yformatter = _->"");
+	end
+end
 
-plt21 = plot()
+plt21 = plot();
 incl_pmf!(plt21, Duniform, yaxis = yaxis_scale, palette = colorpalet, color = fill(1, k));
-setAxis!(plt21)
+setAxis!(plt21, true);
 
-plt22 = plot()
+plt22 = plot();
 for i in eachindex(αβ)
 	α, β = αβ[i]
 	labels = fill("", k)
 	labels[1] = "α = $α, β = $β"
 	incl_pmf!(plt22, BetaBinomialConditionalUrnDistribution(ones(Int, k), 1, α, β), yaxis = yaxis_scale, palette = colorpalet, color = fill(i, k))
 end
-setAxis!(plt22)
+setAxis!(plt22);
 
-plt23 = plot()
+plt23 = plot();
 for i in eachindex(αβ)
 	α = αs[i]
 	labels = fill("", k)
@@ -241,7 +209,7 @@ for i in eachindex(αβ)
 	DP = RandomProcessDistribution(Turing.RandomMeasures.DirichletProcess(α), k)
 	incl_pmf!(plt23, DP, yaxis = yaxis_scale, palette = colorpalet, color = fill(i, k))
 end
-setAxis!(plt23)
+setAxis!(plt23);
 
 
 # plt23 = incl_pmf(DDirichletProcess, yaxis = yaxis_scale, palette = colorpalet);
@@ -250,4 +218,7 @@ setAxis!(plt23)
 w = 420
 joint = plot(plt11, plt12, plt13, plt21, plt22, plt23, layout = (2, 3), size = (2w, 3w))
 savefig(joint, joinpath("figures", "prior_$k.pdf"))
-#endregion
+
+
+# ys = Vector[rand(10), rand(20)]# .* u"km"
+# plot(ys, color=[:black :orange], line=(:dot, 4), marker=([:hex :d], 12, 0.8, Plots.stroke(3, :gray)))
