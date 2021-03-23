@@ -1,87 +1,94 @@
+#=
+
+	This file replicates figures 1 and 2 of:
+
+	Scott, J. G., & Berger, J. O. (2010). Bayes and empirical-Bayes multiplicity adjustment in the variable-selection problem. The Annals of Statistics, 2587-2619.
+
+	in addition, it repeats the same simulation for the following prior distributions over partitions:
+
+		UniformConditionalUrnDistribution
+		BetaBinomialConditionalUrnDistribution
+		DirichletProcessDistribution (Chinese restaurant)
+
+
+	# TODO: double check exactly what Scott & Berger did!
+
+=#
+
 using EqualitySampler, Plots, Distributions
+import Turing
 
 
-#region replication Figures 1 and 2 of Scott & Berger (2010)
-p = 30
-D = BetaBinomial(p, 1, 1)
-included = 0:p
-lpdf = logpdf.(D, included) .- log.(binomial.(p, included))
-fig1 = plot(included, lpdf, legend = false);
-scatter!(fig1, included, lpdf);
-title!(fig1, "Figure 1 of Scott & Berger (2010)");
 
+EqualitySampler.logpdf_model(D::BetaBinomial, no_equalities::Integer) = logpdf(D, no_equalities) - log(binomial(promote(ntrials(D), no_equalities)...))
+diff_lpdf(D, no_inequalities) = logpdf_model(D, no_inequalities - 1) - logpdf_model(D, no_inequalities)
 
+k = 30#BigInt(50)
 variables_added = [1, 2, 5, 10]
-pos_included = 2:2:100
+pos_included = 2:2:30
 
-logpdf_model(D, variable_added) = logpdf(D, variable_added) - log(binomial(ntrials(D), variable_added))
-function diff_lpdf(variable_added, p, α::Float64 = 1.0, β::Float64 = 1.0)
-	D = BetaBinomial(p, α, β)
-	return logpdf_model(D, variable_added - 1) - logpdf_model(D, variable_added)
-end
+dists = [
+	BetaBinomial(k, 1, 1),
+	UniformMvUrnDistribution(k),
+	BetaBinomialMvUrnDistribution(k, 1, 1),
+	RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(1.887))
+]
+updateSize(d::BetaBinomial, k) = BetaBinomial(k, d.α, d.β)
+updateSize(::UniformMvUrnDistribution, k) = UniformMvUrnDistribution(k)
+updateSize(d::BetaBinomialMvUrnDistribution, k) = BetaBinomialMvUrnDistribution(k, d.α, d.β)
+updateSize(d::RandomProcessMvUrnDistribution, k) = RandomProcessMvUrnDistribution(k, d.rpm)
 
-result = Matrix{Float64}(undef, length(variables_added), length(pos_included))
-for (i, p) in enumerate(pos_included)
-	for j in eachindex(variables_added)
-		result[j, i] = diff_lpdf(variables_added[j], p)
+figs = Matrix{Plots.Plot}(undef, 3, length(dists))
+for (i, d) in enumerate(dists)
+	@show i, d
+
+	included = 0:k-1
+	lpdf = logpdf_model.(Ref(d), included)
+	# @assert sum(exp, lpdf) ≈ 1
+
+	fig1 = plot(included, lpdf, legend = false);
+	if d isa UniformMvUrnDistribution
+		ylims!(fig1, (-60, -10));
 	end
+	xticks!(fig1, 0:5:k);
+	xlims!(fig1, (-1, k));
+	scatter!(fig1, included, lpdf);
+	title!(fig1, "$(typeof(d).name.name)");
+
+	result = Matrix{Float64}(undef, length(variables_added), length(pos_included))
+	for (i, p) in enumerate(pos_included)
+		D = updateSize(d, p)
+		for j in eachindex(variables_added)
+			result[j, i] = diff_lpdf(D, variables_added[j])
+		end
+	end
+
+	fig2 = plot(pos_included, exp.(result)', label = permutedims(["$p included" for p in variables_added]),
+				legend = isone(i) ? :topleft : :none);
+	# title!(fig2, "Fig 2 of S & B");
+
+	fig3 = plot(pos_included, result', label = permutedims(["$p included" for p in variables_added]),
+				legend = isone(i) ? :topleft : :none);
+	# title!(fig3, "Fig 2 of S & B (log scale)");
+
+	if i == length(dists)
+		plot!(twinx(fig1), tick = nothing, ylabel = "Figure 1 of S & B", ticks = nothing)
+		plot!(twinx(fig2), tick = nothing, ylabel = "Figure 2 of S & B", )
+		plot!(twinx(fig3), tick = nothing, ylabel = "Figure 3 of S & B (log scale)")
+	end
+
+	figs[1, i] = fig1
+	figs[2, i] = fig2
+	figs[3, i] = fig3
+
 end
 
-fig2 = plot(pos_included, exp.(result)', label = permutedims(["$p included" for p in variables_added]), legend = :topleft);
-title!(fig2, "Figure 2 of Scott & Berger (2010)");
+# i = 4
+# d = dists[4]
 
-fig3 = plot(pos_included, result', label = permutedims(["$p included" for p in variables_added]), legend = :topleft);
-title!(fig3, "Figure 2 of Scott & Berger (2010) with logarithmic y-axis");
+# figs[1, 3]
 
 w = 500
-plot(fig1, fig2, fig3, size = (w, 2w))
-#endregion
+ncols = size(figs, 2)
+plot(permutedims(figs)..., layout = (3, ncols), size = (3w, w * ncols))
 
-#region replication with our custom BetaBinomial distribution
-k = 30
-urns = collect(1:k)
-D = BetaBinomialConditionalUrnDistribution(urns, 1, 1, 1)
-
-equalities = 1:k
-# first make the figure for small k! also make multivariate distributions!
-
-lpdf = log.(expected_inclusion_probabilities(D)) .- log.(expected_inclusion_counts(BigInt(k)))
-fig1 = plot(equalities, lpdf, legend = false, xlab = "No. inequalities", ylab = "log probability");
-scatter!(fig1, equalities, lpdf);
-title!(fig1, "prior model probability given the number of inequalities");
-
-variables_added = [1, 2, 5, 10]
-pos_included = 2:2:35
-
-DD = BetaBinomialConditionalUrnDistribution(ones(Int, 5), 1, 2.3, 4.6)
-BB = BetaBinomial(length(DD) - 1, DD.α, DD.β)
-# EqualitySampler._pdf(DD) ./ expected_inclusion_counts(length(DD))
-exp.(logpdf_model.(BB, 0:ntrials(BB)))
-
-# NOTE: stirlings2(35, 17) overflows...
-
-function logpdf_model(D, no_inequalities)
-	ntrials(D) - no_inequalities + 1 < 0 && return -Inf
-	logpdf(D, no_inequalities) - logstirlings2(ntrials(D) + 1, ntrials(D) - no_inequalities + 1)
-end
-
-function diff_lpdf(no_inequalities, p, α::Float64 = 1.0, β::Float64 = 1.0)
-	D = BetaBinomial(p, α, β)
-	return logpdf_model(D, no_inequalities - 1) - logpdf_model(D, no_inequalities)
-end
-
-result = Matrix{Float64}(undef, length(variables_added), length(pos_included))
-for (i, p) in enumerate(pos_included)
-	for j in eachindex(variables_added)
-		result[j, i] = diff_lpdf(variables_added[j], p)
-	end
-end
-
-fig2 = plot(pos_included, exp.(result)', label = permutedims(["$p included" for p in variables_added]), legend = :topleft);
-title!(fig2, "Figure 2 of Scott & Berger (2010)");
-
-w = 500
-plot(fig1, fig2, layout = (2, 1), size = (w, w))
-
-
-#endregion

@@ -3,14 +3,21 @@ import Combinatorics
 
 @testset "combinatorialFunctions" begin
 
+	nvals = 12
+	kvals = 12
+	rvals = 6
 	@testset "comparison with Combinatorics" begin
 
-		nvals = 8
-		kvals = 8
 		for strategy in (ExplicitStrategy, RecursiveStrategy)
 			@testset "stirlings2, StirlingStrategy: $strategy" begin
 				for n in 1:nvals, k in 1:kvals
 					@test Combinatorics.stirlings2(n, k) == stirlings2(n, k, strategy)
+				end
+			end
+
+			@testset "stirlings1, StirlingStrategy: $strategy" begin
+				for n in 1:nvals, k in 1:kvals
+					@test Combinatorics.stirlings1(n, k) == unsignedstirlings1(n, k, strategy)
 				end
 			end
 		end
@@ -18,6 +25,12 @@ import Combinatorics
 		@testset "bell numbers" begin
 			for n in 1:12
 				@test Combinatorics.bellnum(n) == bellnumr(n, 0)
+			end
+		end
+
+		@testset "unsignedstirlings1" begin
+			for n in 1:nvals, k in 1:kvals
+				@test Combinatorics.stirlings1(n, k) == unsignedstirlings1(n, k)
 			end
 		end
 	end
@@ -79,9 +92,6 @@ import Combinatorics
 		@test reference == replication
 	end
 
-	nvals = 8
-	kvals = 8
-	rvals = 4
 	@testset "compare logstirlings2 against log(stirlings2)" begin
 		for n in 1:nvals, k in 1:kvals
 			@test logstirlings2(n, k) ≈ log(stirlings2(n, k))
@@ -90,6 +100,34 @@ import Combinatorics
 	@testset "compare logstirlings2r against log(stirlings2r)" begin
 		for n in 1:nvals, k in 1:kvals, r in 1:rvals
 			@test logstirlings2r(n, k, r) ≈ log(stirlings2r(n, k, r))
+		end
+	end
+	@testset "compare logunsignedstirlings1 against log(unsignedstirlings1)" begin
+		for n in 1:nvals, k in 1:kvals
+			@test logunsignedstirlings1(n, k) ≈ log(unsignedstirlings1(n, k))
+		end
+	end
+
+	@testset "compare unsignedstirlings1 against wikipedia" begin
+
+		reference = [
+			1      0       0       0      0      0     0    0   0  0
+			0      1       0       0      0      0     0    0   0  0
+			0      1       1       0      0      0     0    0   0  0
+			0      2       3       1      0      0     0    0   0  0
+			0      6      11       6      1      0     0    0   0  0
+			0     24      50      35     10      1     0    0   0  0
+			0    120     274     225     85     15     1    0   0  0
+			0    720    1764    1624    735    175    21    1   0  0
+			0   5040   13068   13132   6769   1960   322   28   1  0
+			0  40320  109584  118124  67284  22449  4536  546  36  1
+		]
+
+		for strategy in (ExplicitStrategy, RecursiveStrategy)
+
+			replication = [unsignedstirlings1(n, k, strategy) for n in 0:9, k in 0:9]
+			@test reference == replication
+
 		end
 	end
 end
