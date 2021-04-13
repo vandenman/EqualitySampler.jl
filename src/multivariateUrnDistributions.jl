@@ -41,7 +41,8 @@ function logpdf_incl(d::AbstractMvUrnDistribution, no_equalities::Integer)
 	logpdf_model(d, no_equalities) + log_count_distinct_models_with_incl(k, no_equalities)
 end
 
-pdf_incl(d::AbstractMvUrnDistribution, no_equalities) = exp(logpdf_incl(d, no_equalities))
+pdf_incl(d::AbstractMvUrnDistribution,  no_equalities) = exp(logpdf_incl(d,  no_equalities))
+pdf_model(d::AbstractMvUrnDistribution, no_equalities) = exp(logpdf_model(d, no_equalities))
 
 #endregion
 
@@ -159,11 +160,11 @@ logpdf_model(::RandomProcessMvUrnDistribution, ::Integer) = throw("unimplemented
 
 function logpdf_model(d::RandomProcessMvUrnDistribution{RPM, T}, no_equalities::Integer) where {RPM<:RandomMeasures.DirichletProcess, T<:Integer}
 
-	n = length(d)
-	M = d.rpm.α
-	k = n - no_equalities
-
-	return k * log(M) + SpecialFunctions.lgamma(M) - SpecialFunctions.lgamma(M + n)
+	# n = length(d)
+	# M = d.rpm.α
+	# k = n - no_equalities
+	# return k * log(M) + SpecialFunctions.lgamma(M) - SpecialFunctions.lgamma(M + n)
+	logpdf_incl(d, no_equalities) - log_count_distinct_models_with_incl(length(d), no_equalities)
 
 end
 

@@ -42,7 +42,11 @@ figs = Matrix{Plots.Plot}(undef, 3, length(dists))
 for (i, d) in enumerate(dists)
 	@show i, d
 
-	included = 0:k-1
+	if d isa RandomProcessDistribution
+		included = BigInt(0):k
+	else
+		included = 0:k
+	end
 	lpdf = logpdf_model.(Ref(d), included)
 	# @assert sum(exp, lpdf) ≈ 1
 
@@ -51,7 +55,7 @@ for (i, d) in enumerate(dists)
 		ylims!(fig1, (-60, -10));
 	end
 	xticks!(fig1, 0:5:k);
-	xlims!(fig1, (-1, k));
+	xlims!(fig1, (-1, k+1));
 	scatter!(fig1, included, lpdf);
 	title!(fig1, "$(typeof(d).name.name)");
 
@@ -68,8 +72,12 @@ for (i, d) in enumerate(dists)
 	# title!(fig2, "Fig 2 of S & B");
 
 	fig3 = plot(pos_included, result', label = permutedims(["$p included" for p in variables_added]),
-				legend = isone(i) ? :topleft : :none);
+	legend = isone(i) ? :topleft : :none);
 	# title!(fig3, "Fig 2 of S & B (log scale)");
+	if d isa UniformMvUrnDistribution
+		plot!(fig2, ylims = (0, 2),  yticks = [0, 1, 2])
+		plot!(fig3, ylims = (-1, 1), yticks = [-1, 0, 1])
+	end
 
 	if i == length(dists)
 		plot!(twinx(fig1), tick = nothing, ylabel = "Figure 1 of S & B", ticks = nothing)
@@ -83,12 +91,22 @@ for (i, d) in enumerate(dists)
 
 end
 
-# i = 4
-# d = dists[4]
-
-# figs[1, 3]
-
 w = 500
 ncols = size(figs, 2)
-plot(permutedims(figs)..., layout = (3, ncols), size = (3w, w * ncols))
+jointPlot = plot(permutedims(figs)..., layout = (3, ncols), size = (3w, w * ncols))
+# savefig(jointPlot, "figures")
+
+
+# plot(figs[2, 2], size = (300, 300))
+
+# d = dists[4]
+# D = updateSize(d, 5)
+
+# pdf_model.(Ref(D), 0:4)
+# pdf_model.(Ref(D), 0:4)
+
+# pdf_incl.(Ref(D), 0:4)
+
+# cc = EqualitySampler.count_distinct_models_with_incl.(5, 0:4)
+# pdf_incl.(Ref(D), 0:4) ./ cc
 

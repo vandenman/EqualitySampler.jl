@@ -36,7 +36,7 @@ import Distributions, Turing
 				d = dist[:dist](args...)
 				m = generate_distinct_models(k)
 
-				@testset "pdf sums to 1 + inclusion probabilities match " begin
+				@testset "pdf sums to 1, inclusion probabilities match, model probabilities match " begin
 
 					s = [count_equalities(col) for col in eachcol(m)]
 					indices = [findall(==(i), s) for i in 0:k-1]
@@ -51,6 +51,13 @@ import Distributions, Turing
 
 					# direct computation of inclusion probabilities (which is more efficient) equals brute force computation of inclusion probabilities
 					@test efficient_incl_probs ≈ brute_force_incl_probs
+
+					model_probs  = pdf_model.(Ref(d), 0:k-1)
+					model_counts = count_distinct_models_with_incl.(k, 0:k-1)
+
+					# dividing inclusion probabilities by model size frequency gives the model probabilities
+					@test efficient_incl_probs ./ model_counts ≈ model_probs
+
 				end
 
 				@testset "simulated properties match theoretical results" begin

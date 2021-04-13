@@ -15,13 +15,16 @@ function alternating_logsumexp_batch(x::AbstractVector{T}) where T <: Number
 	# there is also a streaming version, see http://www.nowozin.net/sebastian/blog/streaming-log-sum-exp-computation.html
 	result = zero(T)
 	sign = isodd(length(x) - 1) ? -1 : 1
-	alpha = maximum(x)
+	range = sign == -1 ? (1:2:length(x)) : (2:2:length(x))
+	alpha = maximum(view(x, range))
+	# alpha = maximum(x)
 	for i in eachindex(x)
 		result += sign * exp(x[i] - alpha)
 		sign *= -1
 	end
 	# TODO: come up with something better than this fallback!
 	if result < 0.0
+		@warn "alternating_logsumexp_batch failed which likely introduced numerical errors."
 		return T(log(sum(value->exp(BigFloat(value)), x)))
 	else
 		return log(result) + alpha
@@ -81,23 +84,17 @@ Memoize.@memoize function stirlings2_recursive(n::T, k::T) where T <: Integer
 end
 
 """
-Base cases for stirlings2. Should return a tuple of (base_case_found::Bool, value::T).
+Base cases for stirlings2. Returns a tuple of (base_case_found::Bool, value::T).
 """
 function stirlings2_base_cases(n::T, k::T) where T <: Integer
 
-	if n < zero(T)
-		throw(DomainError(n, "n must be nonnegative"))
-	elseif k > n
-		return (true, zero(T))
-	elseif n == k
-		return (true, one(T))
-	elseif n == zero(T) || k == zero(T)
-		return (true, zero(T))
-	elseif k == n - 1
-		return (true, binomial(n, T(2)))
-	elseif k == T(2)
-		return (true, 2^(n-1) - 1)
-	end
+	n < zero(T) || k < zero(T) 			&&		return (true, 0)
+	k > n								&&		return (true, zero(T))
+	n == k								&&		return (true, one(T))
+	n == zero(T) || k == zero(T)		&&		return (true, zero(T))
+	k == n - 1							&&		return (true, binomial(n, T(2)))
+	k == T(2)							&&		return (true, 2^(n-1) - 1)
+
 	return (false, zero(T))
 
 end
@@ -119,6 +116,8 @@ function logstirlings2(n::T, k::T) where T <: Integer
 	return alternating_logsumexp_batch(logvalues) - SpecialFunctions.logfactorial(k)
 
 end
+logstirlings2(n::T, k::U) where {T<:Integer, U<:Integer} = logstirlings2(promote(n, k)...)
+
 #endregion
 
 #region r-Stirling numbers of the second kind
@@ -358,7 +357,7 @@ function logunsignedstirlings1(n::T, k::T) where T <: Integer
 
 	# avoids an explicit factorial in unsignedstirlings1_base_cases
 	n != zero(T) && k == 1		&& return SpecialFunctions.logfactorial(n - 1)
-	k == 2						&& return SpecialFunctions.logfactorial(n - 1) + log(sum(i->1/i, 1:n-1))
+	n >= 2 && k == 2			&& return SpecialFunctions.logfactorial(n - 1) + log(sum(i->1/i, 1:n-1))
 
 	succes, value = unsignedstirlings1_base_cases(n, k)
 	succes && value >= zero(T) && return log(Float64(value))
