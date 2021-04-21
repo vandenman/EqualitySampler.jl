@@ -1,15 +1,17 @@
 # for linear models
 using GLM, StatsBase, StatsModels, DataFrames
 # for Bayesian inference
-using Turing, DynamicPPL, FillArrays, LinearAlgebra
+using EqualitySampler, Turing, DynamicPPL, FillArrays, LinearAlgebra
 # for plots
-using StatsPlots, Plots
+using Plots
+# using StatsPlots # has a bit too many dependencies
 import Colors # doesn't really need to be imported with using
-include("src/loglikelihood.jl")
-include("src/helperfunctions.jl")
-include("src/newApproach4.jl")
+using Suppressor
+# include("src/loglikelihood.jl")
+include("simulations/helpersTuring.jl")
+# include("src/newApproach4.jl")
 
-#region helper function 
+#region helper function
 function trace_plots_nuisance(chain)
 	params = string.(chain.name_map.parameters)
 	filter!(!startswith("equal_indices"), params)
@@ -20,8 +22,8 @@ function trace_plots_nuisance(chain)
 end
 
 function get_θ_cs(model, chain)
-	
-	gen = generated_quantities(model, chain)
+
+	gen = Suppressor.@suppress generated_quantities(model, chain)
 	θ_cs_est = Matrix{Float64}(undef, length(gen), length(gen[1][1]))
 	for i in eachindex(gen)
 		θ_cs_est[i, :] .= gen[i][1]
@@ -31,13 +33,13 @@ end
 
 trace_plots_θ_cs(model, chain) = trace_plots_θ_cs(model, chain, get_θ_cs(model, chain))
 function trace_plots_θ_cs(model, chain, θ_cs_est)
-	
+
 	n_groups = size(θ_cs_est)[2]
 	color_options = Colors.distinguishable_colors(n_groups, [RGB(1,1,1), RGB(0,0,0)], dropseed=true);
 	eq_samples = mapslices(reduce_model, Int.(get_eq_samples(chain)), dims = 2)
 
 	subplots = (
-		plot(view(θ_cs_est, :, i), title = "θ_cs_$i", legend = false, 
+		plot(view(θ_cs_est, :, i), title = "θ_cs_$i", legend = false,
 				linecolor = color_options[eq_samples[:, i]])
 			for i in axes(θ_cs_est, 2)
 	)
@@ -50,7 +52,7 @@ function trace_plots(model, chain, θ_cs_est)
 	subplots_nuisance = trace_plots_nuisance(chain)
 	subplotsθ_cs = trace_plots_θ_cs(model, chain, θ_cs_est)
 	plot(Iterators.flatten((subplots_nuisance, subplotsθ_cs))...)
-	
+
 end
 
 density_θ_cs(model, chain) = density_θ_cs(get_θ_cs(model, chain))
@@ -60,6 +62,16 @@ function density_θ_cs(θ_cs_est)
 		dim = vcat(fill.(axes(θ_cs_est, 2), size(θ_cs_est)[1])...)
 	)
 	@df θ_samples density(:θ_cs, group = :dim)
+end
+
+function plot_parameter_retrieval(θ_cs, pop_means, obs_means)
+
+	p1 = plot(pop_means, θ_cs)
+	Plots.abline!(p1, 0, 1)
+
+	p2 = plot(obs_means, θ_cs)
+	Plots.abline!(p2, 0, 1)
+	plot([p1, p2], layout = (1, 2))
 end
 
 function getQ(n_groups::Int)
@@ -120,7 +132,7 @@ end
 	# constrain θ according to the sampled equalities
 	# TODO: first check if full model works as intended!
 	θ_cs = θ_s#average_equality_constraints(θ_s, equal_indices)
-	
+
 	# definition from Rouder et. al., (2012) eq 6.
 	σ = sqrt(σ²)
 	y ~ MvNormal(μ_grand .+ σ .* (X * θ_cs), σ)
@@ -133,16 +145,16 @@ end
 
 	n_groups = length(obs_mean)
 	# sample equalities among the sds
-	equal_indices = TArray{Int}(n_groups)
-	equal_indices .= indicator_state
-	for i in 1:n_groups
-		if uniform
-			equal_indices[i] ~ UniformConditionalUrnDistribution(equal_indices, i)
-		else
-			equal_indices[i] ~ BetaBinomialConditionalUrnDistribution(equal_indices, i)
-		end
-	end
-	indicator_state .= equal_indices
+	# equal_indices = TArray{Int}(n_groups)
+	# equal_indices .= indicator_state
+	# for i in 1:n_groups
+	# 	if uniform
+	# 		equal_indices[i] ~ UniformConditionalUrnDistribution(equal_indices, i)
+	# 	else
+	# 		equal_indices[i] ~ BetaBinomialConditionalUrnDistribution(equal_indices, i)
+	# 	end
+	# end
+	# indicator_state .= equal_indices
 
 	σ² ~ InverseGamma(1, 1)
 	μ_grand ~ Normal(0, 1)
@@ -154,7 +166,38 @@ end
 	# constrain θ according to the sampled equalities
 	# TODO: first check if full model works as intended!
 	θ_cs = θ_s#average_equality_constraints(θ_s, equal_indices)
-	
+
+	# definition from Rouder et. al., (2012) eq 6.
+	σ = sqrt(σ²)
+	for i in 1:n_groups
+		obs_mean[i] ~ NormalSuffStat(obs_var[i], μ_grand + θ_cs[i], σ, obs_n[i])
+	end
+	return (θ_cs, θ_s)
+end
+
+@model function anova_model_ss_mv(obs_mean, obs_var, obs_n, Q, uniform = true, ::Type{T} = Float64) where {T}
+
+	# TODO: this only works for a 1-way anova
+
+	n_groups = length(obs_mean)
+	# sample equalities among the sds
+	if uniform
+		equal_indices ~ UniformMvUrnDistribution(equal_indices, i)
+	else
+		equal_indices ~ BetaBinomialMvUrnDistribution(equal_indices, i)
+	end
+
+	σ² ~ InverseGamma(1, 1)
+	μ_grand ~ Normal(0, 1)
+
+	# The setup for θ follows Rouder et al., 2012, p. 363
+	θ_r ~ filldist(Normal(0, 1), n_groups - 1)
+	# ensure that subtract the mean of θ to ensure the sum to zero constraint
+	θ_s = Q * θ_r
+	# constrain θ according to the sampled equalities
+	# TODO: first check if full model works as intended!
+	θ_cs = θ_s#average_equality_constraints(θ_s, equal_indices)
+
 	# definition from Rouder et. al., (2012) eq 6.
 	σ = sqrt(σ²)
 	for i in 1:n_groups
@@ -168,7 +211,7 @@ end
 
 @model function anova_model_rho_ss(obs_mean, obs_var, obs_n, uniform = true, indicator_state = ones(Int, size(X)[2]), ::Type{T} = Float64) where {T}
 
-	#= TODO: 
+	#= TODO:
 
 		this can be done way easier!
 		first implement the full model with the regular sum to zero constraint
@@ -195,7 +238,7 @@ end
 	ρ ~ Dirichlet(ones(Int, n_groups))
 	ρ_c = average_equality_constraints(ρ, equal_indices)
 	θ_cs = quantile.(Normal(0, 1), ρ_c)
-	
+
 	# definition from Rouder et. al., (2012) eq 6.
 	σ = sqrt(σ²)
 	for i in 1:n_groups
@@ -229,7 +272,7 @@ df = DataFrame(:y => y, :g => categorical(g))
 combine(groupby(df, :g), :y => mean, :y => x->mean(x .- μ_grand_true))
 
 
-# get design matrix without intercept bit with full dummy coding 
+# get design matrix without intercept bit with full dummy coding
 #TODO: maybe an indicator vector is easier (and more efficient) like in the data simulation
 X = StatsModels.modelmatrix(@formula(y ~ 0 + g).rhs, DataFrame(:g => g), hints = Dict(:g => StatsModels.FullDummyCoding()))
 #endregion
@@ -272,7 +315,7 @@ mean(θ_cs_prior, dims = 1)
 
 # study posterior
 spl = Gibbs(PG(100, :equal_indices), HMC(0.0005, 20, :σ, :μ_grand, :θ))
-chn_eq_raw = sample(mod_raw, spl, 50_000)
+chn_eq_raw = sample(mod_raw, spl, 5_000)
 
 # Trace plots of nuisance parameters
 trace_plots(mod_raw, chn_eq_raw)
@@ -321,19 +364,40 @@ mod_ss = anova_model_ss(obs_means, obs_var, obs_n, Q, uniform_prior)
 chn_ss_prior = sample(mod_ss, Prior(), 20_000)
 visualize_helper(prior_distribution, chn_ss_prior)
 
+
+
 θ_cs_prior = get_θ_cs(mod_ss, chn_ss_prior)
 density_θ_cs(θ_cs_prior)
 mean(θ_cs_prior, dims = 1)
 trace_plots(mod_ss, chn_ss_prior, θ_cs_prior)
 
 # study posterior
-spl = Gibbs(PG(50, :equal_indices), HMC(0.05, 20, :σ², :μ_grand, :θ))
-chn_ss_post = sample(mod_ss, spl, 20_000)
+# spl = Gibbs(PG(10, :equal_indices), HMC(0.05, 20, :σ², :μ_grand, :θ))
+# chn_ss_post = sample(mod_ss, spl, 10_000)
+
+spl = Gibbs(PG(10, :equal_indices), HMC(0.05, 20, :σ², :μ_grand, :θ))
+chn_ss_post = sample(mod_ss, spl, 10_000)
+
+
+# Metropolis is way faster, maybe good to try this during development
+# chn_ss_post = sample(mod_ss, MH(), 10_000) # uses the prior for proposals...
+# import AdvancedMH # random walks, but crashes...
+# spl_ml = MH(((:σ², :μ_grand, :θ, :equal_indices) .=> Ref(AdvancedMH.RandomWalkProposal(Normal(0, 0.25))))...)
+# chn_ss_post = sample(mod_ss, spl_mh, 10_000)
+
+gen = Suppressor.@suppress generated_quantities(mod_ss, chn_ss_post)
+θ_cs_est = Matrix{Float64}(undef, length(gen), length(gen[1][1]))
+for i in eachindex(gen)
+	θ_cs_est[i, :] .= gen[i][1]
+end
+return θ_cs_est
 
 θ_cs_post = get_θ_cs(mod_ss, chn_ss_post)
 trace_plots(mod_ss, chn_ss_post, θ_cs_post)
 density_θ_cs(θ_cs_post)
 mean(θ_cs_post, dims = 1)
+
+plot_parameter_retrieval(vec(θ_cs_post), θ_true, obs_means)
 
 visualize_helper(prior_distribution, chn_ss_post)
 

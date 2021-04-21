@@ -8,6 +8,7 @@ import Turing, Turing.RandomMeasures
 
 export
 	NormalSuffStat,
+	MvNormalSuffStat,
 	AbstractConditionalUrnDistribution,
 	UniformConditionalUrnDistribution,
 	BetaBinomialConditionalUrnDistribution,

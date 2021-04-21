@@ -39,7 +39,7 @@ end
 function _univariate_normal_likelihood(obs_mean, obs_var, pop_mean, pop_sds, n)
 
 	pop_prec = 1.0 / (pop_sds * pop_sds)
-	result = 
+	result =
 		log(2 * float(pi)) +
 		2 * log(pop_sds) +
 		obs_var * pop_prec +
@@ -49,20 +49,27 @@ function _univariate_normal_likelihood(obs_mean, obs_var, pop_mean, pop_sds, n)
 end
 
 # MvNormal Distribution parametrized with sufficient statistics for a diagonal covariance matrix
-struct MvNormalSuffStat <: Distributions.AbstractMvNormal
-	obs_var::AbstractVector{<:Real}
-	pop_mean::AbstractVector{<:Real}
-	pop_var::AbstractVector{<:Real}
+struct MvNormalSuffStat{T<:AbstractVector{<:Real}, U<:AbstractVector{<:Real}} <: Distributions.AbstractMvNormal
+# struct MvNormalSuffStat{T<:AbstractVector{<:Real}, U<:AbstractVector{<:Real}} <: Distributions.Distribution{F, S}
+	obs_var::T
+	pop_mean::U
+	pop_var::U
 	n::Int
 end
 Distributions.logpdf(D::MvNormalSuffStat, obs_mean::AbstractVector) = _multivariate_normal_likelihood(obs_mean, D.obs_var, D.pop_mean, D.pop_var, D.n)
 # this method isn't necessary for observe statements in Turing
 # Distributions.rand(rng::Random.AbstractRNG, D::MvNormalSuffStat) = rand(rng, MvNormal(D.pop_mean, D.pop_var ./ D.n))
 
-struct NormalSuffStat <: Distributions.ContinuousUnivariateDistribution
-	obs_var::Real
-	pop_mean::Real
-	pop_var::Real
+struct NormalSuffStat{T<:Real, U<:Real} <: Distributions.ContinuousUnivariateDistribution
+# struct NormalSuffStat{T<:Real, U<:Real} <: Distributions.Distribution
+	obs_var::T
+	pop_mean::U
+	pop_var::U
 	n::Int
 end
 Distributions.logpdf(D::NormalSuffStat, obs_mean::T) where T<:Real = _univariate_normal_likelihood(obs_mean, D.obs_var, D.pop_mean, D.pop_var, D.n)
+
+# NormalSuffStat(::Float64,
+# ::ForwardDiff.Dual{ForwardDiff.Tag{Turing.Core.var"#f#1"{TypedVarInfo{NamedTuple{(:σ², :μ_grand, :θ_r), Tuple{DynamicPPL.Metadata{Dict{VarName{:σ², Tuple{}}, Int64}, Vector{InverseGamma{Float64}}, Vector{VarName{:σ², Tuple{}}}, Vector{Float64}, Vector{Set{DynamicPPL.Selector}}}, DynamicPPL.Metadata{Dict{VarName{:μ_grand, Tuple{}}, Int64}, Vector{Normal{Float64}}, Vector{VarName{:μ_grand, Tuple{}}}, Vector{Float64}, Vector{Set{DynamicPPL.Selector}}}, DynamicPPL.Metadata{Dict{VarName{:θ_r, Tuple{}}, Int64}, Vector{DistributionsAD.TuringScalMvNormal{Vector{Float64}, Float64}}, Vector{VarName{:θ_r, Tuple{}}}, Vector{Float64}, Vector{Set{DynamicPPL.Selector}}}}}, Float64}, Model{var"#24#25", (:obs_mean, :obs_var, :obs_n, :Q, :T), (:T,), (), Tuple{Vector{Float64}, Vector{Float64}, Vector{Int64}, Matrix{Float64}, Type{Float64}}, Tuple{Type{Float64}}}, Sampler{NUTS{Turing.Core.ForwardDiffAD{40}, (), AdvancedHMC.DiagEuclideanMetric}}, DefaultContext}, Float64}, Float64, 7},
+# ::ForwardDiff.Dual{ForwardDiff.Tag{Turing.Core.var"#f#1"{TypedVarInfo{NamedTuple{(:σ², :μ_grand, :θ_r), Tuple{DynamicPPL.Metadata{Dict{VarName{:σ², Tuple{}}, Int64}, Vector{InverseGamma{Float64}}, Vector{VarName{:σ², Tuple{}}}, Vector{Float64}, Vector{Set{DynamicPPL.Selector}}}, DynamicPPL.Metadata{Dict{VarName{:μ_grand, Tuple{}}, Int64}, Vector{Normal{Float64}}, Vector{VarName{:μ_grand, Tuple{}}}, Vector{Float64}, Vector{Set{DynamicPPL.Selector}}}, DynamicPPL.Metadata{Dict{VarName{:θ_r, Tuple{}}, Int64}, Vector{DistributionsAD.TuringScalMvNormal{Vector{Float64}, Float64}}, Vector{VarName{:θ_r, Tuple{}}}, Vector{Float64}, Vector{Set{DynamicPPL.Selector}}}}}, Float64}, Model{var"#24#25", (:obs_mean, :obs_var, :obs_n, :Q, :T), (:T,), (), Tuple{Vector{Float64}, Vector{Float64}, Vector{Int64}, Matrix{Float64}, Type{Float64}}, Tuple{Type{Float64}}}, Sampler{NUTS{Turing.Core.ForwardDiffAD{40}, (), AdvancedHMC.DiagEuclideanMetric}}, DefaultContext}, Float64}, Float64, 7},
+# ::Int64)
