@@ -1,4 +1,6 @@
 import OrderedCollections: OrderedDict
+import StatsBase: countmap
+
 get_eq_ind_nms(samples) = filter(x->startswith(string(x), "equal_indices"), samples.name_map.parameters)
 function get_eq_samples(samples)
 	eq_ind_nms = get_eq_ind_nms(samples)
@@ -74,6 +76,16 @@ function compute_incl_probs(chn; add_missing_inclusions::Bool = true)
 	end
 	return sort(counts2probs(count))
 end
+
+function counts2probs(counts::Dict{T, Int}) where T
+	total_visited = sum(values(counts))
+	probs = Dict{T, Float64}()
+	for (model, count) in counts
+		probs[model] = count / total_visited
+	end
+	return probs
+end
+
 
 function get_posterior_means_mu_sigma(model, chn)
 	s = summarystats(chn)

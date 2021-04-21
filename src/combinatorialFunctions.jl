@@ -32,6 +32,9 @@ function alternating_logsumexp_batch(x::AbstractVector{T}) where T <: Number
 	# return log(sum((sign, value) -> sign * exp(value - alpha), zip(x, it))) + alpha
 end
 
+# TODO: compare this to LogExpFunctions.logsumexp
+# https://github.com/JuliaStats/LogExpFunctions.jl/blob/master/src/logsumexp.jl
+# probably better if we don't have to reinvent the wheel
 function logsumexp_batch(x::AbstractVector{T}) where T <: Number
 	isone(length(x)) && return x[1]
 	alpha = maximum(x)
