@@ -48,7 +48,8 @@ for (i, d) in enumerate(dists)
 		included = 0:k
 	end
 	lpdf = logpdf_model.(Ref(d), included)
-	# @assert sum(exp, lpdf) ≈ 1
+
+	# @assert isapprox(sum(exp, lpdf), 1, atol = 1e-4) # <- should also be multiplied with number of models
 
 	fig1 = plot(included, lpdf, legend = false);
 	if d isa UniformMvUrnDistribution
@@ -94,7 +95,53 @@ end
 w = 500
 ncols = size(figs, 2)
 jointPlot = plot(permutedims(figs)..., layout = (3, ncols), size = (3w, w * ncols))
-# savefig(jointPlot, "figures")
+savefig(jointPlot, joinpath("figures", "prior_comparison_plot_3x4_with_log.pdf"))
+
+jointPlot = plot(permutedims(view(figs, 1:2, :))..., layout = (2, ncols), size = (2w, w * ncols))
+savefig(jointPlot, joinpath("figures", "prior_comparison_plot_2x4_without_log.pdf"))
+
+# diagnosing floating point issues with DPP...
+
+# d = dists[4]
+# included = 0:k
+# lpdf = logpdf_model.(Ref(d), included)
+
+# plot(included, lpdf, legend = false)
+# show(stdout, "text/plain", hcat(included, lpdf))
+
+# logpdf_model(d, 22)
+# logpdf_model(d, 23)
+# logpdf_model(d, 24)
+
+# logpdf_incl(d, 22)
+# log_count_distinct_models_with_incl(length(d), 22)
+
+# @code_warntype logunsignedstirlings1(30, 30-22)
+
+# unsignedstirlings1(big(30), 22)
+# log(unsignedstirlings1(big(30), 22))
+
+# logunsignedstirlings1(30, 30-22)
+
+# terms = map(r->EqualitySampler.stirlings1ExplLogTerm(n, k, r), 0:n-k)
+# log(sum(exp, big.(terms)))
+
+# nvals = 30
+# kvals = 30
+# for n in 1:nvals, k in 1:kvals
+# 	# @show n, k
+# 	result = isapprox(logunsignedstirlings1(n, k), log(unsignedstirlings1(big(n), k)), atol = 1e-4)
+# 	@show result, n, k
+# end
+# unsignedstirlings1(big(22), 2)
+
+# (n, k) = (21, 3)
+# logunsignedstirlings1(n, k) - log(unsignedstirlings1(big(n), k))
+
+# terms = map(r->EqualitySampler.stirlings1ExplLogTerm(n, k, r), 0:n-k)
+# log(sum(exp, big.(terms)))
+
+
 
 
 # plot(figs[2, 2], size = (300, 300))
