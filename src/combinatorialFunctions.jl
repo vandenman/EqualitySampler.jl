@@ -365,6 +365,8 @@ function logunsignedstirlings1(n::T, k::T) where T <: Integer
 	succes, value = unsignedstirlings1_base_cases(n, k)
 	succes && value >= zero(T) && return log(Float64(value))
 
-	terms = map(r->stirlings1ExplLogTerm(n, k, r), 0:n-k)
-	return alternating_logsumexp_batch(terms)
+	# this is more accurate than the stirlings1ExplLogTerm which introduces floating point errors for some reason
+	return Float64(log(unsignedstirlings1(BigInt(n), BigInt(k))))
+	# terms = map(r->stirlings1ExplLogTerm(n, k, r), 0:n-k)
+	# return alternating_logsumexp_batch(terms)
 end
