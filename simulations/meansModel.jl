@@ -196,6 +196,55 @@ function fit_eq_model(df; iterations::Int = 15_000)
 	return mean_θ_cs, θ_cs, chain, model
 end
 
+@model function one_way_anova_eq_cond_ss(obs_mean, obs_var, obs_n, Q, indicator_state = ones(Int, length(obs_mean)), ::Type{T} = Float64) where {T}
+
+	n_groups = length(obs_mean)
+
+	σ² 				~ InverseGamma(1, 1)
+	μ_grand 		~ Normal(0, 1)
+
+	equal_indices = TArray{Int}(n_groups)
+	equal_indices .= indicator_state
+	for i in eachindex(equal_indices)
+		# if uniform
+		equal_indices[i] ~ UniformConditionalUrnDistribution(equal_indices, i)
+		# else
+		# 	equal_indices[i] ~ BetaBinomialConditionalUrnDistribution(equal_indices, i)
+		# end
+	end
+	indicator_state .= equal_indices
+
+	# The setup for θ follows Rouder et al., 2012, p. 363
+	θ_r ~ filldist(Normal(0, 1), n_groups - 1)
+	# ensure that subtract the mean of θ to ensure the sum to zero constraint
+	θ_s = Q * θ_r
+	# constrain θ according to the sampled equalities
+	θ_cs = average_equality_constraints(θ_s, equal_indices)
+
+	# definition from Rouder et. al., (2012) eq 6.
+	σ = sqrt(σ²)
+	for i in 1:n_groups
+		obs_mean[i] ~ NormalSuffStat(obs_var[i], μ_grand + θ_cs[i], σ, obs_n[i])
+	end
+	return (θ_cs, )
+end
+
+function fit_eq_model2(df; iterations::Int = 15_000)
+
+	obs_mean, obs_var, obs_n = get_suff_stats(df)
+
+	Q = getQ(length(obs_mean))
+	@assert isapprox(sum(Q * randn(length(obs_mean) - 1)), 0.0, atol = 1e-8)
+
+	model = one_way_anova_eq_cond_ss(obs_mean, obs_var, obs_n, Q)
+	spl = Gibbs(PG(20, :equal_indices), HMC(0.01, 10, :μ_grand, :σ², :θ_r))
+	chain = sample(model, spl, iterations)
+	θ_cs = get_θ_cs(model, chain)
+	mean_θ_cs = mean(θ_cs, dims = 2)
+
+	return mean_θ_cs, θ_cs, chain, model
+end
+
 # X = StatsModels.modelmatrix(@formula(y ~ 0 + g).rhs, DataFrame(:g => g), hints = Dict(:g => StatsModels.FullDummyCoding()))
 
 n_groups = 6
@@ -235,7 +284,7 @@ LA.UnitLowerTriangular(compute_post_prob_eq(chain_eq))
 
 # example with equalities
 n_groups = 6
-n_obs_per_group = 200
+n_obs_per_group = 5000
 θ_raw = randn(n_groups) .* 3
 θ_raw .-= mean(θ_raw)
 true_model = [1, 1, 2, 2, 3, 3]
@@ -248,7 +297,7 @@ plot(θ_cs_full')
 scatter(true_values[:θ], mean_θ_cs_full, legend = :none);
 Plots.abline!(1, 0)
 
-mean_θ_cs_eq, θ_cs_eq, chain_eq, model_eq = fit_eq_model(df, iterations = 30_000)
+mean_θ_cs_eq, θ_cs_eq, chain_eq, model_eq = fit_eq_model(df, iterations = 100_000)
 plot(θ_cs_eq')
 
 scatter(true_values[:θ], mean_θ_cs_eq, legend = :none)
@@ -265,7 +314,12 @@ filter(x->!iszero(x[2]), model_counts)
 LA.UnitLowerTriangular(compute_post_prob_eq(chain_eq))
 
 
+# fit_eq_model2
+mean_θ_cs_eq, θ_cs_eq, chain_eq, model_eq = fit_eq_model2(df, iterations = 30_000)
+plot(θ_cs_eq')
 
+scatter(true_values[:θ], mean_θ_cs_eq, legend = :none)
+Plots.abline!(1, 0)
 
 
 
