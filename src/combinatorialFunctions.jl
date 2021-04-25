@@ -61,10 +61,13 @@ The `RecursiveStrategy` uses recursion and is mathematically elegant yet ineffic
 stirlings2(n::T, k::T) where T <: Integer = stirlings2(n, k, ExplicitStrategy)
 function stirlings2(n::T, k::T, ::Type{ExplicitStrategy}) where T <: Integer
 
-	# TODO: do something nicer with these common cases
 	succes, value = stirlings2_base_cases(n, k)
 	succes && return value
 
+	return _stirlings2_inner(n, k)
+end
+
+function _stirlings2_inner(n::T, k::T) where T <: Integer
 	res = zero(T)
 	sign = iseven(k) ? -1 : 1
 	for j in 1:k
@@ -98,6 +101,13 @@ function stirlings2_base_cases(n::T, k::T) where T <: Integer
 	k == n - 1							&&		return (true, binomial(n, T(2)))
 	k == T(2)							&&		return (true, 2^(n-1) - 1)
 
+	if n <= _r_stirling2r_N_MAX
+		index = _stirling2r_index(n, k, zero(T))
+		if 1 <= index <= length(_stirlings2r_table_BigInt)
+			return (true, T(_stirlings2r_table_BigInt[index]))
+		end
+	end
+
 	return (false, zero(T))
 
 end
@@ -129,6 +139,9 @@ stirlings2rExplLogTerm(n::T, k::T, r::T, j::T)   where T <: Integer = logbinomia
 stirlings2rExplLogTermr0(n::T, k::T, r::T, j::T) where T <: Integer = logbinomial(n - r, j) + logstirlings2(j, k - r)
 stirlings2rExplTerm(n::T, k::T, r::T, j::T)      where T <: Integer =    binomial(n - r, j) *    stirlings2(j, k - r) *     r  ^ (n - r - j)
 
+# just for precomputing
+_stirlings2rExplTerm_precompute(n::T, k::T, r::T, j::T)      where T <: Integer =    binomial(n - r, j) *    _stirlings2_inner(j, k - r) *     r  ^ (n - r - j)
+
 
 """
 	stirlings2r(n::T, k::T, r::T) where T <: Integer
@@ -145,13 +158,11 @@ function stirlings2r(n::T, k::T, r::T, ::Type{ExplicitStrategy}) where T <: Inte
 	succes, value = stirlings2r_base_cases(n, k, r)
 	succes && return value
 
-	sum(j->stirlings2rExplTerm(n, k, r, j), 1:n-r)
-	# result = zero(T)
-	# for j in 1:n-r
-	# 	result += stirlings2rExplTerm(n, k, r, j)
-	# end
-	# return result
+	return sum(j->stirlings2rExplTerm(n, k, r, j), 1:n-r)
+
 end
+
+_stirlings2r_precompute(n::T, k::T, r::T) where T <: Integer = sum(j->_stirlings2rExplTerm_precompute(n, k, r, j), 1:n-r)
 
 stirlings2r(n::T, k::T, r::T, ::Type{RecursiveStrategy}) where T <: Integer = stirlings2r_recursive(n, k, r)
 
@@ -175,10 +186,51 @@ function stirlings2r_base_cases(n::T, k::T, r::T) where T <: Integer
 	iszero(n) || iszero(k)			&& return (true, zero(T))
 	n == r							&& return (true, one(T))
 	k == r							&& return (true, r^(n - r))
+	k == r + 1						&& return (true, (r + 1)^(n - r) - r^(n - r)) # <- fix me!
 	iszero(r) 						&& return (true, stirlings2(n, k))
+
+	if n <= _r_stirling2r_N_MAX && r <= _r_stirling2r_R_MAX
+		index = _stirling2r_index(n, k, r)
+		if 1 <= index <= length(_stirlings2r_table_BigInt)
+			return (true, T(_stirlings2r_table_BigInt[index]))
+		end
+	end
 
 	return (false, zero(T))
 end
+
+const _r_stirling2r_R_MAX = 15
+const _r_stirling2r_N_MAX = 15
+const _stirlings2r_table_BigInt = Vector{BigInt}(undef, _r_stirling2r_R_MAX * _r_stirling2r_N_MAX * (_r_stirling2r_N_MAX + 1) ÷ 2)
+
+function _stirling2r_index(n::T, k::T, r::T) where T <: Integer
+	# map the triangular array to a linear index
+	# k moves fastest then n, then r.
+	n = n - r - 1
+	k = k - r
+	r_offset	= r * _r_stirling2r_N_MAX * (_r_stirling2r_N_MAX + 1) ÷ 2
+	nk_offset	= n * (n - 1) ÷ 2 + 1 + k - 1
+	return r_offset + nk_offset
+end
+
+for r in range(	eltype(_stirlings2r_table_BigInt)(0),		length = _r_stirling2r_R_MAX),
+	n in range(	eltype(_stirlings2r_table_BigInt)(r+2),		length = _r_stirling2r_N_MAX),
+	k in 		eltype(_stirlings2r_table_BigInt)(r+1):n-1
+
+	_stirlings2r_table_BigInt[_stirling2r_index(n, k, r)] = EqualitySampler._stirlings2r_precompute(n, k, r)
+end
+
+# test = Vector{Int}(undef, _r_stirling2r_R_MAX * _r_stirling2r_N_MAX * (_r_stirling2r_N_MAX + 1) ÷ 2)
+# index = 1
+# for r in range(big(0), length = _r_stirling2r_R_MAX),
+# 	n in range(big(r+2), length = _r_stirling2r_N_MAX),
+# 	k in big(r+1):n-1
+# 	test[index] = _stirling2r_index(n, k, r)
+# 	index += 1
+# end
+# @assert test == 1:_r_stirling2r_R_MAX * _r_stirling2r_N_MAX * (_r_stirling2r_N_MAX + 1) ÷ 2
+# varinfo(r"_stirlings2r_table_BigInt")
+
 
 """
 	logstirlings2r(n::T, k::T, r::T) where T <: Integer
@@ -211,10 +263,16 @@ end
 	Computes the r-Bell numbers.
 """
 function bellnumr(n::T, r::T) where T <: Integer
-	#=
-		TODO: this could also use stirlings2r(n, k, 1), or just sum over them!
 
-	=#
+	succes, value = bellnumr_base_cases(n, r)
+	succes && return value
+
+	return bellnumr_inner(n, r)
+end
+bellnumr(n::T, r::U) where {T <: Integer, U <: Integer} = bellnumr(promote(n, r)...)
+
+function bellnumr_inner(n::T, r::T) where T <: Integer
+
 	res = zero(T)
 	for k in 0:n
 		res += stirlings2r(n+r, k+r, r)
@@ -226,10 +284,14 @@ function bellnumr(n::T, r::T) where T <: Integer
 			# r^(n - i)
 	# end
 	return res
+
 end
-bellnumr(n::T, r::U) where {T <: Integer, U <: Integer} = bellnumr(promote(n, r)...)
 
 function logbellnumr(n::T, r::T) where T <: Integer
+
+	succes, value = bellnumr_base_cases(n, r)
+	succes && return Float64(log(value))
+
 	values = Vector{Float64}(undef, n + 1)
 	for k in 0:n
 		values[k+1] = logstirlings2r(n+r, k+r, r)
@@ -238,6 +300,35 @@ function logbellnumr(n::T, r::T) where T <: Integer
 end
 logbellnumr(n::T, r::U) where {T <: Integer, U <: Integer} = logbellnumr(promote(n, r)...)
 
+# const _bellnumr_table64 = Matrix{Int64}(undef, 11, 11);
+# for n in 0:10, r in 0:10
+# 	_bellnumr_table64[r+1, n+1] = bellnumr(n, r);
+# end
+
+# sufficient for all simulation sizes (this could be more clever though)
+const _bellnumr_table_BigInt = Matrix{BigInt}(undef, 31, 31);
+for n in range(BigInt(5), length = size(_bellnumr_table_BigInt, 1)), r in range(BigInt(0), length = size(_bellnumr_table_BigInt, 2))
+	_bellnumr_table_BigInt[r+1, n-4] = bellnumr_inner(n, r);
+end
+
+function bellnumr_base_cases(n::T, r::T) where T <: Integer
+
+	# base cases
+	n == 0		&& 		return (true, 		one(T))
+	n == 1		&&		return (true, 		r + 1)
+	# https://oeis.org/A002522 offset by 1
+	n == 2 		&& 		return (true, 		(r + 1)^2 + 1)
+	# https://oeis.org/A005491 offset by 1
+	n == 3		&&		return (true, 		(r + 1)^3 + 3(r + 1) + 1)
+	# https://oeis.org/A005492 simplify equations for a(n)
+	n == 4	&&			return (true, 		15 + r * (20 + r * (12 + r * (4 + r))))
+
+	if 0 <= r < size(_bellnumr_table_BigInt, 1) && 5 <= n < size(_bellnumr_table_BigInt, 2) &&
+		return (true, T(_bellnumr_table_BigInt[r+1, n-4]))
+	end
+
+	return (false, 		zero(T))
+end
 
 #endregion
 
