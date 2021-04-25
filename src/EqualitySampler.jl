@@ -6,6 +6,9 @@ import StatsBase: countmap
 import OrderedCollections: OrderedDict
 import Turing, Turing.RandomMeasures
 
+# for BayesFactor
+import QuadGK
+
 export
 	NormalSuffStat,
 	MvNormalSuffStat,
@@ -58,7 +61,9 @@ export
 	AbstractMvUrnDistribution,
 	UniformMvUrnDistribution,
 	BetaBinomialMvUrnDistribution,
-	RandomProcessMvUrnDistribution
+	RandomProcessMvUrnDistribution,
+
+	bayes_factor_one_way_anova
 
 	#,
 	# maybe these shouldn't be exported, at least, the lookup of the name of the turing samples shouldn't be done in there
@@ -73,6 +78,7 @@ include("conditionalUrnDistributions.jl")
 include("normalLogLikelihood.jl")
 include("helpers.jl")
 include("PdfDirichletProcess.jl")
+include("bayesFactors.jl")
 
 
 end

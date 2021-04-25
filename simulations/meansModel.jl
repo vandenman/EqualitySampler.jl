@@ -8,320 +8,124 @@ import	StatsBase 			as SB,
 		DataFrames			as DF,
 		GLM
 
-import DataFrames: DataFrame, categorical
+import DataFrames: DataFrame
 import StatsModels: @formula
 import Suppressor
 import Random
 
-include("simulations/plotFunctions.jl")
+# include("simulations/plotFunctions.jl") # <- unused?
 include("simulations/helpersTuring.jl")
+include("simulations/anovaFunctions.jl")
 
-function simulate_data_one_way_anova(
-		n_groups::Integer,
-		n_obs_per_group::Integer,
-		θ::Vector{Float64} = Float64[],
-		μ::Real = 0.0,
-		σ::Real = 1.0)
-
-	if isempty(θ)
-		θ = 2 .* randn(n_groups)
-	end
-	@assert length(θ) == n_groups
-
-	n_obs = n_groups * n_obs_per_group
-	θ2 = θ .- SB.mean(θ)
-
-	g = Vector{Int}(undef, n_obs)
-	for (i, r) in enumerate(Iterators.partition(1:n_obs, ceil(Int, n_obs / n_groups)))
-		g[r] .= i
-	end
-
-	D = MvNormal(μ .+ σ .* θ[g], σ)
-	y = rand(D)
-
-	df = DataFrame(:y => y, :g => categorical(g))
-	# combine(groupby(df, :g), :y => mean, :y => x->mean(x .- μ_grand_true))
-
-	true_values = Dict(
-		:σ			=> σ,
-		:μ			=> μ,
-		:θ			=> θ2,
-	)
-
-	return y, df, D, true_values
-
-end
-
-function fit_lm(y, df)
-	mod = SM.fit(GLM.LinearModel, @formula(y ~ 1 + g), df)#, contrasts = Dict(:g => StatsModels.FullDummyCoding()))
-	# transform the coefficients to a grand mean and offsets
-	coefs = copy(GLM.coef(mod))
-	ests = similar(coefs)
-	ests[1] = coefs[1] - mean(df[!, :y])
-	ests[2:end] .= coefs[2:end] .+ coefs[1] .- mean(df[!, :y])
-	return ests, mod
-end
-
-function getQ(n_groups)::Matrix{Float64}
-	# X = StatsModels.modelmatrix(@formula(y ~ 0 + g).rhs, DataFrame(:g => g), hints = Dict(:g => StatsModels.FullDummyCoding()))
-	Σₐ = Matrix{Float64}(LA.I, n_groups, n_groups) .- (1.0 / n_groups)
-	_, v::Matrix{Float64} = LA.eigen(Σₐ)
-	v[end:-1:1, end:-1:2] # this is what happens in Rouder et al., (2012) eq ...
-end
-
-@model function one_way_anova_full_ss(obs_mean, obs_var, obs_n, Q, ::Type{T} = Float64) where {T}
-
-	n_groups = length(obs_mean)
-	σ² ~ InverseGamma(1, 1)
-	μ_grand ~ Normal(0, 1)
-
-	# The setup for θ follows Rouder et al., 2012, p. 363
-	θ_r ~ filldist(Normal(0, 1), n_groups - 1)
-	# ensure that subtract the mean of θ to ensure the sum to zero constraint
-	θ_s = Q * θ_r
-	θ_cs = θ_s # full model
-
-	# definition from Rouder et. al., (2012) eq 6.
-	σ = sqrt(σ²)
-	for i in 1:n_groups
-		obs_mean[i] ~ NormalSuffStat(obs_var[i], μ_grand + θ_cs[i], σ, obs_n[i])
-	end
-	return (θ_cs, )
-end
-
-function get_suff_stats(df)
-
-	temp_df::DataFrame = DF.combine(DF.groupby(df, :g), :y => mean, :y => x -> mean(xx -> xx^2, x), :y => length)
-
-	obs_mean::Vector{Float64}	= temp_df[!, "y_mean"]
-	obs_var::Vector{Float64}	= temp_df[!, "y_function"]
-	obs_n::Vector{Int}			= temp_df[!, "y_length"]
-
-	return obs_mean, obs_var, obs_n
-end
-
-function get_θ_cs(model, chain)
-	gen = Suppressor.@suppress generated_quantities(model, chain)
-	θ_cs = Matrix{Float64}(undef, length(first(gen[1])), length(gen))
-	for i in eachindex(gen)
-		θ_cs[:, i] = gen[i][1]
-	end
-	return θ_cs
-end
-
-function fit_full_model(df; iterations::Int = 15_000)
-
-	obs_mean, obs_var, obs_n = get_suff_stats(df)
-
-	Q = getQ(length(obs_mean))
-	@assert isapprox(sum(Q * randn(length(obs_mean) - 1)), 0.0, atol = 1e-8)
-
-	model = one_way_anova_full_ss(obs_mean, obs_var, obs_n, Q)
-	# chain = sample(model, HMC(0.01, 10), 15_000)
-	chain = sample(model, NUTS(), iterations)
-	θ_cs = get_θ_cs(model, chain)
-	mean_θ_cs = mean(θ_cs, dims = 2)
-	return mean_θ_cs, θ_cs, chain, model
-
-end
-
-
-# this is very type unstable...
-# function fit_model(df; which_model::Symbol = :full, iterations::Int = 15_000)
-
-# 	obs_mean, obs_var, obs_n = get_suff_stats(df)
-
-# 	Q = getQ(length(obs_mean))
-# 	@assert isapprox(sum(Q * randn(length(obs_mean) - 1)), 0.0, atol = 1e-8)
-
-# 	if which_model == :full
-# 		model = one_way_anova_full_ss(obs_mean, obs_var, obs_n, Q)
-# 		sampler = Nuts()
-# 	elseif which_model ==:EqualitySampler
-# 		model = one_way_anova_eq_ss(obs_mean, obs_var, obs_n, Q)
-# 		spl = Gibbs(PG(20, :equal_indices), HMC(0.01, 10, :μ_grand, :σ², :θ_r))
-# 	end
-# 	chain = sample(model, sampler, iterations)
-# 	θ_cs = get_θ_cs(model, chain)
-# 	mean_θ_cs = mean(θ_cs, dims = 2)
-
-# 	return mean_θ_cs, θ_cs, chain, model
-# end
-
-function average_equality_constraints(ρ::AbstractVector{<:Real}, equal_indices::AbstractVector{<:Integer})
-	ρ_c = similar(ρ)
-	# this can be done more efficiently but I'm not sure it matters when length(ρ) is small
-	for i in eachindex(ρ)
-		ρ_c[i] = mean(ρ[equal_indices .== equal_indices[i]])
-	end
-	return ρ_c
-end
-
-@model function one_way_anova_eq_ss(obs_mean, obs_var, obs_n, Q, ::Type{T} = Float64) where {T}
-
-	n_groups = length(obs_mean)
-
-	σ² 				~ InverseGamma(1, 1)
-	μ_grand 		~ Normal(0, 1)
-	equal_indices 	~ UniformMvUrnDistribution(n_groups)
-
-	# The setup for θ follows Rouder et al., 2012, p. 363
-	θ_r ~ filldist(Normal(0, 1), n_groups - 1)
-	# ensure that subtract the mean of θ to ensure the sum to zero constraint
-	θ_s = Q * θ_r
-	# constrain θ according to the sampled equalities
-	θ_cs = average_equality_constraints(θ_s, equal_indices)
-
-	# definition from Rouder et. al., (2012) eq 6.
-	σ = sqrt(σ²)
-	for i in 1:n_groups
-		obs_mean[i] ~ NormalSuffStat(obs_var[i], μ_grand + θ_cs[i], σ, obs_n[i])
-	end
-	return (θ_cs, )
-end
-
-function fit_eq_model(df; iterations::Int = 15_000)
-
-	obs_mean, obs_var, obs_n = get_suff_stats(df)
-
-	Q = getQ(length(obs_mean))
-	@assert isapprox(sum(Q * randn(length(obs_mean) - 1)), 0.0, atol = 1e-8)
-
-	model = one_way_anova_eq_ss(obs_mean, obs_var, obs_n, Q)
-	spl = Gibbs(PG(20, :equal_indices), HMC(0.01, 10, :μ_grand, :σ², :θ_r))
-	chain = sample(model, spl, iterations)
-	θ_cs = get_θ_cs(model, chain)
-	mean_θ_cs = mean(θ_cs, dims = 2)
-
-	return mean_θ_cs, θ_cs, chain, model
-end
-
-@model function one_way_anova_eq_cond_ss(obs_mean, obs_var, obs_n, Q, indicator_state = ones(Int, length(obs_mean)), ::Type{T} = Float64) where {T}
-
-	n_groups = length(obs_mean)
-
-	σ² 				~ InverseGamma(1, 1)
-	μ_grand 		~ Normal(0, 1)
-
-	equal_indices = TArray{Int}(n_groups)
-	equal_indices .= indicator_state
-	for i in eachindex(equal_indices)
-		# if uniform
-		equal_indices[i] ~ UniformConditionalUrnDistribution(equal_indices, i)
-		# else
-		# 	equal_indices[i] ~ BetaBinomialConditionalUrnDistribution(equal_indices, i)
-		# end
-	end
-	indicator_state .= equal_indices
-
-	# The setup for θ follows Rouder et al., 2012, p. 363
-	θ_r ~ filldist(Normal(0, 1), n_groups - 1)
-	# ensure that subtract the mean of θ to ensure the sum to zero constraint
-	θ_s = Q * θ_r
-	# constrain θ according to the sampled equalities
-	θ_cs = average_equality_constraints(θ_s, equal_indices)
-
-	# definition from Rouder et. al., (2012) eq 6.
-	σ = sqrt(σ²)
-	for i in 1:n_groups
-		obs_mean[i] ~ NormalSuffStat(obs_var[i], μ_grand + θ_cs[i], σ, obs_n[i])
-	end
-	return (θ_cs, )
-end
-
-function fit_eq_model2(df; iterations::Int = 15_000)
-
-	obs_mean, obs_var, obs_n = get_suff_stats(df)
-
-	Q = getQ(length(obs_mean))
-	@assert isapprox(sum(Q * randn(length(obs_mean) - 1)), 0.0, atol = 1e-8)
-
-	model = one_way_anova_eq_cond_ss(obs_mean, obs_var, obs_n, Q)
-	spl = Gibbs(PG(20, :equal_indices), HMC(0.01, 10, :μ_grand, :σ², :θ_r))
-	chain = sample(model, spl, iterations)
-	θ_cs = get_θ_cs(model, chain)
-	mean_θ_cs = mean(θ_cs, dims = 2)
-
-	return mean_θ_cs, θ_cs, chain, model
-end
-
-# X = StatsModels.modelmatrix(@formula(y ~ 0 + g).rhs, DataFrame(:g => g), hints = Dict(:g => StatsModels.FullDummyCoding()))
-
+# example with full model, no equalities
 n_groups = 6
 n_obs_per_group = 100
 y, df, D, true_values = simulate_data_one_way_anova(n_groups, n_obs_per_group);
 
 # X = SM.modelmatrix(@formula(y ~ 1 + g).rhs, df, hints = Dict(:g => SM.FullDummyCoding()))
 ests, mod = fit_lm(y, df)
-scatter(true_values[:θ], ests, legend = :none);
-Plots.abline!(1, 0)
+scatter(true_values[:θ], ests, legend = :none); Plots.abline!(1, 0)
 
+iterations = 2_000
 
-mean_θ_cs_full, θ_cs_full, chain_full, model_full = fit_full_model(df)
+# full model
+mean_θ_cs_full, θ_cs_full, chain_full, model_full = fit_model(df, iterations = iterations)
+plot(θ_cs_full') # trace plots
+hcat(ests, mean_θ_cs_full) # compare frequentist estimates to posterior means
+scatter(true_values[:θ], mean_θ_cs_full, legend = :none); Plots.abline!(1, 0)
 
-plot(θ_cs_full')
+# ideally we fix the type instability here
+show_code_warntype(model_full)
 
-scatter(true_values[:θ], mean_θ_cs_full, legend = :none);
-Plots.abline!(1, 0)
+# equality model with multivariate prior
+mean_θ_cs_eq, θ_cs_eq, chain_eq, model_eq = fit_model(df, partition_prior = UniformMvUrnDistribution(n_groups))
+plot(θ_cs_eq') # trace plots
+hcat(ests, mean_θ_cs_eq) # compare frequentist estimates to posterior means
+scatter(true_values[:θ], mean_θ_cs_eq, legend = :none); Plots.abline!(1, 0)
+LA.UnitLowerTriangular(compute_post_prob_eq(chain_eq)) # inspect sampled equality constraints
 
+show_code_warntype(model_eq)
 
-mean_θ_cs_eq, θ_cs_eq, chain_eq, model_eq = fit_eq_model(df)
-plot(θ_cs_eq')
+# equality model with conditional distributions
+mean_θ_cs_eq2, θ_cs_eq2, chain_eq2, model_eq2 = fit_model(df, partition_prior = BetaBinomialConditionalUrnDistribution(n_groups), iterations = iterations)
+plot(θ_cs_eq2') # trace plots
+hcat(ests, mean_θ_cs_eq2) # compare frequentist estimates to posterior means
+scatter(true_values[:θ], mean_θ_cs_eq2, legend = :none); Plots.abline!(1, 0)
+LA.UnitLowerTriangular(compute_post_prob_eq(chain_eq2))
 
-scatter(true_values[:θ], mean_θ_cs_eq, legend = :none)
-Plots.abline!(1, 0)
+# this one shows some additional type instabilities, maybe because it uses lambdas?
+show_code_warntype(model_eq2)
 
-# inspect sampled equality constraints
-post_model_probs = sort(compute_model_probs(chain_eq), byvalue=true)
-post_model_probs_nonzero = filter(x->!iszero(x[2]), post_model_probs)
-sort(post_model_probs_nonzero, rev=true)
-compute_incl_probs(chain_eq)
-
-model_counts = compute_model_counts(chain_eq)
-filter(x->!iszero(x[2]), model_counts)
-LA.UnitLowerTriangular(compute_post_prob_eq(chain_eq))
-
+partition_prior = BetaBinomialConditionalUrnDistribution(n_groups)
+get_partition_prior(partition_prior, ones(Int, n_groups), 2)
+@code_warntype get_partition_prior(partition_prior, 2, ones(Int, n_groups))
 
 # example with equalities
 n_groups = 6
-n_obs_per_group = 5000
+n_obs_per_group = 100
 θ_raw = randn(n_groups) .* 3
 θ_raw .-= mean(θ_raw)
 true_model = [1, 1, 2, 2, 3, 3]
 θ_true = average_equality_constraints(θ_raw, true_model)
 y, df, D, true_values = simulate_data_one_way_anova(n_groups, n_obs_per_group, θ_true);
 
+# frequentist result
+ests, mod = fit_lm(y, df)
+scatter(true_values[:θ], ests, legend = :none);
+Plots.abline!(1, 0)
+
+# full model
 mean_θ_cs_full, θ_cs_full, chain_full, model_full = fit_full_model(df)
+plot(θ_cs_full') # trace plots
+hcat(ests, mean_θ_cs_full) # compare frequentist estimates to posterior means
+scatter(true_values[:θ], mean_θ_cs_full, legend = :none); Plots.abline!(1, 0)
 
-plot(θ_cs_full')
-scatter(true_values[:θ], mean_θ_cs_full, legend = :none);
-Plots.abline!(1, 0)
+# equality model with multivariate prior
+mean_θ_cs_eq, θ_cs_eq, chain_eq, model_eq = fit_model(df, model_type = :eq_mv, prior_type = :uniform)
+plot(θ_cs_eq') # trace plots
+hcat(ests, mean_θ_cs_eq) # compare frequentist estimates to posterior means
+scatter(true_values[:θ], mean_θ_cs_eq, legend = :none); Plots.abline!(1, 0)
+LA.UnitLowerTriangular(compute_post_prob_eq(chain_eq)) # inspect sampled equality constraints
 
-mean_θ_cs_eq, θ_cs_eq, chain_eq, model_eq = fit_eq_model(df, iterations = 100_000)
-plot(θ_cs_eq')
+mean_θ_cs_eq, θ_cs_eq, chain_eq, model_eq = fit_model(df, model_type = :eq_mv, prior_type = :beta_binomial, prior_args = (bb_α = 2.0, bb_β = 2.0, dpp_α = 1.887))
+plot(θ_cs_eq') # trace plots
+hcat(ests, mean_θ_cs_eq) # compare frequentist estimates to posterior means
+scatter(true_values[:θ], mean_θ_cs_eq, legend = :none); Plots.abline!(1, 0)
+LA.UnitLowerTriangular(compute_post_prob_eq(chain_eq)) # inspect sampled equality constraints
 
-scatter(true_values[:θ], mean_θ_cs_eq, legend = :none)
-Plots.abline!(1, 0)
+mean_θ_cs_eq, θ_cs_eq, chain_eq, model_eq = fit_model(df, model_type = :eq_mv, prior_type = :dirichlet_process)
+plot(θ_cs_eq') # trace plots
+hcat(ests, mean_θ_cs_eq) # compare frequentist estimates to posterior means
+scatter(true_values[:θ], mean_θ_cs_eq, legend = :none); Plots.abline!(1, 0)
+LA.UnitLowerTriangular(compute_post_prob_eq(chain_eq)) # inspect sampled equality constraints
 
-# inspect sampled equality constraints
-post_model_probs = sort(compute_model_probs(chain_eq), byvalue=true)
-post_model_probs_nonzero = filter(x->!iszero(x[2]), post_model_probs)
-sort(post_model_probs_nonzero, rev=true)
-compute_incl_probs(chain_eq)
-
-model_counts = compute_model_counts(chain_eq)
-filter(x->!iszero(x[2]), model_counts)
-LA.UnitLowerTriangular(compute_post_prob_eq(chain_eq))
-
-
-# fit_eq_model2
-mean_θ_cs_eq, θ_cs_eq, chain_eq, model_eq = fit_eq_model2(df, iterations = 30_000)
-plot(θ_cs_eq')
-
-scatter(true_values[:θ], mean_θ_cs_eq, legend = :none)
-Plots.abline!(1, 0)
+# equality model with conditional distributions
+mean_θ_cs_eq, θ_cs_eq, chain_eq, model_eq = fit_model(df, model_type = :eq_cond, prior_type = :beta_binomial, prior_args = (bb_α = 2.0, bb_β = 2.0, dpp_α = 1.887))
+plot(θ_cs_eq') # trace plots
+hcat(ests, mean_θ_cs_eq) # compare frequentist estimates to posterior means
+scatter(true_values[:θ], mean_θ_cs_eq, legend = :none); Plots.abline!(1, 0)
+LA.UnitLowerTriangular(compute_post_prob_eq(chain_eq)) # inspect sampled equality constraints
 
 
+mean_θ_cs_eq, θ_cs_eq, chain_eq, model_eq = fit_model2(df, model_type = :eq_mv, partition_prior = UniformMvUrnDistribution(n_groups))
+plot(θ_cs_eq') # trace plots
+hcat(ests, mean_θ_cs_eq) # compare frequentist estimates to posterior means
+scatter(true_values[:θ], mean_θ_cs_eq, legend = :none); Plots.abline!(1, 0)
+LA.UnitLowerTriangular(compute_post_prob_eq(chain_eq)) # inspect sampled equality constraints
+
+
+# quick testing
+n_groups = 3
+n_obs_per_group = 100
+y, df, D, true_values = simulate_data_one_way_anova(n_groups, n_obs_per_group);
+
+iterations = 500
+res1 = fit_model(df, iterations = iterations)
+res2 = fit_model(df, iterations = iterations, partition_prior = UniformMvUrnDistribution(1))
+res3 = fit_model(df, iterations = iterations, partition_prior = BetaBinomialMvUrnDistribution(1, 3, 2))
+res4 = fit_model(df, iterations = iterations, partition_prior = RandomProcessMvUrnDistribution(1, Turing.RandomMeasures.DirichletProcess(3)))
+
+@code_warntype fit_model(df, iterations = iterations)
 
 
 # TODO: there shouldn't be any red stuff, but there is :/ (this is mainly optimization though)
@@ -362,4 +166,27 @@ end
 inst_test_1 = model_test_1(obs_mean, obs_var, obs_n, Q)
 show_code_warntype(inst_test_1)
 
-NormalSuffStat <: Distribution
+
+import Random
+d = UniformMvUrnDistribution(20)
+u = rand(d)
+@btime Distributions._rand!($Random.GLOBAL_RNG, $d, $u)
+@edit Distributions._rand!(Random.GLOBAL_RNG, d, u)
+
+VSCodeServer.@profview [Distributions._rand!(Random.GLOBAL_RNG, d, u) for _ in 1:100]
+ProfileView.@profview [Distributions._rand!(Random.GLOBAL_RNG, d, u) for _ in 1:100]
+
+n_groups = 6
+n_obs_per_group = 100
+θ_raw = randn(n_groups) .* 3
+θ_raw .-= mean(θ_raw)
+true_model = [1, 1, 2, 2, 3, 3]
+θ_true = average_equality_constraints(θ_raw, true_model)
+y, df, D, true_values = simulate_data_one_way_anova(n_groups, n_obs_per_group, θ_true);
+
+obs_mean, obs_var, obs_n = get_suff_stats(df)
+
+@code_warntype EqualitySampler.NormalSuffStat(obs_var[1], obs_mean[1], obs_var[1], obs_n[1])
+dd = EqualitySampler.NormalSuffStat(obs_var[1], obs_mean[1], obs_var[1], obs_n[1])
+@code_warntype logpdf(dd, obs_mean[1])
+@btime logpdf(dd, obs_mean[1])

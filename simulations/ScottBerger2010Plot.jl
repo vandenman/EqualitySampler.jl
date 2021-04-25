@@ -38,18 +38,24 @@ updateSize(::UniformMvUrnDistribution, k) = UniformMvUrnDistribution(k)
 updateSize(d::BetaBinomialMvUrnDistribution, k) = BetaBinomialMvUrnDistribution(k, d.α, d.β)
 updateSize(d::RandomProcessMvUrnDistribution, k) = RandomProcessMvUrnDistribution(k, d.rpm)
 
+make_title(d::BetaBinomial) = "BetaBinomial α=$(d.α) β=$(d.β)"
+make_title(::UniformMvUrnDistribution) = "Uniform"
+make_title(d::BetaBinomialMvUrnDistribution) = "BetaBinomial α=$(d.α) β=$(d.β)"
+make_title(d::RandomProcessMvUrnDistribution) = "Dirichlet Process α=$(d.rpm.α)"
+
+# TODO: wrap this in a function
 figs = Matrix{Plots.Plot}(undef, 3, length(dists))
 for (i, d) in enumerate(dists)
 	@show i, d
 
-	if d isa RandomProcessDistribution
-		included = BigInt(0):k
-	else
+	# if d isa RandomProcessDistribution
+	# 	included = BigInt(0):k
+	# else
 		included = 0:k
-	end
+	# end
 	lpdf = logpdf_model.(Ref(d), included)
 
-	# @assert isapprox(sum(exp, lpdf), 1, atol = 1e-4) # <- should also be multiplied with number of models
+	# @assert isapprox(sum(exp, lpdf), 1.0, atol = 1e-4) # <- should also be multiplied with number of models
 
 	fig1 = plot(included, lpdf, legend = false);
 	if d isa UniformMvUrnDistribution
@@ -58,7 +64,7 @@ for (i, d) in enumerate(dists)
 	xticks!(fig1, 0:5:k);
 	xlims!(fig1, (-1, k+1));
 	scatter!(fig1, included, lpdf);
-	title!(fig1, "$(typeof(d).name.name)");
+	title!(fig1, make_title(d));
 
 	result = Matrix{Float64}(undef, length(variables_added), length(pos_included))
 	for (i, p) in enumerate(pos_included)
@@ -80,11 +86,11 @@ for (i, d) in enumerate(dists)
 		plot!(fig3, ylims = (-1, 1), yticks = [-1, 0, 1])
 	end
 
-	if i == length(dists)
-		plot!(twinx(fig1), tick = nothing, ylabel = "Figure 1 of S & B", ticks = nothing)
-		plot!(twinx(fig2), tick = nothing, ylabel = "Figure 2 of S & B", )
-		plot!(twinx(fig3), tick = nothing, ylabel = "Figure 3 of S & B (log scale)")
-	end
+	# if i == length(dists)
+	# 	plot!(twinx(fig1), tick = nothing, ylabel = "Figure 1 of S & B", ticks = nothing)
+	# 	plot!(twinx(fig2), tick = nothing, ylabel = "Figure 2 of S & B", )
+	# 	plot!(twinx(fig3), tick = nothing, ylabel = "Figure 3 of S & B (log scale)")
+	# end
 
 	figs[1, i] = fig1
 	figs[2, i] = fig2
@@ -97,8 +103,15 @@ ncols = size(figs, 2)
 jointPlot = plot(permutedims(figs)..., layout = (3, ncols), size = (3w, w * ncols))
 savefig(jointPlot, joinpath("figures", "prior_comparison_plot_3x4_with_log.pdf"))
 
-jointPlot = plot(permutedims(view(figs, 1:2, :))..., layout = (2, ncols), size = (2w, w * ncols))
+jointPlot = plot(permutedims(view(figs, 1:2, :))..., layout = (2, ncols), size = (2w, w * (ncols - 2)))
 savefig(jointPlot, joinpath("figures", "prior_comparison_plot_2x4_without_log.pdf"))
+
+figs2 = figs[1:2, 3:4]
+plot!(figs2[2, 1], legend = :topleft)
+jointPlot = plot(permutedims(figs2)..., layout = (2, 2), size = (2w, 2w))
+savefig(jointPlot, joinpath("figures", "prior_comparison_plot_2x2_without_log.pdf"))
+
+
 
 # diagnosing floating point issues with DPP...
 

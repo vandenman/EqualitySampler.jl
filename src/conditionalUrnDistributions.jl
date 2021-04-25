@@ -146,6 +146,7 @@ struct UniformConditionalUrnDistribution{T, U<:AbstractVector{T}} <: AbstractCon
 		return new{T, U}(urns, index)
 	end
 end
+UniformConditionalUrnDistribution(k::T) where T <: Integer = UniformConditionalUrnDistribution(ones(T, k), k)
 
 
 # function _pdf(d::UniformConditionalUrnDistribution)
@@ -226,7 +227,7 @@ struct BetaBinomialConditionalUrnDistribution{T, U<:AbstractVector{T}} <: Abstra
 	function BetaBinomialConditionalUrnDistribution(urns::U, index::T = 1, α::Float64 = 1.0, β::Float64 = 1.0) where {T <: Integer, U <: AbstractVector{T}}
 		n = length(urns)
 		all(x-> one(T) <= x <= n, urns) || throw(DomainError(urns, "condition: 0 < urns[i] < length(urns) ∀i is violated"))
-		one(T) <= index <= n || throw(DomainError(urns, "condition: 0 < index < length(urns) is violated"))
+		one(T) <= index <= n || throw(DomainError(urns, "condition: 0 <= index <= length(urns) is violated"))
 		0.0 <= α || throw(DomainError(α, "condition: 0 <= α is violated"))
 		0.0 <= β || throw(DomainError(β, "condition: 0 <= β is violated"))
 		log_model_probs_by_incl = Distributions.logpdf.(Distributions.BetaBinomial(n - 1, α, β), 0:n - 1) .- log_expected_inclusion_counts(n)
@@ -239,7 +240,8 @@ function BetaBinomialConditionalUrnDistribution(urns::AbstractVector{T}, index::
 end
 
 function BetaBinomialConditionalUrnDistribution(k::T, α::Real = 1.0, β::Real = 1.0) where T <: Integer
-	BetaBinomialConditionalUrnDistribution(T[one(T)], k, convert(Float64, α), convert(Float64, β))
+	BetaBinomialConditionalUrnDistribution(ones(T, k), k, convert(Float64, α), convert(Float64, β))
+	# BetaBinomialConditionalUrnDistribution(T[one(T)], k, convert(Float64, α), convert(Float64, β))
 end
 
 _pdf(d::BetaBinomialConditionalUrnDistribution) = _pdf_helper(d, d.index, d.urns)
