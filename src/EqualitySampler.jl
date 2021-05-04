@@ -62,6 +62,7 @@ export
 	UniformMvUrnDistribution,
 	BetaBinomialMvUrnDistribution,
 	RandomProcessMvUrnDistribution,
+	PartitionSampler,
 
 	bayes_factor_one_way_anova
 
@@ -79,6 +80,8 @@ include("normalLogLikelihood.jl")
 include("helpers.jl")
 include("PdfDirichletProcess.jl")
 include("bayesFactors.jl")
+include("PartitionSampler.jl")
+
 
 
 end

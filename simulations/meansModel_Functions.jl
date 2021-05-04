@@ -4,6 +4,7 @@ import	StatsBase 			as SB,
 		DataFrames			as DF,
 		GLM
 
+import CategoricalArrays
 using Turing
 
 function simulate_data_one_way_anova(
@@ -31,7 +32,7 @@ function simulate_data_one_way_anova(
 	D = MvNormal(μ .+ σ .* θ[g], σ)
 	y = rand(D)
 
-	df = DF.DataFrame(:y => y, :g => DF.categorical(g))
+	df = DF.DataFrame(:y => y, :g => CategoricalArrays.categorical(g))
 
 	true_values = Dict(
 		:σ			=> σ,
@@ -188,39 +189,65 @@ end
 	return (θ_cs, )
 end
 
-function fit_model(df::DF.DataFrame; iterations::Int = 15_000, partition_prior::D = nothing) where D<:Union{Nothing, AbstractMvUrnDistribution, AbstractConditionalUrnDistribution}
+function fit_model(df::DF.DataFrame; kwargs...) where D<:Union{Nothing, AbstractMvUrnDistribution, AbstractConditionalUrnDistribution}
 	obs_mean, obs_var, obs_n = get_suff_stats(df)
-	return fit_model(obs_mean, obs_var, obs_n, iterations=iterations, partition_prior=partition_prior)
+	return fit_model(obs_mean, obs_var, obs_n; kwargs...)
 end
 
-function fit_model(obs_mean::Vector{Float64}, obs_var::Vector{Float64}, obs_n::Vector{Int}; iterations::Int = 15_000, partition_prior::D = nothing) where D<:Union{Nothing, AbstractMvUrnDistribution, AbstractConditionalUrnDistribution}
+function fit_model(
+			obs_mean::Vector{Float64},
+			obs_var::Vector{Float64},
+			obs_n::Vector{Int};
+			mcmc_iterations::Int = 15_000,
+			partition_prior::D = nothing,
+			mcmc_burnin::Int = 500,
+			use_Gibbs::Bool = true,
+			kwargs...
+)			where D<:Union{Nothing, AbstractMvUrnDistribution, AbstractConditionalUrnDistribution}
 	Q = getQ(length(obs_mean))
 	@assert length(obs_mean) == length(obs_var) == length(obs_n)
 	if partition_prior !== nothing && length(obs_mean) != length(partition_prior)
 		partition_prior = fix_length(partition_prior, length(obs_mean))
 	end
 	@assert partition_prior === nothing || length(obs_mean) == length(partition_prior)
-	model, sampler = get_model_and_sampler(partition_prior, obs_mean, obs_var, obs_n, Q)
-	return sample_model(model, sampler, iterations)
+	model, sampler = get_model_and_sampler(partition_prior, obs_mean, obs_var, obs_n, Q, use_Gibbs)
+	return sample_model(model, sampler, mcmc_iterations, mcmc_burnin; kwargs...)
 end
 
-function get_model_and_sampler(partition_prior::Nothing, obs_mean, obs_var, obs_n, Q)
+function get_model_and_sampler(::Nothing, obs_mean, obs_var, obs_n, Q, ::Bool)
 	model   = one_way_anova_full_ss(obs_mean, obs_var, obs_n, Q)
 	sampler = NUTS()
 	return model, sampler
 end
 
-function get_model_and_sampler(partition_prior::AbstractMvUrnDistribution, obs_mean, obs_var, obs_n, Q)
+function get_model_and_sampler(partition_prior::AbstractMvUrnDistribution, obs_mean, obs_var, obs_n, Q, use_Gibbs)
 	model   = one_way_anova_eq_mv_ss(obs_mean, obs_var, obs_n, Q, partition_prior)
-	sampler = Gibbs(PG(20, :equal_indices), HMC(0.01, 10, :μ_grand, :σ², :θ_r))
+	if use_Gibbs
+		sampler = Gibbs(GibbsConditional(:equal_indices, EqualitySampler.PartitionSampler(length(obs_mean), get_log_posterior(obs_mean, obs_var, obs_n, Q, partition_prior))), HMC(0.01, 10, :μ_grand, :σ², :θ_r))
+	else
+		sampler = Gibbs(PG(20, :equal_indices), HMC(0.01, 10, :μ_grand, :σ², :θ_r))
+	end
 	return model, sampler
 end
 
-function get_model_and_sampler(partition_prior::AbstractConditionalUrnDistribution, obs_mean, obs_var, obs_n, Q)
+function get_model_and_sampler(partition_prior::AbstractConditionalUrnDistribution, obs_mean, obs_var, obs_n, Q, ::Bool)
 	model   = one_way_anova_eq_cond_ss(obs_mean, obs_var, obs_n, Q, partition_prior)
 	sampler = Gibbs(PG(20, :equal_indices), HMC(0.01, 10, :μ_grand, :σ², :θ_r))
+	# sampler = Gibbs(GibbsConditional(:equal_indices, EqualitySampler.PartitionSampler(n_groups, get_log_posterior(obs_mean, obs_var, obs_n, Q, partition_prior))), HMC(0.01, 10, :μ_grand, :σ², :θ_r))
+	# sampler = MH()#Gibbs(MH(:equal_indices), HMC(0.01, 10, :μ_grand, :σ², :θ_r))
 	return model, sampler
 end
+
+function get_log_posterior(obs_mean, obs_var, obs_n, Q, partition_prior::AbstractMvUrnDistribution)
+	return function logposterior(nextValues, c)
+		σ = sqrt(c.σ²)
+		θ_s = Q * c.θ_r
+		θ_cs = average_equality_constraints(θ_s, nextValues)
+		return sum(logpdf(NormalSuffStat(obs_var[j], c.μ_grand + θ_cs[j], σ, obs_n[j]), obs_mean[j]) for j in eachindex(obs_mean)) + logpdf(partition_prior, nextValues)
+	end
+end
+
+
 
 get_partition_prior(x) = error("use UniformConditionalUrnDistribution or BetaBinomialConditionalUrnDistribution, or implement a custom conditional urn distribution.")
 get_partition_prior(::UniformConditionalUrnDistribution, urns, i) = UniformConditionalUrnDistribution(urns, i)
@@ -230,9 +257,30 @@ fix_length(::UniformMvUrnDistribution, len::Int)		= UniformMvUrnDistribution(len
 fix_length(D::BetaBinomialMvUrnDistribution, len::Int)	= BetaBinomialMvUrnDistribution(len, D.α, D.β)
 fix_length(D::RandomProcessMvUrnDistribution, len::Int)	= RandomProcessMvUrnDistribution(len, D.rpm)
 
-function sample_model(model, sampler, iterations)
-	chain = sample(model, sampler, iterations)
+function sample_model(model, sampler, iterations, burnin; kwargs...)
+	chain = sample(model, sampler, iterations, discard_initial = burnin; kwargs...)
 	θ_cs = get_θ_cs(model, chain)
 	mean_θ_cs = mean(θ_cs, dims = 2)
 	return mean_θ_cs, θ_cs, chain, model
+end
+
+
+function sample_true_model(no_params, no_inequalities)
+
+	target_inequalities = round(Int, (no_params * no_inequalities) / 100)
+	d = BetaBinomialMvUrnDistribution(no_params)
+
+	# tweak the inclusion probabilities
+	d._log_model_probs_by_incl .= [i == target_inequalities + 1 ? 0.0 : -Inf for i in eachindex(d._log_model_probs_by_incl)]
+	u = rand(d)
+
+	@assert count_equalities(u) == target_inequalities
+
+	return u
+
+end
+
+function get_θ(offset, true_model)
+	θ = true_model .* offset
+	return θ .- mean(θ)
 end
