@@ -259,7 +259,7 @@ dists = (
 	),
 	(
 		dist = BetaBinomialMvUrnDistribution(k),
-		args = ((.75, 1.5), (1, 1), (.5, .5))
+		args = ((.75, 1.5), (1, 1), (.5, .5), (1, 5))
 	),
 	(
 		dist = RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(1.887)),
