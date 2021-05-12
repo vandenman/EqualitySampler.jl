@@ -51,9 +51,9 @@ struct UniformMvUrnDistribution{T <: Integer} <: AbstractMvUrnDistribution{T}
 	k::T
 end
 
-Distributions.logpdf(d::UniformMvUrnDistribution, ::AbstractVector{<:Integer}) = - logbellnumr(length(d), 0)
+Distributions.logpdf(d::UniformMvUrnDistribution, ::AbstractVector{T}) where T<:Integer = logpdf_model(d, one(T))
 
-logpdf_model(d::UniformMvUrnDistribution, ::Integer) = -logbellnumr(length(d), 0)
+logpdf_model(d::UniformMvUrnDistribution, ::T) where T <: Integer = -logbellnumr(convert(T, length(d)), 0)
 
 
 
@@ -170,7 +170,14 @@ end
 
 function logpdf_incl(d::RandomProcessMvUrnDistribution{RPM, T}, no_equalities::Integer) where {RPM<:RandomMeasures.DirichletProcess, T<:Integer}
 
-	# from 3.6 TODO: add ref
+	#=
+		From chapter 3: Dirichlet Process, equation 3.6
+		Peter Müller, Abel Rodriguez
+		NSF-CBMS Regional Conference Series in Probability and Statistics, 2013: 23-41 (2013) https://doi.org/10.1214/cbms/1362163748
+
+		In 3.6 the extra n! term cancels when normalizing to a probability
+	=#
+
 	n = length(d)
 	M = d.rpm.α
 	k = n - no_equalities # number of unique values

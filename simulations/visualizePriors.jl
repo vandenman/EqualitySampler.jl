@@ -14,8 +14,9 @@
 
 using EqualitySampler, Plots, Turing
 import StatsBase: countmap
-include("simulations/samplePriorsTuring.jl")
-include("simulations/plotFunctions.jl")
+
+# include("simulations/samplePriorsTuring.jl")
+# include("simulations/plotFunctions.jl")
 
 function linear_interpolation(new_x, known_y::AbstractVector{T}, known_x) where T
 	# assumes new_x and known_x is sorted from small to large
@@ -137,6 +138,20 @@ ylimsIncl   = (0, .5)
 colorpalet  = :seaborn_colorblind
 palette(colorpalet);
 
+dists = (
+	(
+		dist = UniformMvUrnDistribution(k)
+	),
+	(
+		dist = BetaBinomialMvUrnDistribution(k),
+		args = ((.75, 1.5), (1, 1), (.5, .5))
+	),
+	(
+		dist = RandomProcessDistribution(Turing.RandomMeasures.DirichletProcess(1.887), k),
+		dist = (1.887, 1.0, 3.0)
+	)
+)
+
 # TODO: this could just be a loop over distributions with parameter vectors
 # αβ = ((.5, 2), (2, 2), (1, 1), (.5, .5)) # Beta Binomial parameters
 αβ = ((.75, 1.5), (1, 1), (.5, .5)) # Beta Binomial parameters
@@ -222,3 +237,102 @@ savefig(joint, joinpath("figures", "prior_$k.pdf"))
 
 # ys = Vector[rand(10), rand(20)]# .* u"km"
 # plot(ys, color=[:black :orange], line=(:dot, 4), marker=([:hex :d], 12, 0.8, Plots.stroke(3, :gray)))
+
+# rework of the code above using only multivariate distributions
+using EqualitySampler, Distributions, Plots
+import DataFrames as DF
+import Turing, CSV
+
+updateDistribution(d::UniformMvUrnDistribution, args) = d
+updateDistribution(d::BetaBinomialMvUrnDistribution, args) = BetaBinomialMvUrnDistribution(d.k, args...)
+updateDistribution(d::RandomProcessMvUrnDistribution, args) = RandomProcessMvUrnDistribution(d.k, Turing.RandomMeasures.DirichletProcess(args...))
+
+make_title(::UniformMvUrnDistribution) = "Uniform"
+make_title(d::BetaBinomialMvUrnDistribution) = "BetaBinomial α=$(d.α) β=$(d.β)"
+make_title(d::RandomProcessMvUrnDistribution) = "Dirichlet Process α=$(d.rpm.α)"
+
+k=5
+dists = (
+	(
+		dist = UniformMvUrnDistribution(k),
+		args = ((k,),)
+	),
+	(
+		dist = BetaBinomialMvUrnDistribution(k),
+		args = ((.75, 1.5), (1, 1), (.5, .5))
+	),
+	(
+		dist = RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(1.887)),
+		args = ((0.5,), (1.887,), (1.0,), (3.0,))
+	)
+)
+
+
+function get_data(dists)
+
+	k = length(dists[1][:dist])
+	models = generate_distinct_models(k)
+
+	models_int = parse.(Int, vec(mapslices(join, models, dims = 1)))
+	df_wide_model_probs = DF.DataFrame(
+		models = models_int
+	)
+	df_wide_incl_probs = DF.DataFrame(
+		k = collect(0:k-1)
+	)
+
+	ndists = sum(max(1, length(elem[:args])) for elem in dists)
+
+	df_long_model_probs = DF.DataFrame(
+		distribution	= Vector{DataType}(undef, ndists),
+		models			= Vector{Vector{Int}}(undef, ndists),
+		args			= Vector{Tuple}(undef, ndists),
+		value			= Vector{Vector{Float64}}(undef, ndists)
+	)
+	df_long_incl_probs = DF.DataFrame(
+		distribution	= Vector{DataType}(undef, ndists),
+		models			= Vector{Vector{Int}}(undef, ndists),
+		args			= Vector{Tuple}(undef, ndists),
+		value			= Vector{Vector{Float64}}(undef, ndists)
+	)
+
+	i = 1
+	for (d, args) in dists
+		@show d, args, i
+		for arg in args
+			D = updateDistribution(d, arg)
+			model_probs = vec(mapslices(m->logpdf(D, m), models, dims = 1))
+			incl_probs = logpdf_incl.(Ref(D), 0:k-1)
+
+			nm = make_title(D)
+			df_wide_model_probs[!, nm] = model_probs
+			df_wide_incl_probs[!, nm] = incl_probs
+
+			row = (
+				distribution = typeof(D),
+				models = models_int,
+				args = arg,
+				value = model_probs
+			)
+			df_long_model_probs[i, :] = row
+
+			row = (
+				distribution = typeof(D),
+				models = models_int,
+				args = arg,
+				value = incl_probs
+			)
+			df_long_incl_probs[i, :] = row
+
+			i+=1
+		end
+	end
+	return df_wide_model_probs, df_long_model_probs, df_wide_incl_probs, df_long_incl_probs
+end
+
+df_wide_model_probs, df_long_model_probs, df_wide_incl_probs, df_long_incl_probs = get_data(dists)
+
+CSV.write(joinpath("tables", "model_probs_figure_2.csv"), df_wide_model_probs)
+CSV.write(joinpath("tables", "incl_probs_figure_2.csv"),  df_wide_incl_probs)
+
+# TODO actually remake figure 2

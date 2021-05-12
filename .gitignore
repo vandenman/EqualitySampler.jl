@@ -24,3 +24,4 @@ old_files/*
 
 *.jls
 tutorials/*
+.Rproj.user

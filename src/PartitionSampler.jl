@@ -14,7 +14,7 @@ Base.rand(::Random.AbstractRNG, d::PartitionSampler) = d.nextValues
 function (o::PartitionSampler)(c)
 	# @show c
 	o.counter += 1
-	if o.counter > length(c.equal_indices)
+	if o.counter > length(c.partition)
 		o.counter = 0
 	end
 	o.nextValues = sample_next_values(c, o)
@@ -24,9 +24,9 @@ end
 
 function sample_next_values(c, o)
 
-	n_groups = length(c.equal_indices)
+	n_groups = length(c.partition)
 	probvec = zeros(Float64, n_groups)
-	nextValues = copy(c.equal_indices)
+	nextValues = copy(c.partition)
 
 	for j in eachindex(probvec)
 		originalValue = nextValues[j]
