@@ -1,7 +1,7 @@
 import OrderedCollections: OrderedDict
 import StatsBase: countmap
 
-get_eq_ind_nms(samples) = filter(x->startswith(string(x), "equal_indices"), samples.name_map.parameters)
+get_eq_ind_nms(samples) = filter(x->startswith(string(x), "partition"), samples.name_map.parameters)
 function get_eq_samples(samples)
 	eq_ind_nms = get_eq_ind_nms(samples)
 	s = size(samples[eq_ind_nms])
@@ -10,7 +10,7 @@ end
 
 
 """
-	compute the proportion of samples where equal_indices[i] == equal_indices[j] ∀i, j
+	compute the proportion of samples where partition[i] == partition[j] ∀i, j
 """
 function compute_post_prob_eq(samples)
 	samps = get_eq_samples(samples)

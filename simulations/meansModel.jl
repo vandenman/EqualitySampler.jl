@@ -1,5 +1,3 @@
-# unfinished
-
 using EqualitySampler, Turing, DynamicPPL, FillArrays, Plots
 
 import	StatsBase 			as SB,
@@ -40,7 +38,7 @@ scatter(true_values[:θ], ests, legend = :none); Plots.abline!(1, 0)
 iterations = 2_000
 
 # full model
-mean_θ_cs_full, θ_cs_full, chain_full, model_full = fit_model(df, iterations = iterations)
+mean_θ_cs_full, θ_cs_full, chain_full, model_full = fit_model(df, mcmc_iterations = iterations)
 plot(θ_cs_full') # trace plots
 hcat(ests, mean_θ_cs_full) # compare frequentist estimates to posterior means
 scatter(true_values[:θ], mean_θ_cs_full, legend = :none); Plots.abline!(1, 0)
@@ -184,6 +182,8 @@ sample(model, sampler1, 5000)
 resOriginal   = fit_model(df, mcmc_iterations = 25_000, mcmc_burnin = 5_000, partition_prior = UniformMvUrnDistribution(n_groups), use_Gibbs = false)
 resGibbsStuff = fit_model(df, mcmc_iterations = 25_000, mcmc_burnin = 5_000, partition_prior = UniformMvUrnDistribution(n_groups), use_Gibbs = true)
 
+
+
 mean_θ_cs_eq, θ_cs_eq, chain_eq, model_eq = resGibbsStuff
 plot(θ_cs_eq') # trace plots
 hcat(ests, mean_θ_cs_eq) # compare frequentist estimates to posterior means
@@ -193,7 +193,55 @@ rtrue_model = reduce_model(true_model)
 LA.UnitLowerTriangular([i == j for i in rtrue_model, j in rtrue_model])
 LA.UnitLowerTriangular(compute_post_prob_eq(chain_eq) .> 0.5) # inspect sampled equality constraints
 
+# try out a couple of individual simulations
+n_groups = 10
+n_obs_per_group = 1000
+# true_model = collect(1:n_groups)
+true_model = reduce_model(sample_true_model(n_groups, 50))
+true_θ = get_θ(0.2, true_model)
+@assert all(diff(sort(unique(true_θ))) .≈ 0.2)
 
+y, df, D, true_values = simulate_data_one_way_anova(n_groups, n_obs_per_group, true_θ, true_model, 0.0, 1.0);
+obs_mean, obs_var, obs_n = get_suff_stats(df)
+# obs_vars = DF.combine(DF.groupby(df, :g), :y => mean, :y => var, :y => length)[!, :y_var]
+
+@assert unique(D.μ) ≈ sqrt(D.Σ[1]) * unique(true_θ)
+@assert loglikelihood(D, y) ≈ sum(logpdf(NormalSuffStat(obs_var[i], sqrt(D.Σ[1]) * true_θ[i], D.Σ[1], obs_n[i]), obs_mean[i]) for i in eachindex(obs_mean))
+
+hcat(obs_mean, true_θ, true_model)
+
+ests, mod = fit_lm(y, df);
+scatter(true_values[:θ], ests, legend = :none); Plots.abline!(1, 0)
+
+obs_mean, obs_var, obs_n = get_suff_stats(df)
+
+# resOriginal			= fit_model(df, mcmc_iterations = 25_000, mcmc_burnin = 5_000, partition_prior = UniformMvUrnDistribution(n_groups), use_Gibbs = false)
+resGibbsStuff_BB	= fit_model(df, mcmc_iterations = 20_000, mcmc_burnin = 5_000, partition_prior = BetaBinomialMvUrnDistribution(n_groups, 1.0, 1.0), use_Gibbs = true)
+
+mean_θ_cs_eq, θ_cs_eq, chain_eq, model_eq, spl_eq = resGibbsStuff_BB
+plot(θ_cs_eq') # trace plots
+hcat(true_model, ests, mean_θ_cs_eq) # compare frequentist estimates to posterior means
+scatter(true_values[:θ], mean_θ_cs_eq, legend = :none); Plots.abline!(1, 0)
+LA.UnitLowerTriangular(compute_post_prob_eq(chain_eq)) # inspect sampled equality constraints
+rtrue_model = reduce_model(true_model)
+LA.UnitLowerTriangular([i == j for i in rtrue_model, j in rtrue_model])
+LA.UnitLowerTriangular(compute_post_prob_eq(chain_eq) .> 0.2) # inspect sampled equality constraints
+
+post_median_model = reduce_model(incl_probs_to_model(compute_post_prob_eq(chain_eq) .> 0.5))
+compute_retrieval(rtrue_model, post_median_model)
+
+hcat(obs_mean, true_θ, mean_θ_cs_eq, true_model, post_median_model)
+
+
+
+name_map = chain_eq.name_map
+last_sample = chain_eq[size(chain_eq, 1), :, :].value.data
+fake_c = (
+	equal_indices	= Int.(last_sample[findall(x->startswith(string(x), "equal_indices"), name_map.parameters)]),
+	θ_r				= last_sample[findall(x->startswith(string(x), "θ_r"), name_map.parameters)],
+	μ_grand			= last_sample[findall(x->startswith(string(x), "μ_grand"), name_map.parameters)],
+	σ²				= last_sample[findall(x->startswith(string(x), "σ²"), name_map.parameters)]
+)
 
 # quick testing
 n_groups = 3
@@ -304,3 +352,31 @@ yvals_2 = test_pdf_2.(xvals, Ref(θ_other))
 plot(xvals, yvals_1)
 plot(xvals, hcat(yvals_1, yvals_2))
 
+
+
+n_groups = 10
+n_obs_per_group = 1000
+# true_model = collect(1:n_groups)
+true_model = reduce_model(sample_true_model(n_groups, 50))
+true_θ = get_θ(0.2, true_model)
+@assert all(diff(sort(unique(true_θ))) .≈ 0.2)
+
+y, df, D, true_values = simulate_data_one_way_anova(n_groups, n_obs_per_group, true_θ, true_model, 0.0, 1.0);
+
+ests, mod = fit_lm(y, df);
+scatter(true_values[:θ], ests, legend = :none); Plots.abline!(1, 0)
+
+resGibbsStuff = fit_model(df, mcmc_iterations = 25_000, mcmc_burnin = 5_000, partition_prior = UniformMvUrnDistribution(n_groups), use_Gibbs = true)
+
+mean_θ_cs_eq, θ_cs_eq, chain_eq, model_eq = resGibbsStuff
+plot(θ_cs_eq') # trace plots
+hcat(ests, mean_θ_cs_eq) # compare frequentist estimates to posterior means
+scatter(true_values[:θ], mean_θ_cs_eq, legend = :none); Plots.abline!(1, 0)
+LA.UnitLowerTriangular(compute_post_prob_eq(chain_eq)) # inspect sampled equality constraints
+rtrue_model = reduce_model(true_model)
+LA.UnitLowerTriangular([i == j for i in rtrue_model, j in rtrue_model])
+LA.UnitLowerTriangular(compute_post_prob_eq(chain_eq) .> 0.5) # inspect sampled equality constraints
+LA.UnitLowerTriangular([i == j for i in rtrue_model, j in rtrue_model]) .- LA.UnitLowerTriangular(compute_post_prob_eq(chain_eq) .> 0.5)
+compute_retrieval(rtrue_model, compute_post_prob_eq(chain_eq) .> 0.5)
+
+incl_probs_to_model(compute_post_prob_eq(chain_eq))

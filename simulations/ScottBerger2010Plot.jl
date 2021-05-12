@@ -19,9 +19,70 @@ using EqualitySampler, Plots, Distributions
 import Turing
 
 
-
 EqualitySampler.logpdf_model(D::BetaBinomial, no_equalities::Integer) = logpdf(D, no_equalities) - log(binomial(promote(ntrials(D), no_equalities)...))
 diff_lpdf(D, no_inequalities) = logpdf_model(D, no_inequalities - 1) - logpdf_model(D, no_inequalities)
+
+updateSize(d::BetaBinomial, k) = BetaBinomial(k, d.α, d.β)
+updateSize(::UniformMvUrnDistribution, k) = UniformMvUrnDistribution(k)
+updateSize(d::BetaBinomialMvUrnDistribution, k) = BetaBinomialMvUrnDistribution(k, d.α, d.β)
+updateSize(d::RandomProcessMvUrnDistribution, k) = RandomProcessMvUrnDistribution(k, d.rpm)
+
+make_title(d::BetaBinomial) = "BetaBinomial α=$(d.α) β=$(d.β)"
+make_title(::UniformMvUrnDistribution) = "Uniform"
+make_title(d::BetaBinomialMvUrnDistribution) = "BetaBinomial α=$(d.α) β=$(d.β)"
+make_title(d::RandomProcessMvUrnDistribution) = "Dirichlet Process α=$(d.rpm.α)"
+
+function scottberger_figure_1(d::Distribution, k::Integer = big(30))
+
+	included = 0:k
+	lpdf = logpdf_model.(Ref(d), included)
+
+	# figure 1
+	plt = plot(included, lpdf, legend = false);
+	if d isa UniformMvUrnDistribution
+		ylims!(plt, (-60, -10));
+	end
+	xticks!(plt, 0:5:k);
+	xlims!(plt, (-1, k+1));
+	scatter!(plt, included, lpdf);
+	title!(plt, make_title(d));
+
+	return plt
+end
+
+function scottberger_figure_2(
+		d::Distribution,
+		k::Integer = big(30),
+		variables_added = big.((1, 2, 5, 10)),
+		pos_included = big(2):2:30;
+		legend = false
+)
+
+	result = Matrix{Float64}(undef, length(variables_added), length(pos_included))
+	for (i, p) in enumerate(pos_included)
+		D = updateSize(d, p)
+		for j in eachindex(variables_added)
+			result[j, i] = diff_lpdf(D, variables_added[j])
+		end
+	end
+
+	plt = plot(pos_included, exp.(result)', label = permutedims(["$p included" for p in variables_added]);
+				legend = legend);
+
+	return plt
+
+end
+
+function matrix_plot(dists)
+
+	figures = Matrix{Plots.Plot}(undef, length(dists), 2)
+	for (i, d) in enumerate(dists)
+		@show i, d
+		figures[i, 1] = scottberger_figure_1(d)
+		figures[i, 2] = scottberger_figure_2(d)
+	end
+	return figures
+end
 
 k = 30#BigInt(50)
 variables_added = [1, 2, 5, 10]
@@ -33,15 +94,14 @@ dists = [
 	BetaBinomialMvUrnDistribution(k, 1, 1),
 	RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(1.887))
 ]
-updateSize(d::BetaBinomial, k) = BetaBinomial(k, d.α, d.β)
-updateSize(::UniformMvUrnDistribution, k) = UniformMvUrnDistribution(k)
-updateSize(d::BetaBinomialMvUrnDistribution, k) = BetaBinomialMvUrnDistribution(k, d.α, d.β)
-updateSize(d::RandomProcessMvUrnDistribution, k) = RandomProcessMvUrnDistribution(k, d.rpm)
 
-make_title(d::BetaBinomial) = "BetaBinomial α=$(d.α) β=$(d.β)"
-make_title(::UniformMvUrnDistribution) = "Uniform"
-make_title(d::BetaBinomialMvUrnDistribution) = "BetaBinomial α=$(d.α) β=$(d.β)"
-make_title(d::RandomProcessMvUrnDistribution) = "Dirichlet Process α=$(d.rpm.α)"
+figures = matrix_plot(dists)
+
+w = 500
+ncols = size(figures, 1)
+jointPlot = plot(figures..., layout = (2, ncols), size = (2w, w * (ncols - 2)))
+savefig(jointPlot, joinpath("figures", "prior_comparison_plot_2x4_without_log.pdf"))
+
 
 # TODO: wrap this in a function
 figs = Matrix{Plots.Plot}(undef, 3, length(dists))
