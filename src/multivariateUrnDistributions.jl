@@ -38,11 +38,17 @@ end
 function logpdf_incl(d::AbstractMvUrnDistribution, no_equalities::Integer)
 	k = length(d)
 	0 <= no_equalities < k || return -Inf
-	logpdf_model(d, no_equalities) + log_count_distinct_models_with_incl(k, no_equalities)
+	logpdf_model_distinct(d, no_equalities) + log_count_distinct_models_with_incl(k, no_equalities)# + log_count_combinations(k, k - no_equalities)
 end
 
 pdf_incl(d::AbstractMvUrnDistribution,  no_equalities) = exp(logpdf_incl(d,  no_equalities))
-pdf_model(d::AbstractMvUrnDistribution, no_equalities) = exp(logpdf_model(d, no_equalities))
+# pdf_model(d::AbstractMvUrnDistribution, no_equalities) = exp(logpdf_model(d, no_equalities))
+
+logpdf_model(d::AbstractMvUrnDistribution, x::T) where T <: Integer = logpdf_model_distinct(d, x) - log_count_combinations(length(d), length(d) - x)
+logpdf_model(d::AbstractMvUrnDistribution, x::AbstractVector{T}) where T <: Integer = logpdf_model_distinct(d, x) - log_count_combinations(x)
+pdf_model(d::AbstractMvUrnDistribution, x) = exp(logpdf_model(d, x))
+
+Distributions.logpdf(d::AbstractMvUrnDistribution, x::AbstractVector{T}) where T<:Integer = logpdf_model(d, x)
 
 #endregion
 
@@ -51,9 +57,10 @@ struct UniformMvUrnDistribution{T <: Integer} <: AbstractMvUrnDistribution{T}
 	k::T
 end
 
-Distributions.logpdf(d::UniformMvUrnDistribution, ::AbstractVector{T}) where T<:Integer = logpdf_model(d, one(T))
+Distributions.logpdf(d::UniformMvUrnDistribution, x::AbstractVector{T}) where T<:Integer = logpdf_model(d, x)
 
-logpdf_model(d::UniformMvUrnDistribution, ::T) where T <: Integer = -logbellnumr(convert(T, length(d)), 0)
+logpdf_model_distinct(d::UniformMvUrnDistribution, ::AbstractVector{T}) where T <: Integer = -logbellnumr(convert(T, length(d)), 0)
+logpdf_model_distinct(d::UniformMvUrnDistribution, ::T) where T <: Integer = -logbellnumr(convert(T, length(d)), 0)
 
 
 
@@ -76,13 +83,14 @@ function BetaBinomialMvUrnDistribution(k::Integer, α::Number, β::Number = 1.0)
 end
 
 
-function Distributions.logpdf(d::BetaBinomialMvUrnDistribution, x::AbstractVector{<:Integer})
-	log_model_probs_by_incl(d)[count_equalities(x) + 1]
-	# Distributions.logpdf(Distributions.BetaBinomial(length(d) - 1, d.α, d.β), count_equalities(x))
-end
+# function Distributions.logpdf(d::BetaBinomialMvUrnDistribution, x::AbstractVector{<:Integer})
+# 	log_model_probs_by_incl(d)[count_equalities(x) + 1]
+# 	# Distributions.logpdf(Distributions.BetaBinomial(length(d) - 1, d.α, d.β), count_equalities(x))
+# end
 
 log_model_probs_by_incl(d::BetaBinomialMvUrnDistribution) = d._log_model_probs_by_incl
-function logpdf_model(d::BetaBinomialMvUrnDistribution, no_equalities::Integer)
+logpdf_model_distinct(d::BetaBinomialMvUrnDistribution, x::Vector{<:Integer}) = logpdf_model_distinct(d, count_equalities(x))
+function logpdf_model_distinct(d::BetaBinomialMvUrnDistribution, no_equalities::Integer)
 	in_eqsupport(d, no_equalities) || return -Inf
 	log_model_probs_by_incl(d)[no_equalities + 1]
 end
@@ -126,22 +134,22 @@ function _sample_process!(rng::Random.AbstractRNG, rpm::RandomMeasures.AbstractR
 	x
 end
 
-Distributions.logpdf(::RandomProcessMvUrnDistribution, ::AbstractVector{T}) where T<: Real = -Inf
-function Distributions.logpdf(d::RandomProcessMvUrnDistribution, x::AbstractVector{T}) where T<: Integer
+# Distributions.logpdf(::RandomProcessMvUrnDistribution, ::AbstractVector{T}) where T<: Real = -Inf
+# function Distributions.logpdf(d::RandomProcessMvUrnDistribution, x::AbstractVector{T}) where T<: Integer
 
-	lpdf = zero(Float64)
-	K = x[1]
-	for i in 2:length(x)
+# 	lpdf = zero(Float64)
+# 	K = x[1]
+# 	for i in 2:length(x)
 
-		vx = view(x, 1:i-1)
-		nk = Vector{Int}(map(k -> sum(==(k), vx), 1:K))
-		lpdf += Distributions.logpdf(Turing.RandomMeasures.ChineseRestaurantProcess(d.rpm, nk), x[i])
-		K = max(K, x[i])
+# 		vx = view(x, 1:i-1)
+# 		nk = Vector{Int}(map(k -> sum(==(k), vx), 1:K))
+# 		lpdf += Distributions.logpdf(Turing.RandomMeasures.ChineseRestaurantProcess(d.rpm, nk), x[i])
+# 		K = max(K, x[i])
 
-		# vnk = view(nk, 1:K)
-	end
-	lpdf
-end
+# 		# vnk = view(nk, 1:K)
+# 	end
+# 	lpdf
+# end
 
 function logpdf_incl(d::RandomProcessMvUrnDistribution, no_equalities::Integer)
 
@@ -156,15 +164,35 @@ function logpdf_incl(d::RandomProcessMvUrnDistribution, no_equalities::Integer)
 	# return result
 end
 
-logpdf_model(::RandomProcessMvUrnDistribution, ::Integer) = throw("unimplemented")
+logpdf_model_distinct(::RandomProcessMvUrnDistribution, ::Integer) = throw("unimplemented")
 
-function logpdf_model(d::RandomProcessMvUrnDistribution{RPM, T}, no_equalities::Integer) where {RPM<:RandomMeasures.DirichletProcess, T<:Integer}
+function logpdf_model_distinct(d::RandomProcessMvUrnDistribution{RPM, T}, x::AbstractVector{<:Integer})  where {RPM<:RandomMeasures.DirichletProcess, T<:Integer}# = logpdf_model_distinct(d, count_equalities(x))
+# function logpdf_model_distinct(d::RandomProcessMvUrnDistribution{RPM, T}, no_equalities::Integer) where {RPM<:RandomMeasures.DirichletProcess, T<:Integer}
 
-	# n = length(d)
-	# M = d.rpm.α
-	# k = n - no_equalities
-	# return k * log(M) + SpecialFunctions.lgamma(M) - SpecialFunctions.lgamma(M + n)
+
+	n = length(d)
+	M = d.rpm.α
+	# k = n - no_equalities # number of unique values
+
+	cc = countmap(x)
+
+	length(cc) * log(M) +
+		SpecialFunctions.logabsgamma(M)[1] -
+		SpecialFunctions.logabsgamma(M + n)[1] +
+		sum(x->SpecialFunctions.logabsgamma(x)[1], values(cc))
+
+	#=
+		the old implementation below that was based on no_equalities failed because it does not properly distinghuis between
+		the models with equal equalities but different distributions of equalities
+		for example, [1, 1, 2, 2] and [1, 2, 1, 1] received the same probability, although they should not
+
+	n = length(d)
+	M = d.rpm.α
+	k = n - no_equalities
+	return k * log(M) + SpecialFunctions.lgamma(M) - SpecialFunctions.lgamma(M + n)
 	logpdf_incl(d, no_equalities) - log_count_distinct_models_with_incl(length(d), no_equalities)
+
+	=#
 
 end
 

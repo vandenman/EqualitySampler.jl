@@ -47,6 +47,7 @@ export
 	empirical_model_probabilities,
 	empirical_inclusion_probabilities,
 	generate_distinct_models,
+	generate_all_models,
 
 	pdf_model,
 	logpdf_model,
