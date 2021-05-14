@@ -1,9 +1,19 @@
 using  Test
 import Distributions, Turing
 
+#=
+
+	TODO:
+
+	separate this into two parts:
+		- tests on the properties of the distinct model space
+		- tests on the properties of the nondistinct model space
+
+=#
+
 @testset "Multivariate urn distributions" begin
 
-	noSamples = 10_000
+	noSamples = 15_000
 
 	ks = 2:5
 	αs = 0.5:0.5:2
@@ -34,73 +44,78 @@ import Distributions, Turing
 
 				k = first(args)
 				d = dist[:dist](args...)
-				m = generate_distinct_models(k)
+				# m0 = generate_distinct_models(k)
+				m = generate_all_models(k)
 
-				@testset "pdf sums to 1, inclusion probabilities match, model probabilities match " begin
+				@testset "args: $args" begin
 
-					s = [count_equalities(col) for col in eachcol(m)]
-					indices = [findall(==(i), s) for i in 0:k-1]
+					@testset "pdf sums to 1, inclusion probabilities match, model probabilities match " begin
 
-					probs = [Distributions.pdf(d, col) for col in eachcol(m)]
+						s = vec([count_equalities(collect(col)) for col in m])
+						indices = [findall(==(i), s) for i in 0:k-1]
 
-					# pdf over all models sums to 1.0
-					@test sum(probs) ≈ 1.0
+						probs = vec([Distributions.pdf(d, collect(col)) for col in m])
+						# pdf over all models sums to 1.0
+						@test sum(probs) ≈ 1.0
 
-					brute_force_incl_probs = [sum(probs[indices[i]]) for i in 1:k]
-					efficient_incl_probs = [pdf_incl(d, i-1) for i in 1:k]
+						brute_force_incl_probs = [sum(probs[indices[i]]) for i in 1:k]
+						efficient_incl_probs = [pdf_incl(d, i-1) for i in 1:k]
 
-					# direct computation of inclusion probabilities (which is more efficient) equals brute force computation of inclusion probabilities
-					@test efficient_incl_probs ≈ brute_force_incl_probs
+						# direct computation of inclusion probabilities (which is more efficient) equals brute force computation of inclusion probabilities
+						@test efficient_incl_probs ≈ brute_force_incl_probs
 
-					model_probs  = pdf_model.(Ref(d), 0:k-1)
-					model_counts = count_distinct_models_with_incl.(k, 0:k-1)
+						# no. equalities is insufficient for model probabilities for DPP
+						if !(d isa RandomProcessMvUrnDistribution)
+							model_probs  = pdf_model.(Ref(d), 0:k-1)
+							model_counts = count_distinct_models_with_incl.(k, 0:k-1) .* count_combinations.(k, k .- (0:k-1))
 
-					# dividing inclusion probabilities by model size frequency gives the model probabilities
-					@test efficient_incl_probs ./ model_counts ≈ model_probs
-
-				end
-
-				@testset "simulated properties match theoretical results" begin
-
-
-					samples = Matrix{Int}(undef, k, noSamples)
-					for i in axes(samples, 2)
-						v = view(samples, :, i)
-						Distributions.rand!(d, v)
-						v .= reduce_model(v)
+							# dividing inclusion probabilities by model size frequency gives the model probabilities
+							@test efficient_incl_probs ./ model_counts ≈ model_probs
+						end
 					end
 
+					@testset "simulated properties match theoretical results" begin
 
-					if hasmethod(expected_model_probabilities, (RandomProcessMvUrnDistribution, ))
-						empirical_model_probs     = collect(values(empirical_model_probabilities(samples)))
-						expected_model_probs      = expected_model_probabilities(d)
-					else # for the DirichletProcess this method doesn't exist (yet) so we brute force it
-						tmp                       = empirical_model_probabilities(samples)
-						empirical_model_probs     = collect(values(tmp))
-						expected_model_probs      = [Distributions.pdf(d, reduce_model_dpp(parse.(Int, split(model, "")))) for model in keys(tmp)]
+						# TODO: this test should NOT use reduce_model but just call rand!
+						# samples = Distributions.rand(d, noSamples)
+
+						samples = Matrix{Int}(undef, k, noSamples)
+						for i in axes(samples, 2)
+							v = view(samples, :, i)
+							Distributions.rand!(d, v)
+							v .= reduce_model(v)
+						end
+
+						if !(d isa RandomProcessMvUrnDistribution)
+							empirical_model_probs     = collect(values(empirical_model_probabilities(samples)))
+							expected_model_probs      = expected_model_probabilities(d)
+						else # for the DirichletProcess this method doesn't exist (yet) so we brute force it
+							tmp                       = empirical_model_probabilities(samples)
+							empirical_model_probs     = collect(values(tmp))
+							expected_model_probs      = [exp(EqualitySampler.logpdf_model_distinct(d, reduce_model_dpp(parse.(Int, split(model, ""))))) for model in keys(tmp)]
+						end
+
+						empirical_inclusion_probs = collect(values(empirical_inclusion_probabilities(samples)))
+						expected_inclusion_probs  = expected_inclusion_probabilities(d)
+
+						rtol = 0.15 + 0.02k # TODO: something better than this.
+						@test isapprox(empirical_model_probs, expected_model_probs, rtol = rtol)
+						@test isapprox(empirical_inclusion_probs, expected_inclusion_probs, rtol = rtol)
+
 					end
 
-					empirical_inclusion_probs = collect(values(empirical_inclusion_probabilities(samples)))
-					expected_inclusion_probs  = expected_inclusion_probabilities(d)
+					if !(d isa RandomProcessMvUrnDistribution)#hasmethod(log_expected_inclusion_probabilities, (RandomProcessMvUrnDistribution, ))
+						@testset "Batch computations match individual ones" begin
 
-					rtol = 0.15 + 0.02k # TODO: something better than this.
-					@test isapprox(empirical_model_probs, expected_model_probs, rtol = rtol)
-					@test isapprox(empirical_inclusion_probs, expected_inclusion_probs, rtol = rtol)
+							expected = log_expected_inclusion_probabilities(d)
+							observed = logpdf_incl.(Ref(d), 0:length(d) - 1)
 
-				end
+							@test isapprox(expected, observed)
 
-				if hasmethod(log_expected_inclusion_probabilities, (RandomProcessMvUrnDistribution, ))
-					@testset "Batch computations match individual ones" begin
-
-						expected = log_expected_inclusion_probabilities(d)
-						observed = logpdf_incl.(Ref(d), 0:length(d) - 1)
-
-						@test isapprox(expected, observed)
-
+						end
 					end
 				end
 			end
 		end
-
 	end
 end

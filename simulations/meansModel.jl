@@ -10,7 +10,7 @@ import DataFrames: DataFrame
 import StatsModels: @formula
 import Suppressor
 import Random
-
+]
 # include("simulations/plotFunctions.jl") # <- unused?
 include("simulations/helpersTuring.jl")
 include("simulations/meansModel_Functions.jl")
@@ -380,3 +380,24 @@ LA.UnitLowerTriangular([i == j for i in rtrue_model, j in rtrue_model]) .- LA.Un
 compute_retrieval(rtrue_model, compute_post_prob_eq(chain_eq) .> 0.5)
 
 incl_probs_to_model(compute_post_prob_eq(chain_eq))
+
+# TODO file bug report
+# using DynamicPPL, Turing
+
+# @model function demo(xs)
+# 	s ~ InverseGamma(2, 3)
+# 	m_shifted ~ Normal(10, √s)
+# 	m = m_shifted - 10
+
+# 	for i in eachindex(xs)
+# 		xs[i] ~ Normal(m, √s)
+# 	end
+
+# 	return (m, )
+# end
+
+# model = demo(randn(10))
+# spl = Gibbs(MH(:m_shifted), HMCDA(200, 0.65, 0.3, :s))
+# chain = sample(model, spl, 10);
+# generated_quantities(model, chain)
+# generated_quantities(model, sample(model, NUTS(), 10))

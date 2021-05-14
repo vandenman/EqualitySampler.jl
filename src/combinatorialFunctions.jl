@@ -46,7 +46,7 @@ end
 #region Stirling numbers of the second kind
 
 # these two compute one term of the explicit algorithm of the stirlings2. Note that they are incorrect for j = 0!
-stirlings2ExplLogTerm(n::T, k::T, j::T) where T<:Integer = SpecialFunctions.logabsbinomial(k, j)[1] + n * log(j)
+stirlings2ExplLogTerm(n::T, k::T, j::T) where T<:Integer = logbinomial(k, j) + n * log(j)
 stirlings2ExplTerm(n::T, k::T, j::T) where T<:Integer = binomial(k, j) * j^n
 
 """
@@ -337,6 +337,7 @@ end
 """
 	count_combinations(k::Int, islands::Int)
 	count_combinations(s::AbstractString)
+	count_combinations(x::AbstractVector)
 
 Count the number of duplicate configurations that specify an identical model.
 "k" specifes the number of variables and "islands" specifies the number of unequal clusters of variables.
@@ -352,6 +353,7 @@ julia> count_combinations("111") # 111, 222, 333
 ```
 """
 count_combinations(k::Int, islands::Int) = factorial(islands) * binomial(k, islands)
+log_count_combinations(k::Int, islands::Int) = SpecialFunctions.logfactorial(islands) + logbinomial(k, islands)
 function count_combinations(s::AbstractString)
 	s = filter(!isspace, s)
 	k = length(s)
@@ -359,6 +361,8 @@ function count_combinations(s::AbstractString)
 	return count_combinations(k, islands)
 end
 count_combinations(x::AbstractVector) = count_combinations(length(x), length(unique(x)))
+
+log_count_combinations(x::AbstractVector) = log_count_combinations(length(x), length(unique(x)))
 
 """
 	count_distinct_models(k::Int)
@@ -398,6 +402,14 @@ function generate_distinct_models(k::Int)
 	return result
 end
 
+"""
+	generate_distinct_models(k::Int)
+
+Returns an iterator that generates all models that represent equalities, including duplicates that represent the same unique model (e.g., [1, 1, 1] and [2, 2, 2]) .
+"""
+function generate_all_models(k::Int)
+	return Iterators.product(fill(1:k, k)...)
+end
 
 unsignedstirlings1(n::T, k::T) where T <: Integer = unsignedstirlings1(n, k, ExplicitStrategy)
 unsignedstirlings1(n::T, k::U) where {T<:Integer, U<:Integer} = unsignedstirlings1(promote(n, k)...)
