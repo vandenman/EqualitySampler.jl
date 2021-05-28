@@ -10,9 +10,10 @@ import DataFrames: DataFrame
 import StatsModels: @formula
 import Suppressor
 import Random
-]
+
 # include("simulations/plotFunctions.jl") # <- unused?
 include("simulations/helpersTuring.jl")
+include("simulations/silentGeneratedQuantities.jl")
 include("simulations/meansModel_Functions.jl")
 
 function show_code_warntype(model)
@@ -354,7 +355,7 @@ plot(xvals, hcat(yvals_1, yvals_2))
 
 
 
-n_groups = 10
+n_groups = 5
 n_obs_per_group = 1000
 # true_model = collect(1:n_groups)
 true_model = reduce_model(sample_true_model(n_groups, 50))
@@ -369,6 +370,8 @@ scatter(true_values[:θ], ests, legend = :none); Plots.abline!(1, 0)
 resGibbsStuff = fit_model(df, mcmc_iterations = 25_000, mcmc_burnin = 5_000, partition_prior = UniformMvUrnDistribution(n_groups), use_Gibbs = true)
 
 mean_θ_cs_eq, θ_cs_eq, chain_eq, model_eq = resGibbsStuff
+show_code_warntype(model_eq)
+
 plot(θ_cs_eq') # trace plots
 hcat(ests, mean_θ_cs_eq) # compare frequentist estimates to posterior means
 scatter(true_values[:θ], mean_θ_cs_eq, legend = :none); Plots.abline!(1, 0)
@@ -379,7 +382,20 @@ LA.UnitLowerTriangular(compute_post_prob_eq(chain_eq) .> 0.5) # inspect sampled 
 LA.UnitLowerTriangular([i == j for i in rtrue_model, j in rtrue_model]) .- LA.UnitLowerTriangular(compute_post_prob_eq(chain_eq) .> 0.5)
 compute_retrieval(rtrue_model, compute_post_prob_eq(chain_eq) .> 0.5)
 
+mp = sort(compute_model_probs(chain_eq),  byvalue=true, rev=true)
+mc = sort(compute_model_counts(chain_eq), byvalue=true, rev=true)
+
 incl_probs_to_model(compute_post_prob_eq(chain_eq))
+
+
+d_test = RandomProcessMvUrnDistribution(4, Turing.RandomMeasures.DirichletProcess(1.817))
+logpdf(d_test, fill(1, length(d_test)))
+logpdf(d_test, collect(1:length(d_test)))
+
+EqualitySampler.logpdf_model_distinct(d_test, fill(1, length(d_test)))
+EqualitySampler.logpdf_model_distinct(d_test, collect(1:length(d_test)))
+
+find_
 
 # TODO file bug report
 # using DynamicPPL, Turing
@@ -401,3 +417,37 @@ incl_probs_to_model(compute_post_prob_eq(chain_eq))
 # chain = sample(model, spl, 10);
 # generated_quantities(model, chain)
 # generated_quantities(model, sample(model, NUTS(), 10))
+
+function DPP_find_α(k::Integer)
+
+	null_model = fill(1, k)
+	full_model = collect(1:k)
+
+	function target(α)
+		dpp = RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(exp(first(α))))
+		(
+			EqualitySampler.logpdf_model_distinct(dpp, full_model) -
+			EqualitySampler.logpdf_model_distinct(dpp, null_model)
+		)^2
+	end
+
+	result = Optim.optimize(target, [log(1.817)], Optim.BFGS())
+
+	return exp(first(result.minimizer)), result
+
+end
+
+k = 10
+α, _ = DPP_find_α(k)
+
+
+d_test = RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(α))
+
+null_model = fill(1, k)
+full_model = collect(1:k)
+
+logpdf(d_test, null_model)
+logpdf(d_test, full_model)
+
+EqualitySampler.logpdf_model_distinct(d_test, full_model)
+EqualitySampler.logpdf_model_distinct(d_test, null_model)

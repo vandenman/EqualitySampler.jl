@@ -2,21 +2,22 @@
 # just a hack for GibbsConditional
 
 mutable struct PartitionSampler <: Distributions.DiscreteMultivariateDistribution
-	counter::Int
+	# counter::Int
 	size::Int
 	nextValues::Vector{Int}
 	logposterior::Function
-	PartitionSampler(size::Int, logposterior::Function) = new(0, size, ones(Int, size), logposterior)
+	# PartitionSampler(size::Int, logposterior::Function) = new(0, size, ones(Int, size), logposterior)
+	PartitionSampler(size::Int, logposterior::Function) = new(size, ones(Int, size), logposterior)
 end
 
 Base.rand(::Random.AbstractRNG, d::PartitionSampler) = d.nextValues
 
 function (o::PartitionSampler)(c)
 	# @show c
-	o.counter += 1
-	if o.counter > length(c.partition)
-		o.counter = 0
-	end
+	# o.counter += 1
+	# if o.counter > length(c.partition)
+	# 	o.counter = 0
+	# end
 	o.nextValues = sample_next_values(c, o)
 
 	return o
@@ -29,7 +30,7 @@ function sample_next_values(c, o)
 	nextValues = copy(c.partition)
 
 	for j in eachindex(probvec)
-		originalValue = nextValues[j]
+		# originalValue = nextValues[j]
 		for i in eachindex(probvec)
 
 			nextValues[j] = i
@@ -40,7 +41,7 @@ function sample_next_values(c, o)
 			# probvec[i] = sum(logpdf(NormalSuffStat(obs_var[j], c.μ_grand + θ_cs[j], σ, obs_n[j]), obs_mean[j]) for j in 1:n_groups)
 
 		end
-		s = logsumexp_batch(probvec)
+		# s = logsumexp_batch(probvec)
 		probvec .-= logsumexp_batch(probvec)
 		nextValues[j] = rand(Distributions.Categorical(exp.(probvec)))
 	end

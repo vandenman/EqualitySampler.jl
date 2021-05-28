@@ -75,9 +75,12 @@ function plot_model(model::AbstractVector{T}) where T<:Integer
 			count += 1
 		end
 	end
-	graphplot!(plt, A, x = x, y = y, markersize = 0.2, nodeshape=:circle, fontsize = 10, linecolor = :darkgrey, nodecolor = plot_color(:white, 0.0), curves = false)
+	graphplot!(plt, A, x = x, y = y, markersize = 0.2, nodeshape=:circle, fontsize = 10, linecolor = :darkgrey, nodecolor = plot_color(:white, 0.0), curves = false,
+				linewidth = 0)
 	return plt
 end
+
+plot_model(x::Int) = plot_model(reverse(digits(x)))
 
 function make_shape(model, k, x, y, no_points = 32, pointscale = .15)
 
@@ -181,8 +184,8 @@ function plot_modelspace(k::Integer, save::Bool = true, vertical::Bool = true)
 	return plt
 end
 
-plot_modelspace(5, false, false)
+# plot_modelspace(5, false, false)
 
-for k in 3:6
-	plot_modelspace(k, true, false)
-end
+# for k in 3:6
+# 	plot_modelspace(k, true, false)
+# end

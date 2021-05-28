@@ -47,6 +47,7 @@ pdf_incl(d::AbstractMvUrnDistribution,  no_equalities) = exp(logpdf_incl(d,  no_
 logpdf_model(d::AbstractMvUrnDistribution, x::T) where T <: Integer = logpdf_model_distinct(d, x) - log_count_combinations(length(d), length(d) - x)
 logpdf_model(d::AbstractMvUrnDistribution, x::AbstractVector{T}) where T <: Integer = logpdf_model_distinct(d, x) - log_count_combinations(x)
 pdf_model(d::AbstractMvUrnDistribution, x) = exp(logpdf_model(d, x))
+pdf_model_distinct(d::AbstractMvUrnDistribution, x) = exp(logpdf_model_distinct(d, x))
 
 Distributions.logpdf(d::AbstractMvUrnDistribution, x::AbstractVector{T}) where T<:Integer = logpdf_model(d, x)
 
