@@ -25,3 +25,5 @@ old_files/*
 *.jls
 tutorials/*
 .Rproj.user
+
+simulations/simulation_results_*/*

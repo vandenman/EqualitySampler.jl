@@ -1,7 +1,7 @@
 module EqualitySampler
 
 import Base: length
-import Distributions, Random, LinearAlgebra, Memoize, SpecialFunctions
+import Distributions, Random, LinearAlgebra, Memoize, SpecialFunctions, Optim
 import StatsBase: countmap
 import OrderedCollections: OrderedDict
 import Turing, Turing.RandomMeasures
@@ -51,6 +51,8 @@ export
 
 	pdf_model,
 	logpdf_model,
+	pdf_model_distinct,
+	logpdf_model_distinct,
 	pdf_incl,
 	logpdf_incl,
 
@@ -64,6 +66,8 @@ export
 	BetaBinomialMvUrnDistribution,
 	RandomProcessMvUrnDistribution,
 	PartitionSampler,
+
+	dpp_find_α,
 
 	bayes_factor_one_way_anova
 
@@ -82,7 +86,7 @@ include("helpers.jl")
 include("PdfDirichletProcess.jl")
 include("bayesFactors.jl")
 include("PartitionSampler.jl")
-
+include("findDPPalpha.jl")
 
 
 end

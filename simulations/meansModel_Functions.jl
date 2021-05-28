@@ -47,7 +47,8 @@ function simulate_data_one_way_anova(
 
 end
 
-function fit_lm(y, df)
+fit_lm(y, df) = fit_lm(df)
+function fit_lm(df)
 	mod = SM.fit(GLM.LinearModel, SM.@formula(y ~ 1 + g), df)#, contrasts = Dict(:g => StatsModels.FullDummyCoding()))
 	# transform the coefficients to a grand mean and offsets
 	coefs = copy(GLM.coef(mod))
@@ -238,7 +239,7 @@ end
 
 function get_log_posterior(obs_mean, obs_var, obs_n, Q, partition_prior::AbstractMvUrnDistribution)
 	return function logposterior(nextValues, c)
-		σ = sqrt(c.σ²)
+		# σ = sqrt(c.σ²)
 		θ_s = Q * c.θ_r
 		θ_cs = average_equality_constraints(θ_s, nextValues)
 		return sum(logpdf(NormalSuffStat(obs_var[j], c.μ_grand + sqrt(c.σ²) * θ_cs[j], c.σ², obs_n[j]), obs_mean[j]) for j in eachindex(obs_mean)) + logpdf(partition_prior, nextValues)
@@ -412,56 +413,3 @@ function get_initial_values(model, obs_mean, obs_var, obs_n, Q, partition_prior)
 end
 
 
-# TEMPORARILY COPIED FROM DynamicPPL (basically a version of generated_quantities that is always silent)
-
-function _apply2!(kernel!, vi::AbstractVarInfo, values, keys)
-    keys_strings = map(string, DynamicPPL.collectmaybe(keys))
-    num_indices_seen = 0
-
-    for vn in Base.keys(vi)
-        indices_found = kernel!(vi, vn, values, keys_strings)
-		# @show vn, indices_found
-        if indices_found !== nothing
-            num_indices_seen += length(indices_found)
-        end
-    end
-
-    # if length(keys) > num_indices_seen
-    #     # Some keys have not been seen, i.e. attempted to set variables which
-    #     # we were not able to locate in `vi`.
-    #     # Find the ones we missed so we can warn the user.
-    #     unused_keys = DynamicPPL._find_missing_keys(vi, keys_strings)
-    #     @warn "the following keys were not found in `vi`, and thus `kernel!` was not applied to these: $(unused_keys)"
-    # end
-
-    return vi
-end
-
-function generated_quantities2(model, chain)
-    varinfo = DynamicPPL.VarInfo(model)
-    iters = Iterators.product(1:size(chain, 1), 1:size(chain, 3))
-    return map(iters) do (sample_idx, chain_idx)
-        setval_and_resample2!(varinfo, chain, sample_idx, chain_idx)
-        model(varinfo)
-    end
-end
-setval_and_resample2!(vi, x) = _apply!(_setval_and_resample_kernel!, vi, values(x), keys(x))
-function setval_and_resample2!(vi, chains, sample_idx::Int, chain_idx::Int)
-    return _apply2!(_setval_and_resample_kernel2!, vi, chains.value[sample_idx, :, chain_idx], keys(chains))
-end
-
-function _setval_and_resample_kernel2!(vi, vn, values, keys)
-    indices = findall(Base.Fix1(DynamicPPL.subsumes_string, string(vn)), keys)
-    if !isempty(indices)
-        sorted_indices = sort!(indices; by=i -> keys[i], lt=DynamicPPL.NaturalSort.natural)
-        val = reduce(vcat, values[sorted_indices])
-        DynamicPPL.setval!(vi, val, vn)
-        DynamicPPL.settrans!(vi, false, vn)
-    else
-        # Ensures that we'll resample the variable corresponding to `vn` if we run
-        # the model on `vi` again.
-        DynamicPPL.set_flag!(vi, vn, "del")
-    end
-
-    return indices
-end

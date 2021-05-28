@@ -12,6 +12,7 @@
 
 =#
 
+#=
 using EqualitySampler, Plots, Turing
 import StatsBase: countmap
 
@@ -238,35 +239,30 @@ savefig(joint, joinpath("figures", "prior_$k.pdf"))
 # ys = Vector[rand(10), rand(20)]# .* u"km"
 # plot(ys, color=[:black :orange], line=(:dot, 4), marker=([:hex :d], 12, 0.8, Plots.stroke(3, :gray)))
 
+=#
+
 # rework of the code above using only multivariate distributions
 using EqualitySampler, Distributions, Plots
 import DataFrames as DF
 import Turing, CSV
+Plots.PyPlotBackend()
+include("simulations/plotPartitions.jl")
 
 updateDistribution(d::UniformMvUrnDistribution, args) = d
 updateDistribution(d::BetaBinomialMvUrnDistribution, args) = BetaBinomialMvUrnDistribution(d.k, args...)
 updateDistribution(d::RandomProcessMvUrnDistribution, args) = RandomProcessMvUrnDistribution(d.k, Turing.RandomMeasures.DirichletProcess(args...))
 
-make_title(::UniformMvUrnDistribution) = "Uniform"
-make_title(d::BetaBinomialMvUrnDistribution) = "BetaBinomial α=$(d.α) β=$(d.β)"
-make_title(d::RandomProcessMvUrnDistribution) = "Dirichlet Process α=$(d.rpm.α)"
+make_title_wide(::UniformMvUrnDistribution) = "Uniform"
+make_title_wide(d::BetaBinomialMvUrnDistribution) = "BetaBinomial α=$(d.α) β=$(d.β)"
+make_title_wide(d::RandomProcessMvUrnDistribution) = "Dirichlet Process α=$(d.rpm.α)"
 
-k=5
-dists = (
-	(
-		dist = UniformMvUrnDistribution(k),
-		args = ((k,),)
-	),
-	(
-		dist = BetaBinomialMvUrnDistribution(k),
-		args = ((.75, 1.5), (1, 1), (.5, .5), (1, 5))
-	),
-	(
-		dist = RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(1.887)),
-		args = ((0.5,), (1.887,), (1.0,), (3.0,))
-	)
-)
+make_title(::Type{UniformMvUrnDistribution{Int64}}) = "Uniform"
+make_title(::Type{BetaBinomialMvUrnDistribution{Int64}}) = "BetaBinomial"
+make_title(::Type{RandomProcessMvUrnDistribution{Turing.RandomMeasures.DirichletProcess{Float64}, Int64}}) = "Dirichlet Process"
 
+make_label(::Type{UniformMvUrnDistribution{Int64}}, args) = nothing
+make_label(::Type{BetaBinomialMvUrnDistribution{Int64}}, args) = "α=$(args[1]) β=$(args[2])"
+make_label(::Type{RandomProcessMvUrnDistribution{Turing.RandomMeasures.DirichletProcess{Float64}, Int64}}, args) = "α=$(args[1])"
 
 function get_data(dists)
 
@@ -301,10 +297,10 @@ function get_data(dists)
 		@show d, args, i
 		for arg in args
 			D = updateDistribution(d, arg)
-			model_probs = vec(mapslices(m->logpdf(D, m), models, dims = 1))
+			model_probs = vec(mapslices(m->logpdf_model_distinct(D, m), models, dims = 1))
 			incl_probs = logpdf_incl.(Ref(D), 0:k-1)
 
-			nm = make_title(D)
+			nm = make_title_wide(D)
 			df_wide_model_probs[!, nm] = model_probs
 			df_wide_incl_probs[!, nm] = incl_probs
 
@@ -330,9 +326,125 @@ function get_data(dists)
 	return df_wide_model_probs, df_long_model_probs, df_wide_incl_probs, df_long_incl_probs
 end
 
-df_wide_model_probs, df_long_model_probs, df_wide_incl_probs, df_long_incl_probs = get_data(dists)
+function get_idx_unique_models(subdf)
+	tmp = unique(x->round(x, sigdigits = 3), subdf[1, :value])
+	return [findfirst(==(tmp[j]), subdf[1, :value]) for j in eachindex(tmp)]
+end
 
-CSV.write(joinpath("tables", "model_probs_figure_2.csv"), df_wide_model_probs)
-CSV.write(joinpath("tables", "incl_probs_figure_2.csv"),  df_wide_incl_probs)
+# use union of DPP & BetaBinomial
+function make_all_plots(dfg, dfg_incl)
+
+	u = Set{Int}()
+	for subdf in dfg
+		new_idx = get_idx_unique_models(subdf)
+		union!(u, Set(subdf[1, :models][new_idx]))
+	end
+
+	ord = sortperm(ordering.(digits.(values(u))), lt=!isless)
+	x_models = collect(u)[ord]
+	x_idx = [findfirst(==(model), first(dfg)[1, :models]) for model in x_models]
+
+	x_axis_plots = plot_model.(x_models)
+	for plt in x_axis_plots
+		plot!(plt, size = (200, 200))
+	end
+
+	plts = Matrix{Plots.Plot}(undef, 2, length(dfg))
+	# (i, subdf) = first(enumerate(dfg))
+	for (i, subdf) in enumerate(dfg)
+
+		x = subdf[1, :models]
+		y = Matrix{Float64}(undef, length(x_idx), size(subdf, 1))
+		for j in axes(subdf, 1)
+			y[:, j] .= subdf[j, :value][x_idx]
+		end
+
+		plt0 = plot(eachindex(x_idx), y, markershape=:auto, title = make_title(subdf[1, :distribution]), legend = :none,
+				ylims = (-7, 0))
+
+		l = @layout [
+			a{0.8h}
+			grid(1,length(x_axis_plots), heigths = (0.2, ))
+		]
+		# plts[1, i] = deepcopy(plot(plt0, deepcopy(x_axis_plots)..., layout = l))
+		plts[1, i] = plot(plt0, deepcopy(x_axis_plots)..., layout = l)
+
+		subdf_incl = dfg_incl[i]
+
+		x = 0:4
+		y = Matrix{Float64}(undef, length(x), size(subdf_incl, 1))
+		for j in axes(subdf, 1)
+			y[:, j] .= subdf_incl[j, :value]
+		end
+
+		labels = reshape(make_label.(subdf_incl[1, :distribution], subdf_incl[!, :args]), (1, size(subdf_incl, 1)))
+		if subdf_incl[1, :distribution]<: UniformMvUrnDistribution
+			legendpos = :none
+		elseif subdf_incl[1, :distribution]<: BetaBinomialMvUrnDistribution
+			legendpos = :bottomleft
+		elseif subdf_incl[1, :distribution]<: RandomProcessMvUrnDistribution
+			legendpos = :bottomleft
+		end
+
+		plt = plot(reverse(x), y, markershape = :auto, labels = labels, legend = legendpos, ylims = (-7, 0))
+
+		plts[2, i] = plt
+
+	end
+	plts#, x_axis_plots
+end
+
+k=5
+dists = (
+	(
+		dist = UniformMvUrnDistribution(k),
+		args = ((k,),)
+	),
+	(
+		dist = BetaBinomialMvUrnDistribution(k),
+		args = ((1, 1), (.5, .5), (1.5, .75), (5, 1))
+	),
+	(
+		dist = RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(1.887)),
+		args = ((0.5,), (1.887,), (1.0,), (3.0,))
+	)
+)
+
+df_wide_model_probs, df_long_model_probs, df_wide_incl_probs, df_long_incl_probs = get_data(dists);
+
+# CSV.write(joinpath("tables", "model_probs_figure_2.csv"), df_wide_model_probs)
+# CSV.write(joinpath("tables", "incl_probs_figure_2.csv"),  df_wide_incl_probs)
 
 # TODO actually remake figure 2
+dfg = DF.groupby(df_long_model_probs, :distribution);
+dfg_incl = DF.groupby(df_long_incl_probs, :distribution);
+
+plts = make_all_plots(dfg, dfg_incl);
+ylabel!(plts[1, 1], "Prior probabilty");
+ylabel!(plts[2, 1], "Prior probabilty");
+xlabel!(plts[1, 2], "Model type");
+xlabel!(plts[2, 2], "No. inequalities");
+
+
+
+w = 600
+jointplot = plot(permutedims(plts)..., layout = (2, 3), size = (3w, 2w));
+plts[1]
+savefig(jointplot, joinpath("figures", "visualizePriors_2x3.png"))
+# savefig(jointplot, joinpath("figures", "visualizePriors_2x3.svg"))
+
+# jointplot = plot(
+# 	plts[1, :]...,
+# 	deepcopy(x_axis)...,
+# 	deepcopy(x_axis)...,
+# 	deepcopy(x_axis)...,
+# 	plts[2, :]...,
+# 	layout = @layout [
+# 		grid(1, 3,  heights = (0.7,  ))
+# 		grid(1, 21, heights = (0.15, ))
+# 		grid(1, 3,  heights = (0.7,  ))
+# 	]
+# )
+
+
+
