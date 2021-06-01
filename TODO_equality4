@@ -21,8 +21,8 @@ proportion model with statistical errors
 
 for visualizePriors we want
 
-BetaBinomial: (1, 1) & (n_groups, 1)
-DPP: 0.5, 1, Gopalan Berry
+- [ ] BetaBinomial: (1, 1) & (n_groups, 1)
+- [ ] DPP: 0.5, 1, Gopalan Berry
 
 Add alpha 0.5 for the simulations!
 

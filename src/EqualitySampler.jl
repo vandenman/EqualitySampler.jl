@@ -1,5 +1,6 @@
 module EqualitySampler
 
+using Base: Integer, Symbol
 import Base: length
 import Distributions, Random, LinearAlgebra, Memoize, SpecialFunctions, Optim
 import StatsBase: countmap
@@ -65,6 +66,7 @@ export
 	UniformMvUrnDistribution,
 	BetaBinomialMvUrnDistribution,
 	RandomProcessMvUrnDistribution,
+	DirichletProcessMvUrnDistribution,
 	PartitionSampler,
 
 	dpp_find_α,
