@@ -10,7 +10,7 @@ include("simulations/silentGeneratedQuantities.jl")
 include("simulations/meansModel_Functions.jl")
 include("simulations/helpersTuring.jl")
 
-df = DF.DataFrame(CSV.File(joinpath("simulations", "data", "tetris_data.csv")))
+df = DF.DataFrame(CSV.File(joinpath("demos", "data", "tetris_data.csv")))
 df
 
 unique(df[!, :Condition])
