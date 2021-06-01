@@ -61,11 +61,11 @@ Distributions.logpdf(D::MvNormalSuffStat, obs_mean::AbstractVector) = _multivari
 # this method isn't necessary for observe statements in Turing
 # Distributions.rand(rng::Random.AbstractRNG, D::MvNormalSuffStat) = rand(rng, MvNormal(D.pop_mean, D.pop_var ./ D.n))
 
-struct NormalSuffStat{T<:Real, U<:Real} <: Distributions.ContinuousUnivariateDistribution
+struct NormalSuffStat{T<:Real, U<:Real, V<:Real} <: Distributions.ContinuousUnivariateDistribution
 # struct NormalSuffStat{T<:Real, U<:Real} <: Distributions.Distribution
 	obs_var::T
 	pop_mean::U
-	pop_var::U
+	pop_var::V
 	obs_n::Int
 end
 Distributions.logpdf(D::NormalSuffStat, obs_mean::T) where T<:Real = _univariate_normal_likelihood(obs_mean, D.obs_var, D.obs_n, D.pop_mean, D.pop_var)

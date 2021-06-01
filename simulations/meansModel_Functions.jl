@@ -150,6 +150,14 @@ end
 		obs_mean[i] ~ NormalSuffStat(obs_var[i], μ_grand + sqrt(σ²) * θ_cs[i], σ², obs_n[i])
 	end
 	return (θ_cs, )
+
+	# θ_cs = μ_grand .+ sqrt(σ²) .* θ_s
+
+	# for i in 1:n_groups
+	# 	obs_mean[i] ~ NormalSuffStat(obs_var[i], θ_cs[partition[i]], σ², obs_n[i])
+	# end
+	# return (θ_s[partition], )
+
 end
 
 @model function one_way_anova_eq_cond_ss(obs_mean, obs_var, obs_n, Q, partition_prior, indicator_state = ones(Int, length(obs_mean)), ::Type{T} = Float64) where {T}
@@ -194,6 +202,8 @@ function fit_model(
 			partition_prior::D = nothing,
 			mcmc_burnin::Int = 500,
 			use_Gibbs::Bool = true,
+			hmc_stepsize::Float64 = 0.0,
+			n_leapfrog::Int = 10,
 			kwargs...
 )			where D<:Union{Nothing, AbstractMvUrnDistribution, AbstractConditionalUrnDistribution}
 	Q = getQ(length(obs_mean))
@@ -202,7 +212,7 @@ function fit_model(
 		partition_prior = fix_length(partition_prior, length(obs_mean))
 	end
 	@assert partition_prior === nothing || length(obs_mean) == length(partition_prior)
-	model, sampler = get_model_and_sampler(partition_prior, obs_mean, obs_var, obs_n, Q, use_Gibbs)
+	model, sampler = get_model_and_sampler(partition_prior, obs_mean, obs_var, obs_n, Q, use_Gibbs; hmc_stepsize = hmc_stepsize, n_leapfrog = n_leapfrog)
 	init_theta = get_initial_values(model, obs_mean, obs_var, obs_n, Q, partition_prior)
 	return sample_model(model, sampler, mcmc_iterations, mcmc_burnin, init_theta; kwargs...)
 end
@@ -213,14 +223,24 @@ function get_model_and_sampler(::Nothing, obs_mean, obs_var, obs_n, Q, ::Bool)
 	return model, sampler
 end
 
-function get_model_and_sampler(partition_prior::AbstractMvUrnDistribution, obs_mean, obs_var, obs_n, Q, use_Gibbs)
+function get_model_and_sampler(partition_prior::AbstractMvUrnDistribution, obs_mean, obs_var, obs_n, Q, use_Gibbs; hmc_stepsize = 0.0, n_leapfrog::Int = 10)
 	model = one_way_anova_eq_mv_ss(obs_mean, obs_var, obs_n, Q, partition_prior)
 
+	# @show hmc_stepsize, n_leapfrog
 	if use_Gibbs
 		sampler = Gibbs(
 			GibbsConditional(:partition, EqualitySampler.PartitionSampler(length(obs_mean), get_log_posterior(obs_mean, obs_var, obs_n, Q, partition_prior))),
-			# HMC(0.01, 10, :μ_grand, :σ², :θ_r)
-			HMCDA(200, 0.65, 0.3, :μ_grand, :σ², :θ_r)
+			HMC(hmc_stepsize, n_leapfrog, :μ_grand, :σ², :θ_r, :g)
+			# HMC(hmc_stepsize, n_leapfrog, :μ_grand),
+			# HMC(hmc_stepsize, n_leapfrog, :σ²),
+			# HMC(hmc_stepsize, n_leapfrog, :θ_r),
+			# HMC(hmc_stepsize, n_leapfrog, :g)
+			# MH(
+			# 	:μ_grand	=> AdvancedMH.RandomWalkProposal(Normal(0.0, 0.1)),
+			# 	:θ_r		=> AdvancedMH.RandomWalkProposal(MvNormal(length(obs_mean) - 1, 0.1)),
+			# 	:σ²			=> AdvancedMH.RandomWalkProposal(Truncated(Normal(0, 0.1), 0.0, Inf)),
+			# 	:g			=> AdvancedMH.RandomWalkProposal(Truncated(Normal(0, 0.1), 0.0, Inf))
+			# )
 		)
 	else
 		sampler = Gibbs(PG(20, :partition), HMCDA(200, 0.65, 0.3, :μ_grand, :σ², :θ_r))#HMC(0.01, 10, :μ_grand, :σ², :θ_r))
@@ -294,40 +314,6 @@ function get_θ(offset, true_model::Vector{T}) where T<:Integer
 	return θ .- mean(θ)
 end
 
-# function compute_retrieval(true_model::Vector{Int}, estimated_model::Vector{Int})
-
-# 	@assert length(true_model) == length(estimated_model)
-
-
-# 	false_equalities		= 0
-# 	false_inequalities		= 0 # <- examine this to control alpha
-# 	true_equalities			= 0
-# 	true_inequalities		= 0
-
-# 	no_params = length(true_model)
-# 	for i in 1:no_params-1, j in i+1:no_params
-# 		truthEqual		= true_model[i]			== true_model[j]
-# 		estimatedEqual	= estimated_model[i]	== estimated_model[j]
-
-# 		if truthEqual
-# 			if estimatedEqual
-# 				true_equalities += 1
-# 			else
-# 				false_inequalities += 1
-# 			end
-# 		else
-# 			if estimatedEqual
-# 				false_equalities += 1
-# 			else
-# 				true_inequalities += 1
-# 			end
-# 		end
-# 	end
-
-# 	return (false_equalities=false_equalities, false_inequalities=false_inequalities, true_equalities=true_equalities, true_inequalities=true_inequalities)
-
-# end
-
 compute_retrieval(true_model::Vector{Int}, estimated_model::Vector{Int}) = compute_retrieval(BitMatrix(i == j for i in true_model, j in true_model), BitMatrix(i == j for i in estimated_model, j in estimated_model))
 compute_retrieval(true_model::Vector{Int}, estimated_model::BitMatrix) = compute_retrieval(BitMatrix(i == j for i in true_model, j in true_model), estimated_model)
 function compute_retrieval(true_model::BitMatrix, estimated_model::BitMatrix)
@@ -395,7 +381,7 @@ function get_initial_values(model, obs_mean, obs_var, obs_n, Q, partition_prior)
 			μ_grand			= μ_grand_init,
 			σ²				= σ²_init,
 			θ_r				= sqrt(σ²_init) .* θ_r_init,
-			g				= 1.0 # <- no idea how to find this
+			g				= std(θ_r_init)
 		)
 	else
 		priorcontextargs = (
@@ -403,7 +389,7 @@ function get_initial_values(model, obs_mean, obs_var, obs_n, Q, partition_prior)
 			σ²				= σ²_init,
 			θ_r				= sqrt(σ²_init) .* θ_r_init,
 			partition		= collect(eachindex(obs_mean)),
-			g				= 1.0 # <- no idea how to find this
+			g				= std(θ_r_init)
 		)
 	end
 

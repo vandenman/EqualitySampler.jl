@@ -29,7 +29,9 @@ function file_to_row(file)
 	raw_result = Serialization.deserialize(file)
 
 	# sample_size::Int, prior, no_params::Int, no_inequalities::Int, offset::Float64, repetition::Int = raw_result[:sim]
-	sample_size, prior, no_params, no_inequalities, offset, repetition = raw_result[:sim]::Tuple{Int, AbstractMvUrnDistribution, Int, Int, Float64, Int}
+	sample_size, prior, no_params, no_inequalities, offset, repetition = raw_result[:sim]::Tuple{Int, Tuple, Int, Int, Float64, Int}
+
+	priorname = first(prior)::String
 
 	true_model = raw_result[:true_model]::Vector{Int}
 
@@ -49,7 +51,9 @@ function file_to_row(file)
 		sample_size 				= sample_size,
 		no_params					= no_params,
 		no_inequalities				= no_inequalities,
-		prior						= prior,
+
+		# prior						= prior,
+		prior						= priorname,
 
 		# retrieval_counts			= retrieval_counts,
 		# retrieval_probs			= retrieval_probs,
@@ -86,7 +90,8 @@ function read_results()::DF.DataFrame
 		sample_size					= Vector{Int}(undef, nfiles),
 		no_params					= Vector{Int}(undef, nfiles),
 		no_inequalities				= Vector{Int}(undef, nfiles),
-		prior						= Vector{AbstractMvUrnDistribution}(undef, nfiles),
+		# prior						= Vector{AbstractMvUrnDistribution}(undef, nfiles),
+		prior						= Vector{String}(undef, nfiles),
 
 		# retrieval_counts			= Vector{NamedTuple{retrieval_keys, NTuple{4, Float64}}}(undef, nfiles),
 		# retrieval_probs			= Vector{NamedTuple{retrieval_keys, NTuple{4, Float64}}}(undef, nfiles),
@@ -130,7 +135,7 @@ end
 prior_to_string(::UniformMvUrnDistribution) = "Uniform"
 prior_to_string(d::BetaBinomialMvUrnDistribution) = "BetaBinomial α = $(d.α), β = $(d.β)"
 prior_to_string(d::RandomProcessMvUrnDistribution) = "Dirichlet Process α = $(d.rpm.α)"
-
+prior_to_string(s::String) = s
 # function make_title(subdf)
 # 	"prior: $(prior_to_string(subdf[!, :prior][1]))\nparams: $(subdf[!, :no_params][1]) \ninequalities: $((subdf[!, :no_params][1] * subdf[!, :no_inequalities][1]) ÷ 100)"
 # end
@@ -148,7 +153,8 @@ function make_subplot(subdf, target = :false_inequalities; legend = false)
 	# 	yvalue = mean(yvalue)
 	# end
 
-	subdf1 = DF.combine(DF.groupby(subdf[valid, :], [:no_inequalities, :sample_size]), target => mean; renamecols=false)
+	# use median to be slightly robust against misfitting
+	subdf1 = DF.combine(DF.groupby(subdf[valid, :], [:no_inequalities, :sample_size]), target => median; renamecols=false)
 
 	return scatter(
 								categorical(subdf1[!, :sample_size]),
@@ -169,7 +175,7 @@ function make_matrix_plot(grouped_df, target, priors_for_plot, allparams; width 
 	npriors	= length(priors_for_plot)
 	nparams	= length(allparams)
 	plts	= Matrix{Plots.Plot}(undef, nparams, npriors)
-	for (i, subdf) in enumerate(grouped_df)
+	for subdf in grouped_df
 
 		i1 = findfirst(==(subdf[1, :no_params]), allparams)
 		i2 = findfirst(==(subdf[1, :prior]), priors_for_plot)
@@ -209,7 +215,7 @@ end
 for target in (:false_equalities_prob, :false_inequalities_prob, :true_equalities_prob, :true_inequalities_prob, :correlation)
 
 	joint_plot, _ = make_matrix_plot(dfg, target, priors_for_plot, allparams)
-	savefig(joint_plot, joinpath("figures", "newsim2", "means_model_convergence_$(target).pdf"))
+	savefig(joint_plot, joinpath("figures", "newsim3b", "medians_model_convergence_$(target).pdf"))
 
 end
 

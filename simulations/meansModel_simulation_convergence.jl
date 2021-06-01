@@ -56,7 +56,7 @@ function get_simulation_params(no_repeats::Int = 1)
 		("betabinomk1",	k->BetaBinomialMvUrnDistribution(k, k, 1)),
 		("betabinom1k",	k->BetaBinomialMvUrnDistribution(k, 1, k)),
 
-		("dppalpha1",	k->RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(1))),
+		("dppalpha1",	k->RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(1.0))),
 		("dppalphak",	k->RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(dpp_find_α(k))))
 	)
 

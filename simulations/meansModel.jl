@@ -353,24 +353,28 @@ yvals_2 = test_pdf_2.(xvals, Ref(θ_other))
 plot(xvals, yvals_1)
 plot(xvals, hcat(yvals_1, yvals_2))
 
+# for formula interface
+f = @formula(y ~ g)
 
+lhs = f.lhs.sym
+rhs = f.rhs.sym
+df0 = df[!, [lhs, rhs]]
 
 n_groups = 5
-n_obs_per_group = 1000
+n_obs_per_group = 10_000
 # true_model = collect(1:n_groups)
 true_model = reduce_model(sample_true_model(n_groups, 50))
 true_θ = get_θ(0.2, true_model)
-@assert all(diff(sort(unique(true_θ))) .≈ 0.2)
 
 y, df, D, true_values = simulate_data_one_way_anova(n_groups, n_obs_per_group, true_θ, true_model, 0.0, 1.0);
 
 ests, mod = fit_lm(y, df);
 scatter(true_values[:θ], ests, legend = :none); Plots.abline!(1, 0)
 
-resGibbsStuff = fit_model(df, mcmc_iterations = 25_000, mcmc_burnin = 5_000, partition_prior = UniformMvUrnDistribution(n_groups), use_Gibbs = true)
+resGibbsStuff = fit_model(df, mcmc_iterations = 25_000, mcmc_burnin = 5_000, partition_prior = UniformMvUrnDistribution(n_groups), use_Gibbs = true, hmc_stepsize = 0.0)
 
-mean_θ_cs_eq, θ_cs_eq, chain_eq, model_eq = resGibbsStuff
 show_code_warntype(model_eq)
+mean_θ_cs_eq, θ_cs_eq, chain_eq, model_eq = resGibbsStuff
 
 plot(θ_cs_eq') # trace plots
 hcat(ests, mean_θ_cs_eq) # compare frequentist estimates to posterior means
@@ -388,14 +392,74 @@ mc = sort(compute_model_counts(chain_eq), byvalue=true, rev=true)
 incl_probs_to_model(compute_post_prob_eq(chain_eq))
 
 
-d_test = RandomProcessMvUrnDistribution(4, Turing.RandomMeasures.DirichletProcess(1.817))
-logpdf(d_test, fill(1, length(d_test)))
-logpdf(d_test, collect(1:length(d_test)))
+# import AdvancedMH as AMH
 
-EqualitySampler.logpdf_model_distinct(d_test, fill(1, length(d_test)))
-EqualitySampler.logpdf_model_distinct(d_test, collect(1:length(d_test)))
+obs_mean, obs_var, obs_n = get_suff_stats(df)
+Q = getQ(length(obs_mean))
+partition_prior = UniformMvUrnDistribution(n_groups)
+model = one_way_anova_eq_mv_ss(obs_mean, obs_var, obs_n, Q, partition_prior)
+spl = Gibbs(
+	GibbsConditional(:partition, EqualitySampler.PartitionSampler(length(obs_mean), get_log_posterior(obs_mean, obs_var, obs_n, Q, partition_prior))),
+	MH(
+		:μ_grand	=> x -> Normal(x, 1),
+		:σ²			=> x -> Truncated(Normal(x, 1), 0, Inf),
+		:θ_r		=> x -> Normal(x, 1)
+	)
+	# HMC(0.0005, 10, :μ_grand, :σ², :θ_r)
+)
+# pass n_adapts!
+samples = sample(model, spl, 100);
 
-find_
+algs = spl.alg.algs
+i = 0
+samplers = map(algs) do alg
+	i += 1
+	if i == 1
+		prev_alg = algs[end]
+	else
+		prev_alg = algs[i-1]
+	end
+	rerun = Turing.gibbs_rerun(prev_alg, alg)
+	selector = DynamicPPL.Selector(Symbol(typeof(alg)), rerun)
+	DynamicPPL.Sampler(alg, model, selector)
+end
+
+spl = HMC(0.0005, 10, :μ_grand, :σ², :θ_r)
+rng = Random.MersenneTwister()
+vi = Turing.VarInfo(model)
+link!(vi, spl)
+model(rng, vi, spl)
+
+# Extract parameters.
+theta = vi[spl]
+
+import	DynamicPPL			as DPPL,
+		AdvancedHMC			as AHMC,
+		Turing.Inference	as TurInf
+
+# Create a Hamiltonian.
+metricT = TurInf.getmetricT(spl.alg)
+metric = AHMC.metricT(length(theta))
+∂logπ∂θ = gen_∂logπ∂θ(vi, spl, model)
+logπ = gen_logπ(vi, spl, model)
+hamiltonian = AHMC.Hamiltonian(metric, logπ, ∂logπ∂θ)
+
+spl
+spl.alg
+
+# Compute phase point z.
+z = AHMC.phasepoint(rng, theta, hamiltonian)
+
+
+
+DynamicPPL.initialstep(
+	Random.MersenneTwister(),
+	model,
+	HMC(0.0, 10),
+	vi,
+
+)
+
 
 # TODO file bug report
 # using DynamicPPL, Turing
@@ -417,37 +481,3 @@ find_
 # chain = sample(model, spl, 10);
 # generated_quantities(model, chain)
 # generated_quantities(model, sample(model, NUTS(), 10))
-
-function DPP_find_α(k::Integer)
-
-	null_model = fill(1, k)
-	full_model = collect(1:k)
-
-	function target(α)
-		dpp = RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(exp(first(α))))
-		(
-			EqualitySampler.logpdf_model_distinct(dpp, full_model) -
-			EqualitySampler.logpdf_model_distinct(dpp, null_model)
-		)^2
-	end
-
-	result = Optim.optimize(target, [log(1.817)], Optim.BFGS())
-
-	return exp(first(result.minimizer)), result
-
-end
-
-k = 10
-α, _ = DPP_find_α(k)
-
-
-d_test = RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(α))
-
-null_model = fill(1, k)
-full_model = collect(1:k)
-
-logpdf(d_test, null_model)
-logpdf(d_test, full_model)
-
-EqualitySampler.logpdf_model_distinct(d_test, full_model)
-EqualitySampler.logpdf_model_distinct(d_test, null_model)

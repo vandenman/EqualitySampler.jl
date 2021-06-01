@@ -9,7 +9,7 @@ import DynamicPPL: @submodel
 include("simulations/silentGeneratedQuantities.jl")
 include("simulations/helpersTuring.jl")
 
-journal_data = DF.DataFrame(CSV.File(joinpath("simulations", "data", "journal_data.csv")))
+journal_data = DF.DataFrame(CSV.File(joinpath("demos", "data", "journal_data.csv")))
 
 @df journal_data scatter(:journal, :errors, ylims = (0, 1))
 
