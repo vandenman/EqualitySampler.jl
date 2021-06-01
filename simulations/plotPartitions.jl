@@ -69,18 +69,18 @@ function plot_model_data(model::AbstractVector{T}) where T<:Integer
 	# plt = plot(background_color_inside = plot_color(:lightgrey, 0.15), margin = 0.01mm)
 	# TODO: not sure wheter all this OrderedDict is necessary
 	tb = sort(OrderedCollections.OrderedDict(countmap(model)), byvalue=true, lt = !isless)
-	shapes = [make_shape(model, k, x, y) for (k, v) in tb if v > 1] 
+	shapes = [make_shape(model, k, x, y) for (k, v) in tb if v > 1]
 	return A, x, y, shapes
 
 end
 
 plot_model_data(x::Int) = plot_model_data(reverse(digits(x)))
-function plot_model(model::AbstractVector{T}; kwargs...) where T<:Integer 
+function plot_model(model::AbstractVector{T}; kwargs...) where T<:Integer
 	plt = plot(background_color_inside = plot_color(:lightgrey, 0.15), margin = 0.01mm; kwargs...)
 	return plot_model!(plt, model; kwargs...)
 end
 
-function plot_model!(plt, model::AbstractVector{T}; kwargs...) where T<:Integer
+function plot_model!(plt, model::AbstractVector{T}; markersize = 3, markerstroke = 3, kwargs...) where T<:Integer
 
 	k = length(model)
 	A = zeros(T, k, k)
@@ -102,6 +102,11 @@ function plot_model!(plt, model::AbstractVector{T}; kwargs...) where T<:Integer
 			count += 1
 		end
 	end
+	scatter!(plt, x, y, marker = (markersize, 1.0, :white, Plots.stroke(markerstroke, :gray)), legend = false)
+	tmp0 = Iterators.flatten(zip(x, y)) |> extrema
+	tmp1 = 1.3 * maximum(abs, tmp0)
+	lims = (-tmp1, tmp1)
+	plot!(plt, xlim = lims, ylim = lims)
 	# graphplot!(plt, A, x = x, y = y, markersize = 0.2, nodeshape=:circle, fontsize = 10, linecolor = :darkgrey, nodecolor = plot_color(:white, 0.0), curves = false,
 				# linewidth = 0)
 	return plt

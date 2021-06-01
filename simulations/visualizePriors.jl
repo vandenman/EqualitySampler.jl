@@ -1,4 +1,3 @@
-using Base: Symbol
 #=
 
 	This file visualizes the priors over partitions by their
@@ -105,7 +104,13 @@ function get_idx_unique_models(subdf)
 end
 
 # use union of DPP & BetaBinomial
-function make_all_plots(dfg, dfg_incl)
+function make_all_plots(dfg, dfg_incl;
+	inset_size = 0.125,
+	graph_markersize = 4,
+	graph_markerstroke = 1,
+	ylims = (-9, 0),
+	yticks = 0:-2:-8
+)
 
 	u = Set{Int}()
 	for subdf in dfg
@@ -123,6 +128,12 @@ function make_all_plots(dfg, dfg_incl)
 	end
 	# x_axis_plots_data = plot_model_data.(x_models)
 
+	# these determine
+	# inset_size = 0.125
+	# lim = 1.5
+	# markersize = 5
+	# markerstroke = 3
+
 	plts = Matrix{Plots.Plot}(undef, 2, length(dfg))
 	# (i, subdf) = first(enumerate(dfg))
 	for (i, subdf) in enumerate(dfg)
@@ -134,48 +145,25 @@ function make_all_plots(dfg, dfg_incl)
 		end
 
 		plt0 = plot(eachindex(x_idx), y, markershape=:auto, title = make_title(subdf[1, :distribution]), legend = :none,
-				ylims = (-7, 0), xlims = (0, 8), xticks = 1:7)
+				ylims = ylims, yticks = yticks, xlims = (0, 8), xticks = 1:7)
 
-		inset_size = 0.1
-		x0 = .8#1 / 40
-		plot!(plt0; inset_subplots = [(1, bbox(x0, 0, inset_size, inset_size, :bottom, :left))], subplot=2, 
-			legend=false, 
-			# background_color_inside = plot_color(:lightgrey, 0.15),
-			margin = 0.01mm,
-			border=:none, axis=nothing
-		)
-		plot_model!(plt0[2], x_models[1])
-		lim = 1.5
-		plot!(plt0[2], xlim = (-lim, lim), ylim = (-lim, lim), background_color_subplot = "transparent")
-		plt0
-		# plot!(p[2], cos, fg_text=:white)
-		plot_model!(plt0, x_models[1]; )
+		for (j, x_m) in enumerate(x_models)
+			idx = j + 1
+			x0 = (3 / 40) / (10 * inset_size) + 5*(j-1) / 40
 
+			plot!(plt0; inset_subplots = [(1, bbox(x0, 0.05, inset_size, inset_size, :bottom, :left))],
+				legend=false, border=:none, axis=nothing,
+				subplot=idx
+			)
+			plot_model!(plt0[idx], x_m; markersize = graph_markersize, markerstroke = graph_markerstroke)
+			plot!(plt0[idx], #xlim = (-lim, lim), ylim = (-lim, lim),
+				background_color_subplot = "transparent"
+				# background_color_subplot = plot_color(:lightgrey, 0.15)
+			)
+		end
+		# plt0
 
-		graphplot(x_axis_plots_data[1][1], x = x_axis_plots_data[1][2], y = x_axis_plots_data[1][3])
-				x_axis_plots_data[1]
-		
-		plot!(
-			x_models[1];
-			inset = (1, bbox(0.05, 0.05, 0.5, 0.25, :bottom, :right)),
-			bg_inside = nothing
-		)
-		
-		
-		plot!(plt0, 
-
-			# x_axis_plots[1],
-			,
-			inset = (1, bbox(0.0, -7, 1/7, 0.25, :bottom, :left)),
-			bg_inside = nothing
-		)
-
-		l = @layout [
-			a{0.8h}
-			grid(1,length(x_axis_plots), heigths = (0.2, ))
-		]
-		# plts[1, i] = deepcopy(plot(plt0, deepcopy(x_axis_plots)..., layout = l))
-		plts[1, i] = plot(plt0, deepcopy(x_axis_plots)..., layout = l)
+		plts[1, i] = plt0
 
 		subdf_incl = dfg_incl[i]
 
@@ -194,7 +182,9 @@ function make_all_plots(dfg, dfg_incl)
 			legendpos = :bottomleft
 		end
 
-		plt = plot(reverse(x), y, markershape = :auto, labels = labels, legend = legendpos, ylims = (-7, 0))
+		plt = plot(reverse(x), y, markershape = :auto, labels = labels, legend = legendpos,
+				ylims = ylims, yticks = yticks
+		)
 
 		plts[2, i] = plt
 
@@ -253,19 +243,20 @@ savefig(jointplot, joinpath("figures", "visualizePriors_2x3.png"))
 # 	]
 # )
 
+# this is basically https://github.com/JuliaPlots/Plots.jl/issues/3378
+# nr = 1
+# nc = 1
 
+# function show_plotmat(nr, nc)
+# 	plotmat = [plot(randn(10), legend = false) for i in 1:nr, j in 1:nc]
+# 	w = 600
+# 	l = @layout grid(nr, nc)
+# 	plot(plotmat..., layout = l, size = (nc * w, nr * w))
+# 	# plot(plotmat..., layout = grid(nr, nc), size = (nc * w, nr * w))
+# 	# plot(plotmat..., layout = (nr, nc), size = (nc * w, nr * w))
+# end
 
-
-p0 = plot(heatmap(randn(10,20)), plot(rand(1:4,1000),randn(1000)), leg=false)
-w = 1; h = 1
-histogram!(p0, randn(1000), inset_subplots = [(1, bbox(0.05w,0.95h,0.5w,0.5h, v_anchor=:bottom))], subplot=1, ticks=nothing)
-plot!(p0, p1)
-
-sticks!(randn(100),subplot=4,inset_subplots=[bbox(0.35w,0.5h,200px,200px,h_anchor=:center,v_anchor=:center)])
-
-x=range(0,2pi, length = 10)
-y=range(0,2pi, length = 10)
-z = [sin(xx)*cos(yy) for xx in x, yy in y]
-p=contour(x,y,z,fill=true)
-plot!(x, sin.(x),inset_subplots = [(1, bbox(0.05w,0.05h,0.3w,0.3h))], subplot=2)
-plot!(p[2], cos, fg_text=:white)
+# show_plotmat(1, 1) # good!
+# show_plotmat(3, 3) # distances between axis tick labels and axis increases!
+# show_plotmat(6, 2) # y-axis tick labels disappeared / fall outside of the plot area?
+# show_plotmat(2, 6) # x-axis tick labels disappeared / fall outside of the plot area?

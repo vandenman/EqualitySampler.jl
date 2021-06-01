@@ -21,17 +21,17 @@ proportion model with statistical errors
 
 for visualizePriors we want
 
-- [ ] BetaBinomial: (1, 1) & (n_groups, 1)
-- [ ] DPP: 0.5, 1, Gopalan Berry
+- [x] BetaBinomial: (1, 1) & (n_groups, 1)
+- [x] DPP: 0.5, 1, Gopalan Berry
 
-Add alpha 0.5 for the simulations!
+- [ ] Add alpha 0.5 for the simulations!
 
-drop Scott & Berger figure
+- [x] drop Scott & Berger figure
 
-one_or_more_errors.png -> Adjust the DPP to be 1, .5, and Gopalan Berry
-change y-axis to say "at least one error"
+- [ ] one_or_more_errors.png -> Adjust the DPP to be 1, .5, and Gopalan Berry
+- [ ] change y-axis to say "at least one error"
 
-cut slide on DPP rich get richer
-cut title on slide "Comparison of Priors"
-cut slide on Scott & Berger plot
+- [ ] cut slide on DPP rich get richer
+- [ ] cut title on slide "Comparison of Priors"
+- [ ] cut slide on Scott & Berger plot
 
