@@ -1,3 +1,4 @@
+using Plots: push!
 using EqualitySampler, Plots, GraphRecipes, Colors, LazySets, Measures
 import StatsBase: countmap
 import OrderedCollections
@@ -52,7 +53,34 @@ plot adjacency matrix as a network
 
 get_colors(k::Int) = distinguishable_colors(k, [RGB(128/255,128/255,128/255)])
 
-function plot_model(model::AbstractVector{T}) where T<:Integer
+function plot_model_data(model::AbstractVector{T}) where T<:Integer
+
+
+	k = length(model)
+	A = zeros(T, k, k)
+	for i in 1:k
+		A[i, i] = 1
+	end
+
+	# TODO: this should take the model as an argument!
+	# colors = get_colors(k)
+
+	x, y = get_xy(k)
+	# plt = plot(background_color_inside = plot_color(:lightgrey, 0.15), margin = 0.01mm)
+	# TODO: not sure wheter all this OrderedDict is necessary
+	tb = sort(OrderedCollections.OrderedDict(countmap(model)), byvalue=true, lt = !isless)
+	shapes = [make_shape(model, k, x, y) for (k, v) in tb if v > 1] 
+	return A, x, y, shapes
+
+end
+
+plot_model_data(x::Int) = plot_model_data(reverse(digits(x)))
+function plot_model(model::AbstractVector{T}; kwargs...) where T<:Integer 
+	plt = plot(background_color_inside = plot_color(:lightgrey, 0.15), margin = 0.01mm; kwargs...)
+	return plot_model!(plt, model; kwargs...)
+end
+
+function plot_model!(plt, model::AbstractVector{T}; kwargs...) where T<:Integer
 
 	k = length(model)
 	A = zeros(T, k, k)
@@ -64,7 +92,6 @@ function plot_model(model::AbstractVector{T}) where T<:Integer
 	colors = get_colors(k)
 
 	x, y = get_xy(k)
-	plt = plot(background_color_inside = plot_color(:lightgrey, 0.15), margin = 0.01mm)
 	# TODO: not sure wheter all this OrderedDict is necessary
 	tb = sort(OrderedCollections.OrderedDict(countmap(model)), byvalue=true, lt = !isless)
 	count = 1
@@ -75,12 +102,14 @@ function plot_model(model::AbstractVector{T}) where T<:Integer
 			count += 1
 		end
 	end
-	graphplot!(plt, A, x = x, y = y, markersize = 0.2, nodeshape=:circle, fontsize = 10, linecolor = :darkgrey, nodecolor = plot_color(:white, 0.0), curves = false,
-				linewidth = 0)
+	# graphplot!(plt, A, x = x, y = y, markersize = 0.2, nodeshape=:circle, fontsize = 10, linecolor = :darkgrey, nodecolor = plot_color(:white, 0.0), curves = false,
+				# linewidth = 0)
 	return plt
 end
 
-plot_model(x::Int) = plot_model(reverse(digits(x)))
+plot_model(x::Int; kwargs...) = plot_model(reverse(digits(x)); kwargs...)
+plot_model!(p, x::Int; kwargs...) = plot_model!(p, reverse(digits(x)); kwargs...)
+
 
 function make_shape(model, k, x, y, no_points = 32, pointscale = .15)
 

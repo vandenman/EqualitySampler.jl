@@ -1,3 +1,4 @@
+using Base: Symbol
 #=
 
 	This file visualizes the priors over partitions by their
@@ -12,245 +13,17 @@
 
 =#
 
-#=
-using EqualitySampler, Plots, Turing
-import StatsBase: countmap
-
-# include("simulations/samplePriorsTuring.jl")
-# include("simulations/plotFunctions.jl")
-
-function linear_interpolation(new_x, known_y::AbstractVector{T}, known_x) where T
-	# assumes new_x and known_x is sorted from small to large
-	!issorted(new_x)	&& throw(DomainError(new_x,		"new_x should be sorted"))
-	!issorted(known_x)	&& throw(DomainError(known_x,	"known_x should be sorted"))
-
-	result = Vector{T}(undef, length(new_x))
-	j0 = 1
-	for i in eachindex(new_x)
-
-		# find the index of the largest value in new_x smaller than new_x[i]
-		for j in j0:length(known_x)
-			if known_x[j] > new_x[i]
-				j0 = j - 1
-				break
-			end
-		end
-
-		if j0 == length(known_x)
-			i1 = j0 - 1
-			i2 = j0
-		else
-			i1 = j0
-			i2 = i1 + 1
-		end
-
-		w = (new_x[i] - known_x[i1]) / (known_x[i2] - known_x[i1])
-		result[i] = known_y[i1] * (1 - w) + known_y[i2] * w
-
-	end
-	result
-end
-
-function ordering(x)
-	# TODO: ensure this is the actual ordering like on wikipedia
-	d = countmap(x)
-	res = Float64(length(x) - length(d))
-
-	v = sort!(collect(values(d)), lt = !isless)
-	# res = 0.0
-	for i in eachindex(v)
-		res += v[i] ./ 10 .^ (i)
-	end
-	return res
-end
-
-function empty_plot(k; yaxis = :log, legend = true, xrotation = 45, xfontsize = 8, palette = :default)
-
-	allmodels = generate_distinct_models(k)
-	order = sortperm(ordering.(eachcol(allmodels)), lt = !isless)
-	allmodels_str = [join(col) for col in eachcol(view(allmodels, :, order))]
-	transparent = Colors.RGBA(0, 0, 0, 0)
-	plt = plot(allmodels_str, ones(length(allmodels_str)), label = nothing, color = transparent,
-				yaxis = yaxis, legend = legend, xrotation = xrotation,
-				xticks = (0.5:length(allmodels_str)-.5, allmodels_str),
-				xtickfont=font(xfontsize),
-				tickfontvalign = :bottom,
-				palette = palette)
-	plt
-end
-
-function model_pmf!(plt, D, colors = 1:k, labels = :none)
-
-	k = length(D)
-	y = expected_model_probabilities(D)
-	incl_size = expected_inclusion_counts(k)
-	cumulative_sum = 0
-	xstart = 0
-
-	if labels === :none || length(labels) != k
-		labs = incl_size
-	else
-		labs = labels
-	end
-
-	for i in 1:k
-		yval = y[cumulative_sum + incl_size[i]]
-		ycoords = [yval, yval]
-		if isone(incl_size[i])
-			xcoords = [xstart + 0.5, xstart + 0.5]
-			scatter!(plt, xcoords, ycoords, m = 4, label = string(labs[i]), #yaxis = yaxis,
-					 color = colors[i], markerstrokecolor = colors[i]);
-		else
-			xcoords = [xstart, xstart + incl_size[i]]
-			plot!(plt, xcoords, ycoords, lw = 4, label = string(labs[i]), #yaxis = yaxis,
-				  color = colors[i]);
-		end
-		cumulative_sum += incl_size[i]
-		xstart += incl_size[i]
-	end
-	return plt
-end
-
-function incl_pmf!(plt, D; yaxis = :log, palette = :default, color = 1:length(D), label = fill("", length(D)))
-	k = length(D)
-	incl_probs = expected_inclusion_probabilities(D)
-	scatter!(plt, 0:k-1, incl_probs, m = 4, yaxis = yaxis, legend = false,
-				  color = color, markerstrokecolor = color, palette = palette, label = label);
-
-	xx = [i + j for i in 0:k-2 for j in (0.05, 0.95)]
-	yy = linear_interpolation(xx, incl_probs, collect(0:k-1))
-	xm = reshape(xx, (2, k-1))
-	ym = reshape(yy, (2, k-1))
-	plot!(plt, xm, ym, color = color, palette = palette, label = label, yaxis = yaxis, legend = false)
-	# plot!(plt, 0:k-1, incl_probs, color = color, palette = palette, label = label, yaxis = yaxis, legend = false)
-end
-
-k = 5
-Duniform = UniformConditionalUrnDistribution(ones(Int, k))
-DBetaBinom = BetaBinomialConditionalUrnDistribution(ones(Int, k), 1, 1, 1)
-DDirichletProcess = RandomProcessDistribution(Turing.RandomMeasures.DirichletProcess(1.887), k)
-
-# TODO: for some odd reason the x-axis tick labels are offset...
-yaxis_scale = :none
-xrotation   = 90
-xfontsize   = 4
-ylimsModel  = (0, .25)
-ylimsIncl   = (0, .5)
-colorpalet  = :seaborn_colorblind
-palette(colorpalet);
-
-dists = (
-	(
-		dist = UniformMvUrnDistribution(k)
-	),
-	(
-		dist = BetaBinomialMvUrnDistribution(k),
-		args = ((.75, 1.5), (1, 1), (.5, .5))
-	),
-	(
-		dist = RandomProcessDistribution(Turing.RandomMeasures.DirichletProcess(1.887), k),
-		dist = (1.887, 1.0, 3.0)
-	)
-)
-
-# TODO: this could just be a loop over distributions with parameter vectors
-# αβ = ((.5, 2), (2, 2), (1, 1), (.5, .5)) # Beta Binomial parameters
-αβ = ((.75, 1.5), (1, 1), (.5, .5)) # Beta Binomial parameters
-αs = (1.887, 1.0, 3.0) # Dirichlet Process parameters
-# plt row, column
-plt11 = empty_plot(k, legend = false, yaxis = yaxis_scale, xrotation = xrotation, xfontsize = xfontsize, palette = colorpalet);
-model_pmf!(plt11, Duniform, fill(1, k))
-plot!(plt11, title = "Uniform", ylab = "Probabilty", xlab = "Model", ylims = ylimsModel);
-
-# plt12 = empty_plot(k, legend = false, yaxis = yaxis_scale, xrotation = xrotation, xfontsize = xfontsize, palette = colorpalet);
-# model_pmf!(plt12, DBetaBinom);
-# plot!(plt12, title = "Beta-binomial (α = $(DBetaBinom.α), β = $(DBetaBinom.β))", xlab = "Model", ylims = ylimsModel);
-
-plt12 = empty_plot(k, legend = :top, yaxis = yaxis_scale, xrotation = xrotation, xfontsize = xfontsize, palette = colorpalet);
-
-for i in eachindex(αβ)
-	α, β = αβ[i]
-	labels = fill("", k)
-	labels[1] = "α = $α, β = $β"
-	model_pmf!(plt12, BetaBinomialConditionalUrnDistribution(ones(Int, k), 1, α, β), fill(i, k), labels);
-end
-plot!(plt12, title = "Beta-binomial", xlab = "Model", ylims = ylimsModel);
-plot!(plt12, yformatter=_->"");
-
-# plt12 = empty_plot(k, legend = false, yaxis = yaxis_scale, xrotation = xrotation, xfontsize = xfontsize, palette = colorpalet);
-# model_pmf!(plt12, DBetaBinom);
-# plot!(plt12, title = "Beta-binomial (α = $(DBetaBinom.α), β = $(DBetaBinom.β))", xlab = "Model", ylims = ylimsModel)
-
-plt13 = empty_plot(k, legend = :top, yaxis = yaxis_scale, xrotation = xrotation, xfontsize = xfontsize, palette = colorpalet);
-for i in eachindex(αs)
-	α = αs[i]
-	labels = fill("", k)
-	labels[1] = "α = $α"
-	DP = RandomProcessDistribution(Turing.RandomMeasures.DirichletProcess(α), k)
-	model_pmf!(plt13, DP, fill(i, k), labels);
-end
-plot!(plt13, title = "Dirichlet Process", xlab = "Model", ylims = ylimsModel);
-plot!(plt13, yformatter=_->"");
-
-# plt13 = empty_plot(k, legend = false, yaxis = yaxis_scale, xrotation = xrotation, xfontsize = xfontsize, palette = colorpalet);
-# model_pmf!(plt13, DDirichletProcess);
-# plot!(plt13, title = "DirichletProcess (α = $(DDirichletProcess.rpm.α))", xlab = "Model", ylims = ylimsModel);
-
-function setAxis!(plt, addLabels = false)
-	if addLabels
-		plot!(plt, xlab = "No. inequalities", ylab = "Probabilty", ylims = ylimsIncl);
-	else
-		plot!(plt, ylims = ylimsIncl, yformatter = _->"");
-	end
-end
-
-plt21 = plot();
-incl_pmf!(plt21, Duniform, yaxis = yaxis_scale, palette = colorpalet, color = fill(1, k));
-setAxis!(plt21, true);
-
-plt22 = plot();
-for i in eachindex(αβ)
-	α, β = αβ[i]
-	labels = fill("", k)
-	labels[1] = "α = $α, β = $β"
-	incl_pmf!(plt22, BetaBinomialConditionalUrnDistribution(ones(Int, k), 1, α, β), yaxis = yaxis_scale, palette = colorpalet, color = fill(i, k))
-end
-setAxis!(plt22);
-
-plt23 = plot();
-for i in eachindex(αβ)
-	α = αs[i]
-	labels = fill("", k)
-	labels[1] = "α = $α"
-	DP = RandomProcessDistribution(Turing.RandomMeasures.DirichletProcess(α), k)
-	incl_pmf!(plt23, DP, yaxis = yaxis_scale, palette = colorpalet, color = fill(i, k))
-end
-setAxis!(plt23);
-
-
-# plt23 = incl_pmf(DDirichletProcess, yaxis = yaxis_scale, palette = colorpalet);
-# plot!(plt23, xlab = "No. inequalities", ylims = ylimsIncl);
-
-w = 420
-joint = plot(plt11, plt12, plt13, plt21, plt22, plt23, layout = (2, 3), size = (2w, 3w))
-savefig(joint, joinpath("figures", "prior_$k.pdf"))
-
-
-# ys = Vector[rand(10), rand(20)]# .* u"km"
-# plot(ys, color=[:black :orange], line=(:dot, 4), marker=([:hex :d], 12, 0.8, Plots.stroke(3, :gray)))
-
-=#
-
-# rework of the code above using only multivariate distributions
 using EqualitySampler, Distributions, Plots
-import DataFrames as DF
-import Turing, CSV
-Plots.PyPlotBackend()
+import		DataFrames					as DF,
+			CSV
+import Turing.RandomMeasures: DirichletProcess
+
+# Plots.PyPlotBackend()
 include("simulations/plotPartitions.jl")
 
 updateDistribution(d::UniformMvUrnDistribution, args) = d
 updateDistribution(d::BetaBinomialMvUrnDistribution, args) = BetaBinomialMvUrnDistribution(d.k, args...)
-updateDistribution(d::RandomProcessMvUrnDistribution, args) = RandomProcessMvUrnDistribution(d.k, Turing.RandomMeasures.DirichletProcess(args...))
+updateDistribution(d::RandomProcessMvUrnDistribution, args) = DirichletProcessMvUrnDistribution(d.k, args...)
 
 make_title_wide(::UniformMvUrnDistribution) = "Uniform"
 make_title_wide(d::BetaBinomialMvUrnDistribution) = "BetaBinomial α=$(d.α) β=$(d.β)"
@@ -258,11 +31,11 @@ make_title_wide(d::RandomProcessMvUrnDistribution) = "Dirichlet Process α=$(d.r
 
 make_title(::Type{UniformMvUrnDistribution{Int64}}) = "Uniform"
 make_title(::Type{BetaBinomialMvUrnDistribution{Int64}}) = "BetaBinomial"
-make_title(::Type{RandomProcessMvUrnDistribution{Turing.RandomMeasures.DirichletProcess{Float64}, Int64}}) = "Dirichlet Process"
+make_title(::Type{RandomProcessMvUrnDistribution{DirichletProcess{Float64}, Int64}}) = "Dirichlet Process"
 
 make_label(::Type{UniformMvUrnDistribution{Int64}}, args) = nothing
 make_label(::Type{BetaBinomialMvUrnDistribution{Int64}}, args) = "α=$(args[1]) β=$(args[2])"
-make_label(::Type{RandomProcessMvUrnDistribution{Turing.RandomMeasures.DirichletProcess{Float64}, Int64}}, args) = "α=$(args[1])"
+make_label(::Type{RandomProcessMvUrnDistribution{DirichletProcess{Float64}, Int64}}, args) = "α=$(args[1])"
 
 function get_data(dists)
 
@@ -348,6 +121,7 @@ function make_all_plots(dfg, dfg_incl)
 	for plt in x_axis_plots
 		plot!(plt, size = (200, 200))
 	end
+	# x_axis_plots_data = plot_model_data.(x_models)
 
 	plts = Matrix{Plots.Plot}(undef, 2, length(dfg))
 	# (i, subdf) = first(enumerate(dfg))
@@ -360,7 +134,41 @@ function make_all_plots(dfg, dfg_incl)
 		end
 
 		plt0 = plot(eachindex(x_idx), y, markershape=:auto, title = make_title(subdf[1, :distribution]), legend = :none,
-				ylims = (-7, 0))
+				ylims = (-7, 0), xlims = (0, 8), xticks = 1:7)
+
+		inset_size = 0.1
+		x0 = .8#1 / 40
+		plot!(plt0; inset_subplots = [(1, bbox(x0, 0, inset_size, inset_size, :bottom, :left))], subplot=2, 
+			legend=false, 
+			# background_color_inside = plot_color(:lightgrey, 0.15),
+			margin = 0.01mm,
+			border=:none, axis=nothing
+		)
+		plot_model!(plt0[2], x_models[1])
+		lim = 1.5
+		plot!(plt0[2], xlim = (-lim, lim), ylim = (-lim, lim), background_color_subplot = "transparent")
+		plt0
+		# plot!(p[2], cos, fg_text=:white)
+		plot_model!(plt0, x_models[1]; )
+
+
+		graphplot(x_axis_plots_data[1][1], x = x_axis_plots_data[1][2], y = x_axis_plots_data[1][3])
+				x_axis_plots_data[1]
+		
+		plot!(
+			x_models[1];
+			inset = (1, bbox(0.05, 0.05, 0.5, 0.25, :bottom, :right)),
+			bg_inside = nothing
+		)
+		
+		
+		plot!(plt0, 
+
+			# x_axis_plots[1],
+			,
+			inset = (1, bbox(0.0, -7, 1/7, 0.25, :bottom, :left)),
+			bg_inside = nothing
+		)
 
 		l = @layout [
 			a{0.8h}
@@ -402,11 +210,11 @@ dists = (
 	),
 	(
 		dist = BetaBinomialMvUrnDistribution(k),
-		args = ((1, 1), (.5, .5), (1.5, .75), (5, 1))
+		args = ((1, 1), (k, 1))
 	),
 	(
-		dist = RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(1.887)),
-		args = ((0.5,), (1.887,), (1.0,), (3.0,))
+		dist = DirichletProcessMvUrnDistribution(k, 1),
+		args = ((0.5,), (1.0,), (Symbol("Gopalan Berry"),))
 	)
 )
 
@@ -429,7 +237,6 @@ xlabel!(plts[2, 2], "No. inequalities");
 
 w = 600
 jointplot = plot(permutedims(plts)..., layout = (2, 3), size = (3w, 2w));
-plts[1]
 savefig(jointplot, joinpath("figures", "visualizePriors_2x3.png"))
 # savefig(jointplot, joinpath("figures", "visualizePriors_2x3.svg"))
 
@@ -448,3 +255,17 @@ savefig(jointplot, joinpath("figures", "visualizePriors_2x3.png"))
 
 
 
+
+p0 = plot(heatmap(randn(10,20)), plot(rand(1:4,1000),randn(1000)), leg=false)
+w = 1; h = 1
+histogram!(p0, randn(1000), inset_subplots = [(1, bbox(0.05w,0.95h,0.5w,0.5h, v_anchor=:bottom))], subplot=1, ticks=nothing)
+plot!(p0, p1)
+
+sticks!(randn(100),subplot=4,inset_subplots=[bbox(0.35w,0.5h,200px,200px,h_anchor=:center,v_anchor=:center)])
+
+x=range(0,2pi, length = 10)
+y=range(0,2pi, length = 10)
+z = [sin(xx)*cos(yy) for xx in x, yy in y]
+p=contour(x,y,z,fill=true)
+plot!(x, sin.(x),inset_subplots = [(1, bbox(0.05w,0.05h,0.3w,0.3h))], subplot=2)
+plot!(p[2], cos, fg_text=:white)

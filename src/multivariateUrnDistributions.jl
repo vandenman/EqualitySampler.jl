@@ -109,6 +109,20 @@ struct RandomProcessMvUrnDistribution{RPM <: Turing.RandomMeasures.AbstractRando
 end
 rpm(d::RandomProcessMvUrnDistribution) = d.rpm
 
+"""
+    DirichletProcessMvUrnDistribution(k::Integer, α::Float64)
+    DirichletProcessMvUrnDistribution(k::Integer, ::Symbol = :Gopalan_Berry)
+
+Wrapper function to create an object representing a Dirichlet process prior. These call RandomProcessMvUrnDistribution but are a bit more user friendly.
+Either set α directly by passing a float, or pass (any) symbol to use `dpp_find_α` to specify α, which uses the heuristic by
+Gopalan & Berry (1998) so that p(everything equal) == p(everything unequal).
+"""
+DirichletProcessMvUrnDistribution(k::Integer, α::Float64) = RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(α))
+DirichletProcessMvUrnDistribution(k::Integer, ::Symbol = :Gopalan_Berry) = DirichletProcessMvUrnDistribution(k, dpp_find_α(k))
+DirichletProcessMvUrnDistribution(k::Integer, α::Real) = DirichletProcessMvUrnDistribution(k, convert(Float64, α))
+# whats the best way to do this ↓ ?
+# const DirichletProcessMvUrnDistributionType{T} = RandomProcessMvUrnDistribution{Turing.RandomMeasures.DirichletProcess{Float64}, T}
+
 function Distributions._rand!(rng::Random.AbstractRNG, d::RandomProcessMvUrnDistribution, x::AbstractVector)
 	_sample_process!(rng, rpm(d), x)
 end
