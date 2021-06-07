@@ -40,8 +40,7 @@ end
 function _setval_and_resample_kernel2!(vi, vn, values, keys)
 	indices = findall(Base.Fix1(DynamicPPL.subsumes_string, string(vn)), keys)
 	if !isempty(indices)
-		sorted_indices = sort!(indices; by=i -> keys[i], lt=DynamicPPL.NaturalSort.natural)
-		val = reduce(vcat, values[sorted_indices])
+		val = reduce(vcat, values[indices])
 		DynamicPPL.setval!(vi, val, vn)
 		DynamicPPL.settrans!(vi, false, vn)
 	else
@@ -52,3 +51,4 @@ function _setval_and_resample_kernel2!(vi, vn, values, keys)
 
 	return indices
 end
+

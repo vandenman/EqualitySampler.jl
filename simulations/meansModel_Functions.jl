@@ -389,7 +389,7 @@ function get_initial_values(model, obs_mean, obs_var, obs_n, Q, partition_prior)
 			σ²				= σ²_init,
 			θ_r				= sqrt(σ²_init) .* θ_r_init,
 			partition		= collect(eachindex(obs_mean)),
-			g				= std(θ_r_init)
+			g				= isone(length(θ_r_init)) ? 1.0 : std(θ_r_init)
 		)
 	end
 

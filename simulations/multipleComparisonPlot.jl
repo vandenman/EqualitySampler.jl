@@ -1,3 +1,11 @@
+using Plots: length
+#=
+
+	# TODO: 
+		JUST SAVE EACH RUN TO DISK!
+
+=#
+
 # from a terminal run julia -O3 -t auto simulations/multipleComparisonPlot.jl
 
 println("interactive = $(isinteractive())")
@@ -24,12 +32,29 @@ import Suppressor
 import Random
 
 if isinteractive()
+	include("simulations/silentGeneratedQuantities.jl")
 	include("simulations/meansModel_Functions.jl")
 	include("simulations/helpersTuring.jl")
+	include("simulations/limitedLogger.jl")
 else
+	include("silentGeneratedQuantities.jl")
 	include("meansModel_Functions.jl")
 	include("helpersTuring.jl")
+	include("limitedLogger.jl")
 end
+
+function get_priors()
+	return (
+		(n_groups)->UniformMvUrnDistribution(n_groups),
+		(n_groups)->BetaBinomialMvUrnDistribution(n_groups),
+		(n_groups)->BetaBinomialMvUrnDistribution(n_groups, n_groups, 1.0),
+		# (n_groups)->BetaBinomialMvUrnDistribution(n_groups, 1.0, n_groups),
+		(n_groups)->DirichletProcessMvUrnDistribution(n_groups, 0.5),
+		(n_groups)->DirichletProcessMvUrnDistribution(n_groups, 1),
+		(n_groups)->DirichletProcessMvUrnDistribution(n_groups, :Gopalan_Berry)
+	)
+end
+
 
 compute_post_prob_eq_helper(x) = compute_post_prob_eq(x[3])
 
@@ -55,6 +80,13 @@ function prop_incorrect(x)
 	return count / (n * (n - 1) / 2)
 end
 
+function get_resultsdir()
+	results_dir = joinpath("simulations", "results_multiplecomparisonsplot", "jls_files")
+	!ispath(results_dir) && mkpath(results_dir)
+	return results_dir
+end
+
+make_filename(results_dir, r, i) = joinpath(results_dir, "repeat_$(r)_groups_$(i).jls")
 
 function run_simulation()
 
@@ -70,68 +102,93 @@ function run_simulation()
 	nsim = length(sim_opts)
 	println("starting simulation of $(nsim) runs with $(Threads.nthreads()) threads")
 
-	# TODO: loop over these priors
-	priors = (
-		(n_groups)->UniformMvUrnDistribution(n_groups),
-		(n_groups)->BetaBinomialMvUrnDistribution(n_groups),
-		(n_groups)->BetaBinomialMvUrnDistribution(n_groups, n_groups, 1.0),
-		(n_groups)->BetaBinomialMvUrnDistribution(n_groups, 1.0, n_groups),
-		(n_groups)->RandomProcessMvUrnDistribution(n_groups, Turing.RandomMeasures.DirichletProcess(1.887))
-	)
+	priors = get_priors()
 
-	results = BitArray(undef, length(priors), length(groups), repeats)
-	results_big = Array{Matrix{Float64}}(undef, length(priors), length(groups), repeats)
+	# results = BitArray(undef, length(priors), length(groups), repeats)
+	# results_big = Array{Matrix{Float64}}(undef, length(priors), length(groups), repeats)
 	p = ProgressMeter.Progress(nsim)
 	Turing.setprogress!(false)
-	Logging.disable_logging(Logging.Info)
 
+	Logging.disable_logging(Logging.Warn)
+	# Logging.global_logger(limited_warning_logger(3))
+
+	results_dir = get_resultsdir()
+	
+	# (r, i) = first(sim_opts)
 	Threads.@threads for (r, i) in collect(sim_opts)
 
-		n_groups = groups[i]
-		true_model = fill(1, n_groups)
-		true_θ = get_θ(0.2, true_model)
+		filename = make_filename(results_dir, r, i)
+		if !isfile(filename)
 
-		_, df, _, _ = simulate_data_one_way_anova(n_groups, n_obs_per_group, true_θ, true_model);
+			n_groups = groups[i]
+			true_model = fill(1, n_groups)
+			true_θ = get_θ(0.2, true_model)
 
-		for (j, fun) in enumerate(priors)
+			_, df, _, _ = simulate_data_one_way_anova(n_groups, n_obs_per_group, true_θ, true_model);
 
-			partition_prior = fun(n_groups)
-			res = fit_model(df, mcmc_iterations = mcmc_iterations, mcmc_burnin = mcmc_burnin, partition_prior = partition_prior);
-			post_probs =  compute_post_prob_eq_helper(res)
+			results = BitArray(undef, length(priors))
+			results_big = Array{Matrix{Float64}}(undef, length(priors))	
+			
+			# (j, fun) = first(enumerate(priors))
+			for (j, fun) in enumerate(priors)
 
-			results[j, i, r] = any_incorrect(post_probs)
-			results_big[j, i, r] = post_probs
+				partition_prior = fun(n_groups)
+				res = fit_model(df; mcmc_iterations = mcmc_iterations, mcmc_burnin = mcmc_burnin, partition_prior = partition_prior, use_Gibbs = true, hmc_stepsize = 0.0);
+				post_probs =  compute_post_prob_eq_helper(res)
+
+				results[j] = any_incorrect(post_probs)
+				results_big[j] = post_probs
+
+				# results[j, i, r] = any_incorrect(post_probs)
+				# results_big[j, i, r] = post_probs
+
+			end
+
+			Serialization.serialize(filename, (results, results_big))
 
 		end
 
 		ProgressMeter.next!(p)#; showvalues = [(:r, r), (:groups, n_groups)])
 
 	end
-	return results, results_big
+	# return results, results_big
 end
 
-path = joinpath("simulations", "results_multiplecomparisonsplot", "multipleComparisonPlot.jls")
-if !isfile(path)
-	allresult = run_simulation()
-	Serialization.serialize(path, allresult)
-	results, results_big = allresult
-else
-	results, results_big = Serialization.deserialize(path);
+# path = joinpath("simulations", "results_multiplecomparisonsplot", "multipleComparisonPlot.jls")
+# if !isfile(path)
+if !isinteractive()
+	run_simulation()
+	exit()
 end
-!isinteractive() && exit()
 
-#=
-	TODO:
-	- rerun with more mcmc samples!
-	- plot proportion incorrect instead of totals
-=#
+repeats = 100
+groups = 2:10
+len_priors = length(get_priors())
+sim_opts = Iterators.product(1:repeats, eachindex(groups))
+results_dir = get_resultsdir()
+
+results = BitArray(undef, len_priors, length(groups), repeats)
+results_big = Array{Matrix{Float64}}(undef, len_priors, length(groups), repeats)
+
+ProgressMeter.@showprogress for (r, i) in sim_opts
+	filename = make_filename(results_dir, r, i)
+	if isfile(filename)
+
+		temp, temp_big = Serialization.deserialize(filename)
+		results[:, i, r] .= temp
+		results_big[:, i, r] .= temp_big
+
+	else
+		@warn "This file does not exist: " filename
+	end
+end
 
 
-function make_figure(x, y, ylab, labels)
+function make_figure(x, y, ylab, labels; shapes = :auto, kwargs...)
 	plot(
 		x,
 		y,
-		markershape			= :auto,
+		markershape			= shapes,
 		legend				= :topleft,
 		labels				= labels,
 		markeralpha			= 0.75,
@@ -145,28 +202,29 @@ function make_figure(x, y, ylab, labels)
 
 		background_color_legend = nothing,
 		foreground_color_legend = nothing
+		;
+		kwargs...
 	)
 end
 
 size(results)
-labels = ["Uniform" "BetaBinomial (α=1, β=1)" "BetaBinomial (α=no. groups, β=1)" "BetaBinomial (α=1, β=no. groups)" "DPP(α=1.887)"]
-keep = [1, 2, 3, 5]
+
+labels = ["Uniform" "BetaBinomial (α=1, β=1)" "BetaBinomial (α=no. groups, β=1)" "DPP (α=0.5)" "DPP (α=1.0)" "DPP(α=Gopalan Berry)"]
+keep = eachindex(labels)#[1, 2, 3, 5]
 labels = reshape(labels[1, keep], 1, length(keep))
+
+shapes = [:circle :rect :star5 :diamond :hexagon :utriangle]
 
 mu = dropdims(mean(results, dims = 3), dims = 3)[keep, :]
 # [mean(results[i, g, :]) for i in axes(results, 1), g in axes(results, 2)] == mu
-p1 = make_figure(2:10, permutedims(mu), "P(one or more errors)", labels)
+p1 = make_figure(groups, permutedims(mu), "P(one or more errors)", labels; shapes = shapes)
 
 try2 = prop_incorrect.(results_big)
 mu2 = dropdims(mean(try2, dims = 3), dims = 3)[keep, :]
-p2 = make_figure(2:10, permutedims(mu2), "P(errors)", labels)
+p2 = make_figure(groups, permutedims(mu2), "P(errors)", labels)
 
-# figsize = (1200, 800)
-figsize = (600, 400)
-savefig(plot(p1, size = figsize), joinpath("simulations", "figures_multiplecomparisonsplot", "one_or_more_errors.png"))
-savefig(plot(p2, size = figsize), joinpath("simulations", "figures_multiplecomparisonsplot", "errors.png"))
-
-k = 20
-included = 0:k-1
-plot(included, pdf_incl.(Ref(BetaBinomialMvUrnDistribution(k, 1.0, k)), included))
-plot(included, pdf_incl.(Ref(BetaBinomialMvUrnDistribution(k, k, 1.0)), included))
+figdir = joinpath("simulations", "results_multiplecomparisonsplot", "figures")
+savefig(plot(p1, size = figsize), joinpath(figdir, "one_or_more_errors.png"))
+savefig(plot(p2, size = figsize), joinpath(figdir, "errors.png"))
+savefig(plot(p1, size = figsize), joinpath(figdir, "one_or_more_errors.pdf"))
+savefig(plot(p2, size = figsize), joinpath(figdir, "errors.pdf"))
