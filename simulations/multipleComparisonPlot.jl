@@ -1,11 +1,3 @@
-using Plots: length
-#=
-
-	# TODO: 
-		JUST SAVE EACH RUN TO DISK!
-
-=#
-
 # from a terminal run julia -O3 -t auto simulations/multipleComparisonPlot.jl
 
 println("interactive = $(isinteractive())")
@@ -113,7 +105,7 @@ function run_simulation()
 	# Logging.global_logger(limited_warning_logger(3))
 
 	results_dir = get_resultsdir()
-	
+
 	# (r, i) = first(sim_opts)
 	Threads.@threads for (r, i) in collect(sim_opts)
 
@@ -127,8 +119,8 @@ function run_simulation()
 			_, df, _, _ = simulate_data_one_way_anova(n_groups, n_obs_per_group, true_θ, true_model);
 
 			results = BitArray(undef, length(priors))
-			results_big = Array{Matrix{Float64}}(undef, length(priors))	
-			
+			results_big = Array{Matrix{Float64}}(undef, length(priors))
+
 			# (j, fun) = first(enumerate(priors))
 			for (j, fun) in enumerate(priors)
 
@@ -209,7 +201,7 @@ end
 
 size(results)
 
-labels = ["Uniform" "BetaBinomial (α=1, β=1)" "BetaBinomial (α=no. groups, β=1)" "DPP (α=0.5)" "DPP (α=1.0)" "DPP(α=Gopalan Berry)"]
+labels = ["Uniform" "BetaBinomial α=1, β=1" "BetaBinomial α=# groups, β=1" "DPP α=0.5" "DPP α=1.0" "DPP α=Gopalan Berry"]
 keep = eachindex(labels)#[1, 2, 3, 5]
 labels = reshape(labels[1, keep], 1, length(keep))
 
@@ -218,13 +210,17 @@ shapes = [:circle :rect :star5 :diamond :hexagon :utriangle]
 mu = dropdims(mean(results, dims = 3), dims = 3)[keep, :]
 # [mean(results[i, g, :]) for i in axes(results, 1), g in axes(results, 2)] == mu
 p1 = make_figure(groups, permutedims(mu), "P(one or more errors)", labels; shapes = shapes)
+# plot!(p1, xlabel = "Number of groups", xticks = 2:10, xlim = (2, 10), ylim = (0, 1), widen = true)
+plot!(p1, xlabel = "Number of groups", xticks = 2:10, xlim = (2, 10), ylim = (0, 1), widen = true, legend = (0.085, .95))
+
 
 try2 = prop_incorrect.(results_big)
 mu2 = dropdims(mean(try2, dims = 3), dims = 3)[keep, :]
 p2 = make_figure(groups, permutedims(mu2), "P(errors)", labels)
 
+figsize = (600, 400)
 figdir = joinpath("simulations", "results_multiplecomparisonsplot", "figures")
-savefig(plot(p1, size = figsize), joinpath(figdir, "one_or_more_errors.png"))
+savefig(plot(p1, size = figsize), joinpath(figdir, "one_or_more_errors2.png"))
 savefig(plot(p2, size = figsize), joinpath(figdir, "errors.png"))
-savefig(plot(p1, size = figsize), joinpath(figdir, "one_or_more_errors.pdf"))
+savefig(plot(p1, size = figsize), joinpath(figdir, "one_or_more_errors2.pdf"))
 savefig(plot(p2, size = figsize), joinpath(figdir, "errors.pdf"))

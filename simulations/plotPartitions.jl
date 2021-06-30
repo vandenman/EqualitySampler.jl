@@ -1,4 +1,3 @@
-using Plots: push!
 using EqualitySampler, Plots, GraphRecipes, Colors, LazySets, Measures
 import StatsBase: countmap
 import OrderedCollections
@@ -83,10 +82,10 @@ end
 function plot_model!(plt, model::AbstractVector{T}; markersize = 3, markerstroke = 3, kwargs...) where T<:Integer
 
 	k = length(model)
-	A = zeros(T, k, k)
-	for i in 1:k
-		A[i, i] = 1
-	end
+	# A = zeros(T, k, k)
+	# for i in 1:k
+	# 	A[i, i] = 1
+	# end
 
 	# TODO: this should take the model as an argument!
 	colors = get_colors(k)
@@ -95,18 +94,21 @@ function plot_model!(plt, model::AbstractVector{T}; markersize = 3, markerstroke
 	# TODO: not sure wheter all this OrderedDict is necessary
 	tb = sort(OrderedCollections.OrderedDict(countmap(model)), byvalue=true, lt = !isless)
 	count = 1
+
+	# @show kwargs
 	for (k, v) in tb
 		if v > 1
 			shape = make_shape(model, k, x, y)
-			plot!(plt, shape, alpha = .5, fillcolor = colors[count], linealpha = 0.0)
+			plot!(plt, shape; alpha = .5, fillcolor = colors[count], linealpha = 0.0, kwargs...)
 			count += 1
 		end
 	end
-	scatter!(plt, x, y, marker = (markersize, 1.0, :white, Plots.stroke(markerstroke, :gray)), legend = false)
+	scatter!(plt, x, y; marker = (markersize, 1.0, :white, Plots.stroke(markerstroke, :gray)), kwargs...)
 	tmp0 = Iterators.flatten(zip(x, y)) |> extrema
 	tmp1 = 1.3 * maximum(abs, tmp0)
 	lims = (-tmp1, tmp1)
-	plot!(plt, xlim = lims, ylim = lims)
+	# @show lims
+	plot!(plt; xlim = lims, ylim = lims, kwargs...)
 	# graphplot!(plt, A, x = x, y = y, markersize = 0.2, nodeshape=:circle, fontsize = 10, linecolor = :darkgrey, nodecolor = plot_color(:white, 0.0), curves = false,
 				# linewidth = 0)
 	return plt

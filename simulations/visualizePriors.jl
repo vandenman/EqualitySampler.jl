@@ -17,7 +17,6 @@ import		DataFrames					as DF,
 			CSV
 import Turing.RandomMeasures: DirichletProcess
 
-# Plots.PyPlotBackend()
 include("simulations/plotPartitions.jl")
 
 updateDistribution(d::UniformMvUrnDistribution, args) = d
@@ -144,9 +143,20 @@ function make_all_plots(dfg, dfg_incl;
 			y[:, j] .= subdf[j, :value][x_idx]
 		end
 
-		plt0 = plot(eachindex(x_idx), y, markershape=:auto, title = make_title(subdf[1, :distribution]), legend = :none,
-				ylims = ylims, yticks = yticks, xlims = (0, 8), xticks = 1:7)
+		labels = reshape(make_label.(subdf[1, :distribution], subdf[!, :args]), (1, size(subdf, 1)))
+		if subdf[1, :distribution]<: UniformMvUrnDistribution
+			legendpos = :none
+		else#if subdf[1, :distribution]<: BetaBinomialMvUrnDistribution
+			legendpos = :topright
+		# elseif subdf[1, :distribution]<: RandomProcessMvUrnDistribution
+		# 	legendpos = :topright
+		end
 
+		plt0 = plot(eachindex(x_idx), y, markershape=:auto, title = make_title(subdf[1, :distribution]),
+					legend = legendpos, labels = labels,
+					ylims = ylims, yticks = yticks, xlims = (0, 8), xticks = 1:7)
+
+		# (j, x_m) = first(enumerate(x_models))
 		for (j, x_m) in enumerate(x_models)
 			idx = j + 1
 			x0 = (3 / 40) / (10 * inset_size) + 5*(j-1) / 40
@@ -154,7 +164,32 @@ function make_all_plots(dfg, dfg_incl;
 			plot!(plt0; inset_subplots = [(1, bbox(x0, 0.05, inset_size, inset_size, :bottom, :left))],
 				legend=false, border=:none, axis=nothing,
 				subplot=idx
-			)
+			);
+
+
+			# plot_model!(plt0, x_m; #markersize = graph_markersize, markerstroke = graph_markerstroke,
+			# 	inset_subplots = (1, bbox(x0, 0.05, inset_size, inset_size, :bottom, :left)),
+			# 	legend=false, border=:none, axis=nothing,
+			# 	subplot = idx
+			# )
+
+
+			# plot!(plt0, 0:1, 0:1,
+			# 	inset_subplots = ((1, bbox(x0, 0.05, inset_size, inset_size, :bottom, :left))),
+			# 	# legend=false, border=:none, axis=nothing,
+			# 	subplot = idx
+			# )
+
+			# plot!(plt0, shape, alpha = .5, fillcolor = colors[count], linealpha = 0.0,
+			# 	inset_subplots = (1, bbox(x0, 0.05, inset_size, inset_size, :bottom, :left)),
+			# 	legend=false, border=:none, axis=nothing,
+			# 	subplot = idx
+			# )
+
+			# plot_model!(plt0[idx], x_m)
+			# plt0
+			# plot!(plt0[idx], xlim = (-5, 5))
+
 			plot_model!(plt0[idx], x_m; markersize = graph_markersize, markerstroke = graph_markerstroke)
 			plot!(plt0[idx], #xlim = (-lim, lim), ylim = (-lim, lim),
 				background_color_subplot = "transparent"
@@ -173,16 +208,17 @@ function make_all_plots(dfg, dfg_incl;
 			y[:, j] .= subdf_incl[j, :value]
 		end
 
-		labels = reshape(make_label.(subdf_incl[1, :distribution], subdf_incl[!, :args]), (1, size(subdf_incl, 1)))
-		if subdf_incl[1, :distribution]<: UniformMvUrnDistribution
-			legendpos = :none
-		elseif subdf_incl[1, :distribution]<: BetaBinomialMvUrnDistribution
-			legendpos = :bottomleft
-		elseif subdf_incl[1, :distribution]<: RandomProcessMvUrnDistribution
-			legendpos = :bottomleft
-		end
+		# labels = reshape(make_label.(subdf_incl[1, :distribution], subdf_incl[!, :args]), (1, size(subdf_incl, 1)))
+		# if subdf_incl[1, :distribution]<: UniformMvUrnDistribution
+		# 	legendpos = :none
+		# elseif subdf_incl[1, :distribution]<: BetaBinomialMvUrnDistribution
+		# 	legendpos = :bottomleft
+		# elseif subdf_incl[1, :distribution]<: RandomProcessMvUrnDistribution
+		# 	legendpos = :bottomleft
+		# end
 
-		plt = plot(reverse(x), y, markershape = :auto, labels = labels, legend = legendpos,
+		plt = plot(reverse(x), y, markershape = :auto,# labels = labels,
+				legend = :none,#legendpos,
 				ylims = ylims, yticks = yticks
 		)
 
@@ -260,3 +296,67 @@ savefig(jointplot, joinpath("figures", "visualizePriors_2x3.png"))
 # show_plotmat(3, 3) # distances between axis tick labels and axis increases!
 # show_plotmat(6, 2) # y-axis tick labels disappeared / fall outside of the plot area?
 # show_plotmat(2, 6) # x-axis tick labels disappeared / fall outside of the plot area?
+
+using Plots
+using StatsPlots, StatsPlots.PlotMeasures
+gr()
+plot(contourf(randn(10, 20)), boxplot(rand(1:4, 1000), randn(1000)))
+
+# Add a histogram inset on the heatmap.
+# We set the (optional) position relative to bottom-right of the 1st subplot.
+# The call is `bbox(x, y, width, height, origin...)`, where numbers are treated as
+# "percent of parent".
+histogram!(
+    randn(1000),
+    inset = (1, bbox(0.05, 0.05, 0.5, 0.25, :bottom, :right)),
+    ticks = nothing,
+    subplot = 3,
+    bg_inside = nothing
+)
+
+# Add sticks floating in the window (inset relative to the window, as opposed to being
+# relative to a subplot)
+sticks!(
+    randn(100),
+    inset = bbox(0, -0.2, 200px, 100px, :center),
+    ticks = nothing,
+    subplot = 4
+)
+
+p0 = plot(1:10, 1:10);
+plot!(p0, 0:1, 0:1,
+	inset_subplots = (1, bbox(x0, 0.05, inset_size, inset_size, :bottom, :left)),
+	subplot = 2
+)
+
+p0 = plot(1:10, 1:10);
+plot!(p0, 0:1, 0:1,
+	inset_subplots = (1, bbox(x0, 0.05, inset_size, inset_size, :bottom, :left)),
+	subplot = 2
+)
+plot!(p0[2], xlim = (-3, 3))
+
+p0 = plot(1:10, 1:10);
+plot!(p0, 0:1, 0:1,
+	inset_subplots = (1, bbox(x0, 0.05, inset_size, inset_size, :bottom, :left)),
+	subplot = 2,
+	xlim = (-3, 3) # works
+);
+p0
+
+p1 = plot(1:10, 1:10);
+plot!(p1, 0:1, 0:1,
+	inset_subplots = (1, bbox(x0, 0.05, inset_size, inset_size, :bottom, :left)),
+	subplot = 2
+)
+plot!(p1[2], xlim = (-3, 3));
+p1
+
+
+plot!(p0, 0:1, 0:1,
+	inset_subplots = (1, bbox(x0, 0.05, inset_size, inset_size, :bottom, :left)),
+	subplot = 2,
+	xlim = (-3, 3)
+)
+
+
