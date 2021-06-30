@@ -25,21 +25,25 @@ import	StatsBase 			as SB,
 		GLM
 
 # import Suppressor
-import Serialization
+# import Serialization
+import JLD2
 import Random
 import ProgressMeter
+import Logging
 
 if isinteractive()
 	include("simulations/silentGeneratedQuantities.jl")
 	include("simulations/meansModel_Functions.jl")
 	include("simulations/helpersTuring.jl")
+	include("simulations/customHMCAdaptation.jl")
 else
 	include("silentGeneratedQuantities.jl")
 	include("meansModel_Functions.jl")
 	include("helpersTuring.jl")
+	include("customHMCAdaptation.jl")
 end
 
-const dir_for_results = joinpath("simulations", "simulation_results")
+const dir_for_results = joinpath("simulations", "simulation_results_test")
 !isdir(dir_for_results) && mkdir(dir_for_results)
 
 function get_simulation_params(no_repeats::Int = 1)
@@ -54,8 +58,9 @@ function get_simulation_params(no_repeats::Int = 1)
 
 		("betabinom11",	k->BetaBinomialMvUrnDistribution(k, 1, 1)),
 		("betabinomk1",	k->BetaBinomialMvUrnDistribution(k, k, 1)),
-		("betabinom1k",	k->BetaBinomialMvUrnDistribution(k, 1, k)),
+		# ("betabinom1k",	k->BetaBinomialMvUrnDistribution(k, 1, k)),
 
+		("dppalpha0.5",	k->RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(0.5))),
 		("dppalpha1",	k->RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(1.0))),
 		("dppalphak",	k->RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(dpp_find_α(k))))
 	)
@@ -84,7 +89,7 @@ function make_filename(sample_size, priorstring, no_params, no_inequalities, off
 
 	return joinpath(
 		dir_for_results,
-		"results__n_$(sample_size)__prior_$(priorstring)__no_params_$(no_params)__no_inequalities_$(no_inequalities)__offset_$(offset)__repeat_$(repeat).jls"
+		"results__n_$(sample_size)__prior_$(priorstring)__no_params_$(no_params)__no_inequalities_$(no_inequalities)__offset_$(offset)__repeat_$(repeat).jld2"
 	)
 
 end
@@ -107,14 +112,16 @@ function get_seeds_dict(simulation_options)
 	seeds_dict
 end
 
-function run_simulation(;mcmc_iterations::Int = 30_000, mcmc_burnin::Int = 10_000)
+function run_simulation(;mcmc_iterations::Int = 20_000, mcmc_burnin::Int = 5_000)
 
-	simulation_options = get_simulation_params(5)
+	simulation_options = get_simulation_params(100)
 	seeds_dict = get_seeds_dict(simulation_options)
 
 	println("starting simulation of $(length(simulation_options)) runs with $(Threads.nthreads()) threads")
 
 	Turing.setprogress!(false)
+
+	Logging.disable_logging(Logging.Warn)
 
 	p = ProgressMeter.Progress(length(simulation_options))
 	Threads.@threads for (i, sim) in collect(enumerate(simulation_options))
@@ -152,20 +159,21 @@ function run_simulation(;mcmc_iterations::Int = 30_000, mcmc_burnin::Int = 10_00
 					# :y				=>		y,
 					# :df				=>		df,
 					# :D				=>		D,
-					:true_values	=>		true_values,
-					:mean_θ_cs_eq	=>		mean_θ_cs_eq,
-					:θ_cs_eq		=>		θ_cs_eq,
+					"true_values"	=>		true_values,
+					"mean_θ_cs_eq"	=>		mean_θ_cs_eq,
+					"θ_cs_eq"		=>		θ_cs_eq,
 					# :chain_eq		=>		chain_eq,
 					# :model_eq		=>		model_eq,
-					:incl_probs		=>		incl_probs,
-					:included		=>		included,
-					:seed			=>		i,
-					:true_model		=>		true_model,
-					:sim			=>		sim,
-					:priorname		=>		prior[1]
+					"incl_probs"	=>		incl_probs,
+					"included"		=>		included,
+					"seed"			=>		i,
+					"true_model"	=>		true_model,
+					"sim"			=>		sim,
+					"priorname"		=>		prior[1]
 				)
 
-				Serialization.serialize(filename, result)
+				# Serialization.serialize(filename, result)
+				JLD2.save(filename, result)
 
 			catch e
 

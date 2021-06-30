@@ -24,14 +24,15 @@ for visualizePriors we want
 - [x] BetaBinomial: (1, 1) & (n_groups, 1)
 - [x] DPP: 0.5, 1, Gopalan Berry
 
-- [ ] Add alpha 0.5 for the simulations!
+- [x] Add alpha 0.5 for the simulations!
 
 - [x] drop Scott & Berger figure
 
-- [ ] one_or_more_errors.png -> Adjust the DPP to be 1, .5, and Gopalan Berry
-- [ ] change y-axis to say "at least one error"
+- [x] one_or_more_errors.png -> Adjust the DPP to be 1, .5, and Gopalan Berry
+- [x] change y-axis to say "at least one error"
 
-- [ ] cut slide on DPP rich get richer
-- [ ] cut title on slide "Comparison of Priors"
-- [ ] cut slide on Scott & Berger plot
+- [x] cut slide on DPP rich get richer
+- [x] cut title on slide "Comparison of Priors"
+- [x] cut slide on Scott & Berger plot
 
+- [ ] colors + shapes in Illustration slide should be the same everywhere

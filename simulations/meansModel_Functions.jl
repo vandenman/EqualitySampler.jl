@@ -8,6 +8,7 @@ import Statistics: mean, var
 # import Suppressor
 import CategoricalArrays
 using Turing
+import Memoize
 
 function simulate_data_one_way_anova(
 		n_groups::Integer,
@@ -21,7 +22,8 @@ function simulate_data_one_way_anova(
 		# θ = 2 .* randn(n_groups)
 		θ = 0.2 .* true_partition
 	end
-	@assert length(θ) == n_groups
+
+	length(θ) != n_groups && throw(error("length(θ) != n_groups"))
 
 	n_obs = n_groups * n_obs_per_group
 	θ2 = θ .- SB.mean(θ)
@@ -36,11 +38,11 @@ function simulate_data_one_way_anova(
 
 	df = DF.DataFrame(:y => y, :g => CategoricalArrays.categorical(g))
 
-	true_values = Dict(
+	true_values = Dict{Symbol, Union{Float64, Vector{Float64}, Vector{Int}}}(
 		:σ					=> σ,
 		:μ					=> μ,
 		:θ					=> θ2,
-		true_partition		=> true_partition
+		:true_partition		=> true_partition
 	)
 
 	return y, df, D, true_values
@@ -58,7 +60,9 @@ function fit_lm(df)
 	return ests, mod
 end
 
-function getQ(n_groups)::Matrix{Float64}
+getQ(n_groups::Integer)::Matrix{Float64} = getQ_Stan(n_groups)
+
+function getQ_Rouder(n_groups::Integer)::Matrix{Float64}
 	# X = StatsModels.modelmatrix(@formula(y ~ 0 + g).rhs, DataFrame(:g => g), hints = Dict(:g => StatsModels.FullDummyCoding()))
 	Σₐ = Matrix{Float64}(LA.I, n_groups, n_groups) .- (1.0 / n_groups)
 	_, v::Matrix{Float64} = LA.eigen(Σₐ)
@@ -68,6 +72,17 @@ function getQ(n_groups)::Matrix{Float64}
 
 	return Q
 end
+
+function getQ_Stan(K::Integer)::Matrix{Float64}
+	# Stan approach: https://mc-stan.org/docs/2_18/stan-users-guide/parameterizing-centered-vectors.html
+	A = Matrix(LA.Diagonal(ones(K)))
+	for i in 1:K-1
+		A[K, i] = -1;
+	end
+	A[K,K] = 0;
+	return LA.qr(A).Q[:, 1:K-1]
+end
+
 
 @model function one_way_anova_full_ss(obs_mean, obs_var, obs_n, Q, ::Type{T} = Float64) where {T}
 
@@ -110,21 +125,47 @@ function get_θ_cs(model, chain)
 	return θ_cs
 end
 
-function average_equality_constraints(ρ::AbstractVector{<:Real}, partition::AbstractVector{<:Integer})
-
+function average_equality_constraints!(ρ::AbstractVector{<:Real}, partition::AbstractVector{<:Integer})
 	idx_vecs = [Int[] for _ in eachindex(partition)]
 	@inbounds for i in eachindex(partition)
 		push!(idx_vecs[partition[i]], i)
 	end
 
-	ρ_c = similar(ρ)
 	@inbounds for idx in idx_vecs
 		isempty(idx) && continue
-		ρ_c[idx] .= mean(ρ[idx])
+		ρ[idx] .= mean(ρ[idx])
 	end
-
-	return ρ_c
+	return ρ
 end
+
+average_equality_constraints(ρ::AbstractVector{<:Real}, partition::AbstractVector{<:Integer}) = average_equality_constraints!(copy(ρ), partition)
+
+
+# Memoize.@memoize function get_idx_vecs(partition::AbstractVector{<:Integer})
+# 	idx_vecs = Dict{Int, Vector{Int}}()
+# 	@inbounds for i in eachindex(partition)
+# 		key = @inbounds partition[i]
+# 		if haskey(idx_vecs, key)
+# 			push!(idx_vecs[key], i)
+# 		else
+# 			idx_vecs[key] = [i]
+# 		end
+# 	end
+# 	idx_vecs
+# end
+
+# function average_equality_constraints_memoized(ρ::AbstractVector{<:Real}, partition::AbstractVector{<:Integer})
+
+# 	idx_vecs = get_idx_vecs(partition)
+
+# 	ρ_c = similar(ρ)
+# 	@inbounds for idx in values(idx_vecs)
+# 		ρ_c[idx] .= mean(ρ[idx])
+# 	end
+
+# 	return ρ_c
+
+# end
 
 @model function one_way_anova_eq_mv_ss(obs_mean, obs_var, obs_n, Q, partition_prior::D, ::Type{T} = Float64) where {T, D<:AbstractMvUrnDistribution}
 
@@ -138,9 +179,10 @@ end
 
 	# The setup for θ follows Rouder et al., 2012, p. 363
 	g   ~ InverseGamma(0.5, 0.5)
-	θ_r ~ filldist(Normal(0, sqrt(g)), n_groups - 1)
+
+	θ_r ~ MvNormal(n_groups - 1, 1.0)
 	# ensure the sum to zero constraint
-	θ_s = Q * θ_r
+	θ_s = Q * (sqrt(g) .* θ_r)
 
 	# constrain θ according to the sampled equalities
 	θ_cs = average_equality_constraints(θ_s, partition)
@@ -150,13 +192,6 @@ end
 		obs_mean[i] ~ NormalSuffStat(obs_var[i], μ_grand + sqrt(σ²) * θ_cs[i], σ², obs_n[i])
 	end
 	return (θ_cs, )
-
-	# θ_cs = μ_grand .+ sqrt(σ²) .* θ_s
-
-	# for i in 1:n_groups
-	# 	obs_mean[i] ~ NormalSuffStat(obs_var[i], θ_cs[partition[i]], σ², obs_n[i])
-	# end
-	# return (θ_s[partition], )
 
 end
 
@@ -204,6 +239,9 @@ function fit_model(
 			use_Gibbs::Bool = true,
 			hmc_stepsize::Float64 = 0.0,
 			n_leapfrog::Int = 10,
+			model = nothing,
+			custom_hmc_adaptation::Bool = true,
+			custom_hmc = nothing,
 			kwargs...
 )			where D<:Union{Nothing, AbstractMvUrnDistribution, AbstractConditionalUrnDistribution}
 	Q = getQ(length(obs_mean))
@@ -212,8 +250,11 @@ function fit_model(
 		partition_prior = fix_length(partition_prior, length(obs_mean))
 	end
 	@assert partition_prior === nothing || length(obs_mean) == length(partition_prior)
-	model, sampler = get_model_and_sampler(partition_prior, obs_mean, obs_var, obs_n, Q, use_Gibbs; hmc_stepsize = hmc_stepsize, n_leapfrog = n_leapfrog)
+	model, sampler = get_model_and_sampler(partition_prior, obs_mean, obs_var, obs_n, Q, use_Gibbs; hmc_stepsize = hmc_stepsize, n_leapfrog = n_leapfrog, model, custom_hmc)
 	init_theta = get_initial_values(model, obs_mean, obs_var, obs_n, Q, partition_prior)
+	if custom_hmc_adaptation && isnothing(custom_hmc)
+		sampler = sampler_with_custom_adaptation(model, sampler, init_theta, partition_prior, obs_mean, obs_var, obs_n, Q, n_leapfrog)
+	end
 	return sample_model(model, sampler, mcmc_iterations, mcmc_burnin, init_theta; kwargs...)
 end
 
@@ -223,14 +264,22 @@ function get_model_and_sampler(::Nothing, obs_mean, obs_var, obs_n, Q, ::Bool)
 	return model, sampler
 end
 
-function get_model_and_sampler(partition_prior::AbstractMvUrnDistribution, obs_mean, obs_var, obs_n, Q, use_Gibbs; hmc_stepsize = 0.0, n_leapfrog::Int = 10)
-	model = one_way_anova_eq_mv_ss(obs_mean, obs_var, obs_n, Q, partition_prior)
+function get_model_and_sampler(partition_prior::AbstractMvUrnDistribution, obs_mean, obs_var, obs_n, Q, use_Gibbs; hmc_stepsize = 0.0, n_leapfrog::Int = 10, model, custom_hmc)
+	if isnothing(model)
+		model = one_way_anova_eq_mv_ss(obs_mean, obs_var, obs_n, Q, partition_prior)
+	elseif model isa Function
+		model = model(obs_mean, obs_var, obs_n, Q, partition_prior)
+	elseif model isa DynamicPPL.Model
+		# nothing
+	else
+		throw(DomainError(model, "Model should be nothing, a function, or a DynamicPPL.Model"))
+	end
 
 	# @show hmc_stepsize, n_leapfrog
 	if use_Gibbs
 		sampler = Gibbs(
 			GibbsConditional(:partition, EqualitySampler.PartitionSampler(length(obs_mean), get_log_posterior(obs_mean, obs_var, obs_n, Q, partition_prior))),
-			HMC(hmc_stepsize, n_leapfrog, :μ_grand, :σ², :θ_r, :g)
+			isnothing(custom_hmc) ? HMC(hmc_stepsize, n_leapfrog, :μ_grand, :σ², :θ_r, :g) : custom_hmc
 			# HMC(hmc_stepsize, n_leapfrog, :μ_grand),
 			# HMC(hmc_stepsize, n_leapfrog, :σ²),
 			# HMC(hmc_stepsize, n_leapfrog, :θ_r),
@@ -243,9 +292,21 @@ function get_model_and_sampler(partition_prior::AbstractMvUrnDistribution, obs_m
 			# )
 		)
 	else
-		sampler = Gibbs(PG(20, :partition), HMCDA(200, 0.65, 0.3, :μ_grand, :σ², :θ_r))#HMC(0.01, 10, :μ_grand, :σ², :θ_r))
+		sampler = Gibbs(
+			PG(20, :partition),
+			isnothing(custom_hmc) ? HMC(hmc_stepsize, n_leapfrog, :μ_grand, :σ², :θ_r, :g) : custom_hmc
+		)
 	end
+
 	return model, sampler
+end
+
+function sampler_with_custom_adaptation(model, spl0, init_theta, partition_prior, obs_mean, obs_var, obs_n, Q, n_leapfrog)
+	hmc_stepsize = custom_hmc_adaptation(model, spl0, init_theta)
+	return Gibbs(
+		GibbsConditional(:partition, EqualitySampler.PartitionSampler(length(obs_mean), get_log_posterior(obs_mean, obs_var, obs_n, Q, partition_prior))),
+		HMC(hmc_stepsize, n_leapfrog, :μ_grand, :σ², :θ_r, :g)
+	)
 end
 
 function get_model_and_sampler(partition_prior::AbstractConditionalUrnDistribution, obs_mean, obs_var, obs_n, Q, ::Bool)

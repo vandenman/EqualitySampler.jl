@@ -55,7 +55,7 @@ function equality_prob_table(journal_data, samples)
 	rawnms = ["$(rpad(journal, maxsize)) ($(round(prob, digits=3)))" for (journal, prob) in eachrow(journal_data[!, [:journal, :errors]])]
 	nms = OrderedDict(rawnms .=> axes(journal_data, 1))
 	return NA.NamedArray(
-		LA.UnitLowerTriangular(compute_post_prob_eq(samps_eq_2)),
+		collect(LA.UnitLowerTriangular(compute_post_prob_eq(samps_eq_2))),
 		(nms, nms), ("Rows", "Cols")
 	)
 end
@@ -67,9 +67,16 @@ model_full = proportion_model_full(no_errors, total_counts)
 samps_full = sample(model_full, NUTS(), 50_000);
 means_p_full, samps_p_full = get_p_constrained(model_full, samps_full)
 
-scatter(journal_data[!, :errors], means_p_full, legend = false, ylim = (0, 1), xlim = (0, 1)); Plots.abline!(1, 0)
+p01 = plot(samps_p_full', xlab = "iteration", ylab = "proportions", legend = false, ylim = (0, 1))
+p02 = plot();
+Plots.abline!(p02, 1, 0, legend = false, color = "black", label = "");
+scatter!(p02, journal_data[!, :errors]', means_p_full', legend = :topleft,
+		label = permutedims(journal_data[!, :journal]),
+		ylim = (0, 1), xlim = (0, 1), xlab = "observed proportion", ylab = "posterior mean");
+p1 = plot(p01, p02, layout = (1, 2), size = (800, 400))
+# savefig(p1, "demos/proportion_fullmodel.png")
 
-model_eq = proportion_model_eq(no_errors, total_counts, BetaBinomialMvUrnDistribution(length(no_errors)))
+model_eq = proportion_model_eq(no_errors, total_counts, BetaBinomialMvUrnDistribution(length(no_errors), length(no_errors), 1))
 
 # PG does not seem to work well here
 # spl_eq_1 = Gibbs(HMCDA(200, 0.65, 0.3, Symbol("inner.p_raw")), PG(5, :partition))
@@ -101,9 +108,44 @@ plot(hcat(get(samps_eq_2, Symbol("inner.p_raw"))[1]...), labels = reshape(journa
 plot(samps_p_eq_2', labels = reshape(journal_data[!, :journal], 1, 8))
 scatter(journal_data[!, :errors], means_p_eq_2, legend = false, ylim = (0, 1), xlim = (0, 1)); Plots.abline!(1, 0)
 
+p11 = plot(samps_p_eq_2', xlab = "iteration", ylab = "proportions", legend = false, ylim = (0, 1));
+p12 = plot();
+Plots.abline!(p12, 1, 0, legend = false, color = "black", label = "")
+scatter!(p12, journal_data[!, :errors]', means_p_eq_2', legend = :topleft,
+		label = permutedims(journal_data[!, :journal]),
+		ylim = (0, 1), xlim = (0, 1), xlab = "observed proportion", ylab = "posterior mean");
+p1 = plot(p11, p12, layout = (1, 2), size = (800, 400))
+# savefig(p1, "demos/proportion_eqmodel.png")
+
+
+p12_no_legend = plot(p12, legend = false);
+p2 = plot(p02, p12_no_legend, layout = (1, 2), size = (800, 400))
+savefig(p2, "demos/proportion_nochains.png")
+
+
 mp = sort(compute_model_probs(samps_eq_2),  byvalue=true, rev=true)
 mc = sort(compute_model_counts(samps_eq_2), byvalue=true, rev=true)
 count(!iszero, values(mp))
 count(>(0), values(mc)) # number of models visited
 
 equality_prob_table(journal_data, samps_eq_2)
+
+
+
+# maxsize = maximum(length, journal_data[!, :journal])
+# rawnms = ["$(rpad(journal, maxsize)) ($(round(prob, digits=3)))" for (journal, prob) in eachrow(journal_data[!, [:journal, :errors]])]
+# nms = OrderedDict(rawnms .=> axes(journal_data, 1))
+# mm = LA.UnitLowerTriangular(compute_post_prob_eq(samps_eq_2))
+# NA.NamedArray(mm, (nms, nms), ("Rows", "Cols"))
+# NA.NamedArray(rand(8, 8), (nms, nms), ("Rows", "Cols"))
+# NA.NamedArray([1 3; 2 4], ( OrderedDict("A"=>1, "B"=>2), OrderedDict("C"=>1, "D"=>2) ), ("Rows", "Cols"))
+
+# function foo(x)
+# 	print("c(")
+# 	for y in x
+# 		print("$y, ")
+# 	end
+# 	print(")")
+# end
+# foo(mm)
+

@@ -28,22 +28,34 @@ function sample_next_values(c, o)
 	n_groups = length(c.partition)
 	probvec = zeros(Float64, n_groups)
 	nextValues = copy(c.partition)
+	cache_idx = 0
+	cache_value = -Inf # defined here to extend the scope beyond the if statement and for loop
 
 	for j in eachindex(probvec)
 		# originalValue = nextValues[j]
 		for i in eachindex(probvec)
 
+			# Maybe cache the one value that can be reused?
 			nextValues[j] = i
-			probvec[i] = o.logposterior(nextValues, c)
-
-			# this should be a bit more general
-			# θ_cs = average_equality_constraints(θ_s, equal_indices)
-			# probvec[i] = sum(logpdf(NormalSuffStat(obs_var[j], c.μ_grand + θ_cs[j], σ, obs_n[j]), obs_mean[j]) for j in 1:n_groups)
+			if nextValues[j] != cache_idx
+				probvec[i] = o.logposterior(nextValues, c)
+			else
+				# println("use cache")
+				# @show i cache_idx cache_value nextValues
+				probvec[i] = cache_value
+			end
 
 		end
-		# s = logsumexp_batch(probvec)
-		probvec .-= logsumexp_batch(probvec)
-		nextValues[j] = rand(Distributions.Categorical(exp.(probvec)))
+
+		nextValues[j] = rand(Distributions.Categorical(exp.(probvec .- logsumexp_batch(probvec))))
+		if j != length(probvec)
+
+			cache_idx = nextValues[j+1]
+			cache_value = probvec[nextValues[j]]
+
+			# println("updated cache")
+			# @show cache_idx cache_value nextValues probvec
+		end
 	end
 	return nextValues
 end
