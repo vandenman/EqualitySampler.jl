@@ -264,7 +264,7 @@ xlabel!(plts[2, 2], "No. inequalities");
 w = 600
 jointplot = plot(permutedims(plts)..., layout = (2, 3), size = (3w, 2w));
 savefig(jointplot, joinpath("figures", "visualizePriors_2x3.png"))
-# savefig(jointplot, joinpath("figures", "visualizePriors_2x3.svg"))
+savefig(jointplot, joinpath("figures", "visualizePriors_2x3.pdf"))
 
 # jointplot = plot(
 # 	plts[1, :]...,
