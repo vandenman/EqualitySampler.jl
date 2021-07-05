@@ -19,8 +19,8 @@
 - [x] More repetitions, at least 50! After reparametrizing the model maybe?
 
 ### simulations/meansModel_analyze_convergence_results.jl
-- [ ] One big figure for the appendix
-- [ ] Labelling went wrong! BetaBinomial should be DPP in right columns
+- [x] One big figure for the appendix
+- [x] Labelling went wrong! BetaBinomial should be DPP in right columns
 
 ### demos/proportions.jl
 - [ ] same issue where axes lines should not exceed the limits (y: (0, 1), x: (2, 10))
