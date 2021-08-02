@@ -27,9 +27,9 @@ make_title_wide(::UniformMvUrnDistribution) = "Uniform"
 make_title_wide(d::BetaBinomialMvUrnDistribution) = "BetaBinomial α=$(d.α) β=$(d.β)"
 make_title_wide(d::RandomProcessMvUrnDistribution) = "Dirichlet Process α=$(d.rpm.α)"
 
-make_title(::Type{UniformMvUrnDistribution{Int64}}) = "Uniform"
-make_title(::Type{BetaBinomialMvUrnDistribution{Int64}}) = "BetaBinomial"
-make_title(::Type{RandomProcessMvUrnDistribution{DirichletProcess{Float64}, Int64}}) = "Dirichlet Process"
+make_title(::Type{UniformMvUrnDistribution{Int64}}) = "Uniform prior"
+make_title(::Type{BetaBinomialMvUrnDistribution{Int64}}) = "Beta-binomial prior"
+make_title(::Type{RandomProcessMvUrnDistribution{DirichletProcess{Float64}, Int64}}) = "Dirichlet process prior"
 
 make_label(::Type{UniformMvUrnDistribution{Int64}}, args) = nothing
 make_label(::Type{BetaBinomialMvUrnDistribution{Int64}}, args) = "α=$(args[1]) β=$(args[2])"
@@ -152,9 +152,14 @@ function make_all_plots(dfg, dfg_incl;
 		# 	legendpos = :topright
 		end
 
+		if subdf[1, :distribution] <: RandomProcessMvUrnDistribution{DirichletProcess{Float64}, Int64}
+			y = y[:, [2, 1, 3]]
+			labels = labels[:, [2, 1, 3]]
+		end
+
 		plt0 = plot(eachindex(x_idx), y, markershape=:auto, title = make_title(subdf[1, :distribution]),
 					legend = legendpos, labels = labels,
-					ylims = ylims, yticks = yticks, xlims = (0, 8), xticks = 1:7)
+					ylims = ylims, yticks = yticks, xlims = (0, 8), xticks = (1:7, fill("", 7)))
 
 		# (j, x_m) = first(enumerate(x_models))
 		for (j, x_m) in enumerate(x_models)
@@ -254,15 +259,26 @@ dfg = DF.groupby(df_long_model_probs, :distribution);
 dfg_incl = DF.groupby(df_long_incl_probs, :distribution);
 
 plts = make_all_plots(dfg, dfg_incl);
-ylabel!(plts[1, 1], "Prior probabilty");
-ylabel!(plts[2, 1], "Prior probabilty");
+plts = plts[:, [3, 1, 2]]
+ylabel!(plts[1, 1], "Log prior probabilty");
+ylabel!(plts[2, 1], "Log prior probabilty");
 xlabel!(plts[1, 2], "Model type");
 xlabel!(plts[2, 2], "No. inequalities");
-
-
+plot!(plts[1, 1]; foreground_color_legend = nothing, background_color_legend = nothing);
+plot!(plts[1, 3]; foreground_color_legend = nothing, background_color_legend = nothing);
+plot!(plts[2, 2], bottom_margin = 10mm);
+plot!(plts[1, 1], left_margin = 15mm);
+plot!(plts[2, 1], left_margin = 15mm);
+# for i in 1:3
+# 	plot!(plts[1, i], xticks = (1:7, fill("", 7)));
+# end
+plot(plts[1, 1], titlefont = font(16))
 
 w = 600
-jointplot = plot(permutedims(plts)..., layout = (2, 3), size = (3w, 2w));
+joint_plts = permutedims(plts)
+Plots.resetfontsizes()
+Plots.scalefontsizes(1.8) # only run this once!
+jointplot = plot(joint_plts..., legendfont = font(12), titlefont = font(24), layout = (2, 3), size = (3w, 2w));
 savefig(jointplot, joinpath("figures", "visualizePriors_2x3.png"))
 savefig(jointplot, joinpath("figures", "visualizePriors_2x3.pdf"))
 

@@ -47,3 +47,35 @@ examine whether DPP prior is not horribly slow!
 
 - [ ] consider looping over the priors within each run
   - [ ] possibly loading the old file to see if every prior is already there
+
+
+### Figure 2
+- [x] Reorder DPP, Uniform, BetaBinomial
+- [x] No box around the legend
+- [x] Left panels need y-axis labels
+- [x] Bigger font size
+- [x] Switch color for DPP so orange line is decreasing
+- [x] Add "Prior" to the column titles
+- [x] Column title "BetaBinomial" -> "Beta-Binomial"
+- [x] Drop partition numbers (x-axis tick labels)
+
+### Figure 3
+- [ ] "BetaBinomial" -> "Beta-Binomial"
+- [ ] "Gopalan Berry" -> "Gopalan & Berry" (ampersand)
+- [ ]
+
+### Figure 4 + Figure 5
+- [ ] check zero vs non-zero?
+- [ ] adjust y-axis limits to (0, .5)
+- [ ] use mean instead of median
+- [ ] create nicer figures for true inequalities (power) and all other options
+
+### Scott & Berger plot
+- [ ] \alpha = 0.5
+- [ ] make figure and add it to the overleaf
+
+### Add proportion demo
+- [ ] Review all the comments in the manuscript
+
+### Appendix
+- [ ] "BetaBinomial" -> "Beta-Binomial"

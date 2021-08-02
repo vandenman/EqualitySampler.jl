@@ -222,7 +222,8 @@ function make_subplot(subdf, target = :false_inequalities; legend = false)
 	# end
 
 	# use median to be slightly robust against misfitting
-	subdf1 = DF.combine(DF.groupby(subdf[valid, :], [:no_inequalities, :sample_size]), target => median; renamecols=false)
+	subdf1 = DF.combine(DF.groupby(subdf[valid, :], [:no_inequalities, :sample_size]), target => mean; renamecols=false)
+	# subdf1 = DF.combine(DF.groupby(subdf[valid, :], [:no_inequalities, :sample_size]), target => median; renamecols=false)
 
 	return Plots.scatter(
 								categorical(subdf1[!, :sample_size]),
@@ -233,24 +234,30 @@ function make_subplot(subdf, target = :false_inequalities; legend = false)
 		markerstrokewidth	=	0.1,
 		markersize			=	7,
 		legend				=	legend,
-		ylims				=	(0, 1),
-		yticks				=	0:.2:1.0,
+		ylims				=	(0, 0.5),
+		yticks				=	0:.1:0.5,
 		alpha				=	0.5
 	)
 end
 
-function make_matrix_plot(grouped_df, target, priors_for_plot, allparams; width = 400)
+function make_matrix_plot(grouped_df, target, priors_for_plot, allparams; width = 400, dims = nothing)
 
 	npriors	= length(priors_for_plot)
 	nparams	= length(allparams)
-	plts	= Matrix{Plots.Plot}(undef, nparams, npriors)
-	for subdf in grouped_df
+	if isnothing(dims)
+		plts = Matrix{Plots.Plot}(undef, nparams, npriors)
+	else
+		@assert prod(dims) == length(grouped_df)
+		plts = Matrix{Plots.Plot}(undef, dims)
+	end
+	for (i, subdf) in enumerate(grouped_df)
 
 		i1 = findfirst(==(subdf[1, :no_params]), allparams)
 		i2 = findfirst(==(subdf[1, :prior]), priors_for_plot)
 		plt = make_subplot(subdf, target; legend = i1 == nparams && i2 == 1);
 
-		plts[i1, i2] = plt;
+		# plts[i1, i2] = plt;
+		plts[i] = plt;
 	end
 
 	layout = reverse(size(plts))
@@ -319,8 +326,9 @@ all_options = unique(df[!, :prior])
 priors_for_plot = all_options#[vcat(1, 3:7)]
 allparams = sort!(unique(df[!, :no_params]))
 
-DF.sort!(df, :no_params)
+DF.sort!(df, :prior)
 dfg = DF.groupby(DF.filter(row->row[:prior] in priors_for_plot, df), [:no_params, :prior])
+keys(dfg)
 
 dfc2 = DF.combine(DF.groupby(DF.filter(row->row[:prior] in priors_for_plot, df), [:no_params, :prior, :no_inequalities]),
 	((:false_equalities_prob, :false_inequalities_prob, :true_equalities_prob, :true_inequalities_prob, :correlation) .=> mean)...; renamecols=false)
@@ -332,10 +340,21 @@ for subdf in dfc2g
 	end
 end
 
+w = 400
 for target in (:false_equalities_prob, :false_inequalities_prob, :true_equalities_prob, :true_inequalities_prob, :correlation)
 
-	joint_plot, _ = make_matrix_plot(dfg, target, priors_for_plot, allparams)
-	savefig(joint_plot, joinpath("figures", "simulation_results_test_figures", "medians_model_convergence_$(target).pdf"))
+	_, sub_plts = make_matrix_plot(dfg, target, priors_for_plot, allparams)#, dims = (3, 4))
+
+	sub_plts2 = permutedims(reshape(sub_plts, 4, 3));
+	for (i, plt) in enumerate(sub_plts2)
+		plot!(plt, legend = isone(i), widen = true);
+	end
+	joint_plt = plot(
+		sub_plts2...,
+		layout = (4, 3),
+		size = (3w, 4w)
+	)
+	savefig(joint_plt, joinpath("figures", "simulation_results_test_figures_means", "means_model_convergence_$(target).pdf"))
 
 end
 
