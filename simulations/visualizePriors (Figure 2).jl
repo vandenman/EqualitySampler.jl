@@ -269,10 +269,6 @@ plot!(plts[1, 3]; foreground_color_legend = nothing, background_color_legend = n
 plot!(plts[2, 2], bottom_margin = 10mm);
 plot!(plts[1, 1], left_margin = 15mm);
 plot!(plts[2, 1], left_margin = 15mm);
-# for i in 1:3
-# 	plot!(plts[1, i], xticks = (1:7, fill("", 7)));
-# end
-plot(plts[1, 1], titlefont = font(16))
 
 w = 600
 joint_plts = permutedims(plts)

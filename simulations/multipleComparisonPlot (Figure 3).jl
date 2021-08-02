@@ -201,7 +201,7 @@ end
 
 size(results)
 
-labels = ["Uniform" "BetaBinomial α=1, β=1" "BetaBinomial α=# groups, β=1" "DPP α=0.5" "DPP α=1.0" "DPP α=Gopalan Berry"]
+labels = ["Uniform" "Beta-binomial α=1, β=1" "Beta-binomial α=# groups, β=1" "DPP α=0.5" "DPP α=1.0" "DPP α=Gopalan & Berry"]
 keep = eachindex(labels)#[1, 2, 3, 5]
 labels = reshape(labels[1, keep], 1, length(keep))
 
@@ -221,6 +221,6 @@ p2 = make_figure(groups, permutedims(mu2), "P(errors)", labels)
 figsize = (600, 400)
 figdir = joinpath("simulations", "results_multiplecomparisonsplot", "figures")
 savefig(plot(p1, size = figsize), joinpath(figdir, "one_or_more_errors2.png"))
-savefig(plot(p2, size = figsize), joinpath(figdir, "errors.png"))
+# savefig(plot(p2, size = figsize), joinpath(figdir, "errors.png"))
 savefig(plot(p1, size = figsize), joinpath(figdir, "one_or_more_errors2.pdf"))
-savefig(plot(p2, size = figsize), joinpath(figdir, "errors.pdf"))
+# savefig(plot(p2, size = figsize), joinpath(figdir, "errors.pdf"))

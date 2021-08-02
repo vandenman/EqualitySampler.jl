@@ -60,9 +60,8 @@ examine whether DPP prior is not horribly slow!
 - [x] Drop partition numbers (x-axis tick labels)
 
 ### Figure 3
-- [ ] "BetaBinomial" -> "Beta-Binomial"
-- [ ] "Gopalan Berry" -> "Gopalan & Berry" (ampersand)
-- [ ]
+- [x] "BetaBinomial" -> "Beta-Binomial"
+- [x] "Gopalan Berry" -> "Gopalan & Berry" (ampersand)
 
 ### Figure 4 + Figure 5
 - [ ] check zero vs non-zero?
