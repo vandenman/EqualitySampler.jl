@@ -352,8 +352,11 @@ julia> count_combinations("111") # 111, 222, 333
 3
 ```
 """
-count_combinations(k::Int, islands::Int) = factorial(islands) * binomial(k, islands)
-log_count_combinations(k::Int, islands::Int) = SpecialFunctions.logfactorial(islands) + logbinomial(k, islands)
+count_combinations(k::T, islands::T) where T<:Integer = factorial(islands) * binomial(k, islands)
+count_combinations(k::T, islands::U) where {T<:Integer, U<:Integer} = count_combinations(promote(k, islands)...)
+log_count_combinations(k::T, islands::T) where T<:Integer = SpecialFunctions.logfactorial(islands) + logbinomial(k, islands)
+log_count_combinations(k::T, islands::U) where {T<:Integer, U<:Integer} = log_count_combinations(promote(k, islands)...)
+
 function count_combinations(s::AbstractString)
 	s = filter(!isspace, s)
 	k = length(s)
@@ -474,4 +477,35 @@ function logunsignedstirlings1(n::T, k::T) where T <: Integer
 	return Float64(log(unsignedstirlings1(BigInt(n), BigInt(k))))
 	# terms = map(r->stirlings1ExplLogTerm(n, k, r), 0:n-k)
 	# return alternating_logsumexp_batch(terms)
+end
+
+
+
+
+
+"""
+count_set_partitions_given_partition_size(n::T) where T<:Integer
+
+Given a maximum partition size n, counts the number of partitions that have length 1:n.
+count_set_partitions_given_partition_size(n) is more efficient than count_set_partitions_given_partition_size.(n, 1:n).
+The implementation is based on the mathematica code in https://oeis.org/A036040
+"""
+function count_set_partitions_given_partition_size(n::T) where T<:Integer
+	part = sort!(reverse!(sort!.(Combinatorics.integer_partitions(n); rev=true)); by = length)
+	result = Vector{T}(undef, length(part))
+	for i in eachindex(result)
+		result[i] = Combinatorics.multinomial(T.(part[i])...) ÷ mapreduce(x->factorial(T(x)), *, runs(part[i]))
+	end
+	return result, part
+end
+runs(x) = sort!(collect(values(countmap(x))))
+"""
+count_set_partitions_given_partition_size(n::T, m::T) where T<:Integer
+
+Given a maximum partition size n, counts the number of partitions that have length m.
+"""
+function count_set_partitions_given_partition_size(n::T, m::T) where T<:Integer
+	part = sort!(reverse!(sort!.(Combinatorics.integer_partitions(n); rev=true)); by = length)
+	result = Combinatorics.multinomial(T.(part[m])...) ÷ mapreduce(x->factorial(T(x)), *, runs(part[m]))
+	return result, part[m]
 end

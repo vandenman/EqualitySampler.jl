@@ -1,5 +1,5 @@
 using  Test
-import Distributions, Turing
+import Distributions, Turing, StatsBase
 
 #=
 
@@ -118,4 +118,34 @@ import Distributions, Turing
 			end
 		end
 	end
+
+	@testset "logpdf_model_distinct works with DPP" begin
+
+		for k in 2:10
+			d = DirichletProcessMvUrnDistribution(k, .5)
+			m = generate_distinct_models(k)
+
+			lpdfs = mapslices(x->logpdf_model_distinct(d, x), m, dims = 1)
+			manual_sizes = [sort!(collect(values(StatsBase.countmap(x))); rev = true) for x in eachcol(m)]
+			counts, sizes = count_set_partitions_given_partition_size(k)
+
+			for i in eachindex(sizes)
+
+				idx = findall(==(sizes[i]), manual_sizes)
+
+				@test length(idx) == counts[i]
+				@test sum(lpdfs[idx]) ≈ counts[i] * lpdfs[idx[1]]
+
+			end
+
+			eqs = [count_equalities(x) for x in eachcol(m)]
+			ueqs = unique(eqs)
+			expected = [mean(lpdfs[ueqs_i .== eqs]) for ueqs_i in ueqs]
+			computed = logpdf_model_distinct.(Ref(d), ueqs)
+			@test expected ≈ computed
+
+		end
+	end
 end
+
+

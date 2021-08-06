@@ -1,11 +1,11 @@
 module EqualitySampler
 
-using Base: Integer, Symbol
 import Base: length
 import Distributions, Random, LinearAlgebra, Memoize, SpecialFunctions, Optim
 import StatsBase: countmap
 import OrderedCollections: OrderedDict
 import Turing, Turing.RandomMeasures
+import Combinatorics
 
 # for BayesFactor
 import QuadGK
@@ -49,6 +49,7 @@ export
 	empirical_inclusion_probabilities,
 	generate_distinct_models,
 	generate_all_models,
+	count_set_partitions_given_partition_size,
 
 	pdf_model,
 	logpdf_model,

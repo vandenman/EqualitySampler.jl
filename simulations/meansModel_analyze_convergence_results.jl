@@ -180,25 +180,30 @@ function read_results()::DF.DataFrame
 
 end
 
-prior_to_string(::UniformMvUrnDistribution) = "Uniform"
-prior_to_string(d::BetaBinomialMvUrnDistribution) = "BetaBinomial α = $(d.α), β = $(d.β)"
-prior_to_string(d::RandomProcessMvUrnDistribution) = "Dirichlet Process α = $(d.rpm.α)"
+prior_to_string(::UniformMvUrnDistribution) = "Uniform prior"
+prior_to_string(d::BetaBinomialMvUrnDistribution) = "Beta-binomial prior α = $(d.α), β = $(d.β)"
+prior_to_string(d::RandomProcessMvUrnDistribution) = "Dirichlet process prior α = $(d.rpm.α)"
 function prior_to_string(s::String)
 
-	s == "uniform"			&& return "Uniform"
+	# s == "uniform"			&& return "Uniform"
 
-	s == "betabinom11"		&& return "BetaBinomial α=1, β=1"
-	s == "betabinomk1"		&& return "BetaBinomial α=k, β=1"
-	s == "betabinom1k"		&& return "BetaBinomial α=1, β=k"
+	# s == "betabinom11"		&& return "BetaBinomial α=1, β=1"
+	# s == "betabinomk1"		&& return "BetaBinomial α=k, β=1"
+	# s == "betabinom1k"		&& return "BetaBinomial α=1, β=k"
 
-	# "dppalpha0.5"
-	# "dppalpha1"
-	# "dppalphak"
+	# s == "dppalpha0.5"		&& return "DPP α=0.5"
+	# s == "dppalpha1"		&& return "DPP α=1"
+	# s == "dppalphak"		&& return "DPP α=Gopalan & Berry"
 
-	s == "dppalpha0.5"		&& return "DPP α=0.5"
-	s == "dppalpha1"		&& return "DPP α=1"
-	s == "dppalphak"		&& return "DPP α=Gopalan & Berry"
+	s == "uniform"			&& return "Uniform prior"
 
+	s == "betabinom11"		&& return "Beta-binomial prior α=1, β=1"
+	s == "betabinomk1"		&& return "Beta-binomial prior α=k, β=1"
+	s == "betabinom1k"		&& return "Beta-binomial prior α=1, β=k"
+
+	s == "dppalpha0.5"		&& return "Dirichlet process prior α=0.50"
+	s == "dppalpha1"		&& return "Dirichlet process prior α=1"
+	s == "dppalphak"		&& return "Dirichlet process prior\nα=Gopalan & Berry"
 
 	return s
 
@@ -208,7 +213,8 @@ end
 # 	"prior: $(prior_to_string(subdf[!, :prior][1]))\nparams: $(subdf[!, :no_params][1]) \ninequalities: $((subdf[!, :no_params][1] * subdf[!, :no_inequalities][1]) ÷ 100)"
 # end
 function make_title(subdf)
-	"prior: $(prior_to_string(subdf[!, :prior][1]))\nparams: $(subdf[!, :no_params][1])"
+	"$(prior_to_string(subdf[!, :prior][1]))\nparameters: $(subdf[!, :no_params][1])"
+	# "prior: $(prior_to_string(subdf[!, :prior][1]))\nparams: $(subdf[!, :no_params][1])"
 end
 
 function make_subplot(subdf, target = :false_inequalities; legend = false)
@@ -226,17 +232,19 @@ function make_subplot(subdf, target = :false_inequalities; legend = false)
 	# subdf1 = DF.combine(DF.groupby(subdf[valid, :], [:no_inequalities, :sample_size]), target => median; renamecols=false)
 
 	return Plots.scatter(
-								categorical(subdf1[!, :sample_size]),
-								subdf1[!, target],
-		group				=	subdf1[!, :no_inequalities],
-		title				=	title,
-		markershape			=	[:circle :rect :star5 :diamond],
-		markerstrokewidth	=	0.1,
-		markersize			=	7,
-		legend				=	legend,
-		ylims				=	(0, 0.5),
-		yticks				=	0:.1:0.5,
-		alpha				=	0.5
+									categorical(subdf1[!, :sample_size]),
+									subdf1[!, target],
+		group					=	subdf1[!, :no_inequalities],
+		title					=	title,
+		markershape				=	[:circle :rect :star5 :diamond],
+		markerstrokewidth		=	0.1,
+		markersize				=	7,
+		legend					=	legend,
+		ylims					=	(0, 0.5),
+		yticks					=	0:.1:0.5,
+		alpha					=	0.5,
+		foreground_color_legend	=	nothing,
+		background_color_legend	=	nothing
 	)
 end
 
@@ -354,7 +362,7 @@ for target in (:false_equalities_prob, :false_inequalities_prob, :true_equalitie
 		layout = (4, 3),
 		size = (3w, 4w)
 	)
-	savefig(joint_plt, joinpath("figures", "simulation_results_test_figures_means", "means_model_convergence_$(target).pdf"))
+	# savefig(joint_plt, joinpath("figures", "simulation_results_test_figures_means", "means_model_convergence_$(target).pdf"))
 
 end
 
@@ -364,11 +372,18 @@ joint_plot, plts = make_matrix_plot(dfg, :false_inequalities_prob, priors_for_pl
 w = 420
 
 plts_main = permutedims(reshape(plts[[11, 12, 3, 4, 5, 6]], 2, 3));
+plts_main = plts_main[:, 2:-1:1]
 for (i, plt) in enumerate(plts_main)
-	plot!(plt, legend = isone(i), widen = true);
+	plot!(plt, bottom_margin = 5mm, left_margin = 5mm, right_margin = 5mm, top_margin = 5mm)
 end
+for (i, plt) in enumerate(plts_main)
+	plot!(plt, legend = isone(i));#, widen = true);
+end
+plot!(plts_main[1, 1], legend = (.95, .99))
+
 plt_main = plot(
 	plts_main...,
+	titlefont = font(16),
 	layout = (2, 3),
 	size = (3w, 2w)#,
 	# xlab = "Sample size",
@@ -377,102 +392,21 @@ plt_main = plot(
 savefig(plt_main, joinpath("figures", "simulation_results_test_clean_figures", "simulation_manuscript.pdf"))
 
 # figure for the appendix
-
 plts_appendix = permutedims(reshape(plts, 4, 3));
+plts_appendix = plts_appendix[[4, 5, 6, 1, 2, 3, 10, 11, 12, 7, 8, 9]]
 for (i, plt) in enumerate(plts_appendix)
-	plot!(plt, legend = isone(i), widen = true);
+	plot!(plt, legend = isone(i));#, widen = true);
 end
+for (i, plt) in enumerate(plts_main)
+	plot!(plt, bottom_margin = 5mm, left_margin = 5mm, right_margin = 5mm)
+end
+plot!(plts_appendix[1, 1], legend = (.95, .99))
 plt_appendix = plot(
 	plts_appendix...,
+	titlefont = font(14),
 	layout = (4, 3),
 	size = (3w, 4w)
 )
 savefig(plt_appendix, joinpath("figures", "simulation_results_test_clean_figures", "simulation_appendix.pdf"))
 
 
-
-# stuff for ISBA talk
-# blankplot = plot(legend=false,grid=false,foreground_color_subplot=:white);
-
-# pltsUniform   = vcat(reshape(plts[11:12], 1, 2), [blankplot blankplot; blankplot blankplot]);
-# pltsBetaBinom = vcat(reshape(plts[[1, 3, 2, 4]],   2, 2), [blankplot blankplot]);
-# pltsDpp       =      reshape(plts[[5, 7, 9, 6, 8, 10]],  3, 2);
-# # plot(permutedims(pltsDpp)..., layout = (3, 2))
-
-# plotmat2 = hcat(pltsUniform, pltsBetaBinom, pltsDpp);
-
-# # joint = plot(plotmat2..., layout = ll);
-
-# # # plotly()
-# # w = 2400
-# # h =  w ÷ 2
-# # joint = plot(permutedims(plotmat2)..., layout = (3, 6), size = (w, h));
-# # path_1 = joinpath("figures", "newsim4", "medians_fancier_false_inequalities_prob.html")
-# # Plots.savefig(joint, path_1)
-# # path_2 = joinpath("ISBA2021-Talk", "Figures", "medians_fancier_false_inequalities_prob.html")
-# # cp(path_1, path_2; force = true)
-
-
-# plot!(plotmat2[1, 4], legend = false);
-
-
-# legendplot = Plots.scatter(
-# 	[0.0],
-# 	reshape(1:4, 1, 4),
-# 	markershape = [:circle :hexagon :rect :square],
-# 	markercolor = reshape(1:4, 1, 4),
-# 	markersize  = fill(10, 1, 4),
-# 	legend = false, border = :none, axis = nothing,
-# 	xlim = (-0.5, 1),
-# 	ylim = (0, 5)
-# );
-# Plots.annotate!(
-# 	legendplot,
-# 	[(0.1, i, Plots.text("$(20 * i)% of variables are equal"; halign = :left, pointsize = 14)) for i in 1:4]
-# );
-
-
-# size(plotmat2)
-plotmat2[3, 1] = legendplot;
-plotmat2[3, 2] = blankplot;
-
-# gr()
-w = 2400
-h = w ÷ 2
-joint = plot(permutedims(plotmat2)..., layout = (3, 6), size = (w, h));
-path_1 = joinpath("figures", "newsim4", "medians_fancier_false_inequalities_prob.png")
-Plots.savefig(joint, path_1)
-path_2 = joinpath("ISBA2021-Talk", "Figures", "medians_fancier_false_inequalities_prob.png")
-cp(path_1, path_2; force = true)
-
-
-# w = 400
-# joint = plot(permutedims(plotmat2)..., layout = (3, 6), size = (6w, 3w));
-# path_0 = joinpath("figures", "newsim4", "medians_fancier_false_inequalities_prob.pdf")
-# Plots.savefig(joint, path_0)
-
-
-# TODO post this online
-# using Plots
-
-# function matrixplot(nrows = 5, ncols = 4)
-# 	plotmat = Matrix{Plots.Plot}(undef, nrows, ncols)
-# 	for i in eachindex(plotmat)
-# 		# this is more complicated in reality
-# 		plotmat[i] = scatter(rand(10), rand(10))
-# 	end
-# 	return plotmat
-# end
-
-# plotmat = matrixplot()
-
-# plotmat[1, 1]
-# width = 300
-# this seems to modify plotmat!
-# plot(plotmat..., layout = size(plotmat), size = width .* reverse(size(plotmat)))
-# plotmat[1, 1]
-
-
-# how to control draw order?
-# scatter(zeros(4), zeros(4, 4), shape = [:circle :rect :star5 :diamond], markersize = 150,
-# xlim = (-2, 2), ylim = (-2, 2), alpha = .5)

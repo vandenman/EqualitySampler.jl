@@ -35,16 +35,25 @@ function Distributions._rand!(rng::Random.AbstractRNG, d::AbstractMvUrnDistribut
 	x
 end
 
-function logpdf_incl(d::AbstractMvUrnDistribution, no_equalities::Integer)
+function logpdf_incl(d::AbstractMvUrnDistribution, no_equalities::T) where T<:Integer
 	k = length(d)
-	0 <= no_equalities < k || return -Inf
+	if 0 <= no_equalities < k
+		T <: BigInt && return BigFloat(-Inf)
+		return -Inf
+	end
 	logpdf_model_distinct(d, no_equalities) + log_count_distinct_models_with_incl(k, no_equalities)# + log_count_combinations(k, k - no_equalities)
 end
 
 pdf_incl(d::AbstractMvUrnDistribution,  no_equalities) = exp(logpdf_incl(d,  no_equalities))
 # pdf_model(d::AbstractMvUrnDistribution, no_equalities) = exp(logpdf_model(d, no_equalities))
 
-logpdf_model(d::AbstractMvUrnDistribution, x::T) where T <: Integer = logpdf_model_distinct(d, x) - log_count_combinations(length(d), length(d) - x)
+function logpdf_model(d::AbstractMvUrnDistribution, x::T) where T <: Integer
+	if x > length(d)
+		T <: BigInt && return BigFloat(-Inf)
+		return -Inf
+	end
+	logpdf_model_distinct(d, x) - log_count_combinations(length(d), length(d) - x)
+end
 logpdf_model(d::AbstractMvUrnDistribution, x::AbstractVector{T}) where T <: Integer = logpdf_model_distinct(d, x) - log_count_combinations(x)
 pdf_model(d::AbstractMvUrnDistribution, x) = exp(logpdf_model(d, x))
 pdf_model_distinct(d::AbstractMvUrnDistribution, x) = exp(logpdf_model_distinct(d, x))
@@ -110,8 +119,9 @@ end
 rpm(d::RandomProcessMvUrnDistribution) = d.rpm
 
 """
-    DirichletProcessMvUrnDistribution(k::Integer, α::Float64)
-    DirichletProcessMvUrnDistribution(k::Integer, ::Symbol = :Gopalan_Berry)
+DirichletProcessMvUrnDistribution(k::Integer, α::Float64)
+DirichletProcessMvUrnDistribution(k::Integer, ::Symbol = :Gopalan_Berry)
+DirichletProcessMvUrnDistribution(k::Integer, α::Real)
 
 Wrapper function to create an object representing a Dirichlet process prior. These call RandomProcessMvUrnDistribution but are a bit more user friendly.
 Either set α directly by passing a float, or pass (any) symbol to use `dpp_find_α` to specify α, which uses the heuristic by
@@ -179,10 +189,27 @@ function logpdf_incl(d::RandomProcessMvUrnDistribution, no_equalities::Integer)
 	# return result
 end
 
-logpdf_model_distinct(::RandomProcessMvUrnDistribution, ::Integer) = throw("unimplemented")
+function logpdf_model_distinct(d::RandomProcessMvUrnDistribution, x::T) where T<:Integer
 
-function logpdf_model_distinct(d::RandomProcessMvUrnDistribution{RPM, T}, x::AbstractVector{<:Integer})  where {RPM<:RandomMeasures.DirichletProcess, T<:Integer}# = logpdf_model_distinct(d, count_equalities(x))
-# function logpdf_model_distinct(d::RandomProcessMvUrnDistribution{RPM, T}, no_equalities::Integer) where {RPM<:RandomMeasures.DirichletProcess, T<:Integer}
+	U = T <: BigInt ? BigFloat : Float64
+	n = T(length(d))
+	counts, sizes = count_set_partitions_given_partition_size(n)
+	idx = findall(==(n - x), length.(sizes))
+	M = U(d.rpm.α)
+
+	res = U(0.0)
+	for i in idx
+		v = length(sizes[i]) * log(M) +
+			SpecialFunctions.logabsgamma(M)[1] -
+			SpecialFunctions.logabsgamma(M + n)[1] +
+			sum(x->SpecialFunctions.logabsgamma(x)[1], sizes[i])
+
+		res += counts[i] * v
+	end
+	return res / sum(counts[idx])
+end
+
+function logpdf_model_distinct(d::RandomProcessMvUrnDistribution{RPM, T}, x::AbstractVector{<:Integer})  where {RPM<:RandomMeasures.DirichletProcess, T<:Integer}
 
 
 	n = length(d)
@@ -191,7 +218,7 @@ function logpdf_model_distinct(d::RandomProcessMvUrnDistribution{RPM, T}, x::Abs
 
 	cc = countmap(x)
 
-	length(cc) * log(M) +
+	return length(cc) * log(M) +
 		SpecialFunctions.logabsgamma(M)[1] -
 		SpecialFunctions.logabsgamma(M + n)[1] +
 		sum(x->SpecialFunctions.logabsgamma(x)[1], values(cc))

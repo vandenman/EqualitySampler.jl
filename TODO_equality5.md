@@ -64,9 +64,10 @@ examine whether DPP prior is not horribly slow!
 - [x] "Gopalan Berry" -> "Gopalan & Berry" (ampersand)
 
 ### Figure 4 + Figure 5
-- [ ] check zero vs non-zero?
-- [ ] adjust y-axis limits to (0, .5)
-- [ ] use mean instead of median
+- [?] check zero vs non-zero? What was this about?
+- [x] adjust y-axis limits to (0, .5)
+- [x] use mean instead of median
+- [ ] For manuscript figure, put No. parameters left and don't repeat prior in the title (basically mimic facet_grid)
 - [ ] create nicer figures for true inequalities (power) and all other options
 
 ### Scott & Berger plot

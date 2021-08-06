@@ -1,6 +1,6 @@
 import Distributions: Normal, MvNormal, loglikelihood, logpdf
 import Statistics: mean, var
-
+import LinearAlgebra: Diagonal
 
 @testset "Multivariate normal likelihood" begin
 
@@ -10,7 +10,8 @@ import Statistics: mean, var
 		pop_mu = randn(p)
 		pop_sds = abs.(randn(p))
 
-		D = MvNormal(pop_mu, pop_sds)
+		D = MvNormal(pop_mu, Diagonal(map(abs2, pop_sds)))
+		# D = MvNormal(pop_mu, Diagonal(pop_sds))
 		x = rand(D, n)
 
 		obs_mean = mean(x, dims = 2)
