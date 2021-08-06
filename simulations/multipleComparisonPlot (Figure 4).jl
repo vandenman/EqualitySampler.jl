@@ -218,8 +218,8 @@ try2 = prop_incorrect.(results_big)
 mu2 = dropdims(mean(try2, dims = 3), dims = 3)[keep, :]
 p2 = make_figure(groups, permutedims(mu2), "P(errors)", labels)
 
-figsize = (600, 400)
-figdir = joinpath("simulations", "results_multiplecomparisonsplot", "figures")
+figsize = (700, 500)
+figdir = joinpath("figures")
 savefig(plot(p1, size = figsize), joinpath(figdir, "one_or_more_errors2.png"))
 # savefig(plot(p2, size = figsize), joinpath(figdir, "errors.png"))
 savefig(plot(p1, size = figsize), joinpath(figdir, "one_or_more_errors2.pdf"))

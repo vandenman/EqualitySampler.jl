@@ -37,7 +37,7 @@ end
 
 function logpdf_incl(d::AbstractMvUrnDistribution, no_equalities::T) where T<:Integer
 	k = length(d)
-	if 0 <= no_equalities < k
+	if !(0 <= no_equalities < k)
 		T <: BigInt && return BigFloat(-Inf)
 		return -Inf
 	end
