@@ -1,10 +1,8 @@
-# import Statistics: cor
-
 updateDistribution(::UniformConditionalUrnDistribution, urns, j) = UniformConditionalUrnDistribution(urns, j)
 updateDistribution(D::BetaBinomialConditionalUrnDistribution, urns, j) = BetaBinomialConditionalUrnDistribution(urns, j, D.α, D.β)
 
 @testset "Simulated Properties Match Theoretical Ones" begin
-	
+
 	Dset = [UniformConditionalUrnDistribution([1, 1], 1), BetaBinomialConditionalUrnDistribution([1, 1], 1, 1, 1)]
 	ks = 2:5
 	noSamples = 10_000

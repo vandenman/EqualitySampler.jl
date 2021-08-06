@@ -175,7 +175,6 @@ ProgressMeter.@showprogress for (r, i) in sim_opts
 	end
 end
 
-
 function make_figure(x, y, ylab, labels; shapes = :auto, kwargs...)
 	plot(
 		x,

@@ -71,11 +71,11 @@ examine whether DPP prior is not horribly slow!
 - [ ] create nicer figures for true inequalities (power) and all other options
 
 ### Scott & Berger plot
-- [ ] \alpha = 0.5
+- [x] \alpha = 0.5
 - [ ] make figure and add it to the overleaf
 
 ### Add proportion demo
 - [ ] Review all the comments in the manuscript
 
 ### Appendix
-- [ ] "BetaBinomial" -> "Beta-Binomial"
+- [x] "BetaBinomial" -> "Beta-Binomial"
