@@ -17,6 +17,7 @@
 
 using EqualitySampler, Plots, Distributions
 import Turing
+import Plots.PlotMeasures: mm
 
 
 EqualitySampler.logpdf_model_distinct(D::BetaBinomial, no_equalities::Integer) = logpdf(D, no_equalities) - log(binomial(promote(ntrials(D), no_equalities)...))
@@ -89,67 +90,10 @@ function matrix_plot(dists, k::Integer, pos_included = 2:2:k; kwargs...)
 	return figures
 end
 
-function make_figs(dists)
-	figs = Matrix{Plots.Plot}(undef, 3, length(dists))
-	for (i, d) in enumerate(dists)
-		@show i, d
-
-		# if d isa RandomProcessDistribution
-		# 	included = BigInt(0):k
-		# else
-			included = 0:k
-		# end
-		lpdf = logpdf_model.(Ref(d), included)
-
-		# @assert isapprox(sum(exp, lpdf), 1.0, atol = 1e-4) # <- should also be multiplied with number of models
-
-		fig1 = plot(included, lpdf, legend = false);
-		if d isa UniformMvUrnDistribution
-			ylims!(fig1, (-60, -10));
-		end
-		xticks!(fig1, 0:5:k);
-		xlims!(fig1, (-1, k+1));
-		scatter!(fig1, included, lpdf);
-		title!(fig1, make_title(d));
-
-		result = Matrix{Float64}(undef, length(variables_added), length(pos_included))
-		for (i, p) in enumerate(pos_included)
-			D = updateSize(d, p)
-			for j in eachindex(variables_added)
-				result[j, i] = diff_lpdf(D, variables_added[j])
-			end
-		end
-
-		fig2 = plot(pos_included, exp.(result)', label = permutedims(["$p included" for p in variables_added]),
-					legend = isone(i) ? :topleft : :none);
-		# title!(fig2, "Fig 2 of S & B");
-
-		fig3 = plot(pos_included, result', label = permutedims(["$p included" for p in variables_added]),
-		legend = isone(i) ? :topleft : :none);
-		# title!(fig3, "Fig 2 of S & B (log scale)");
-		if d isa UniformMvUrnDistribution
-			plot!(fig2, ylims = (0, 2),  yticks = [0, 1, 2])
-			plot!(fig3, ylims = (-1, 1), yticks = [-1, 0, 1])
-		end
-
-		# if i == length(dists)
-		# 	plot!(twinx(fig1), tick = nothing, ylabel = "Figure 1 of S & B", ticks = nothing)
-		# 	plot!(twinx(fig2), tick = nothing, ylabel = "Figure 2 of S & B", )
-		# 	plot!(twinx(fig3), tick = nothing, ylabel = "Figure 3 of S & B (log scale)")
-		# end
-
-		figs[1, i] = fig1
-		figs[2, i] = fig2
-		figs[3, i] = fig3
-
-	end
-	return figs
-end
-
-function make_jointplot(figures; width::Int = 500)
+function make_jointplot(figures; width::Int = 500, kwargs...)
 	ncols = size(figures, 1)
 	nrows = size(figures, 2)
-	return plot(figures..., layout = (nrows, ncols), size = (ncols * width, nrows * width))
+	return plot(figures...; layout = (nrows, ncols), size = (ncols * width, nrows * width), kwargs...)
 end
 
 k = BigInt(30)
@@ -164,19 +108,84 @@ dists = (
 	# RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(1.887))
 )
 
-labels = reshape(["1ˢᵗ", "2ⁿᵈ", "3ʳᵈ", "4ᵗʰ"] .* " variable added", 1, 4)
+labels = reshape(["1ˢᵗ", "2ⁿᵈ", "3ʳᵈ", "4ᵗʰ"] .* " inequality added", 1, 4)
 figures = matrix_plot(dists, k; label = labels)
-beep()
+# beep()
 
 legend_on!(x)  = plot!(x; legend = :topleft, foreground_color_legend = nothing, background_color_legend = nothing)
 # legend_off!(x) = plot!(x; legend = false)
 
+Plots.resetfontsizes()
+Plots.scalefontsizes(1.6)
 legend_on!(figures[3, 3])
-joint_3x4 = make_jointplot(figures)
+joint_3x4 = make_jointplot(figures, legendfont = font(12), titlefont = font(20))
 legend_on!(figures[3, 2])
-joint_2x4 = make_jointplot(figures[:, 1:2])
-joint_2x3 = make_jointplot(figures[2:4, 1:2])
+Plots.plot!(figures[3, 1], xlab = "No. inequalities",    bottom_margin = 5mm)
+Plots.plot!(figures[3, 2], xlab = "Total no. variables", bottom_margin = 5mm)
+Plots.plot!(figures[2, 1], ylab = "log probability", left_margin = 7mm, yticks = -80:20:0)
+Plots.plot!(figures[2, 2], ylab = "log probability", left_margin = 7mm, yticks = (0:0.1:0.5, lpad.(0:0.1:0.5, 4)))
+joint_2x4 = make_jointplot(figures[:, 1:2], legendfont = font(12), titlefont = font(20))
+joint_2x3 = make_jointplot(figures[2:4, 1:2], legendfont = font(12), titlefont = font(20))
 
 savefig(joint_3x4, joinpath("figures", "prior_comparison_plot_3x4_with_log.pdf"))
 savefig(joint_2x4, joinpath("figures", "prior_comparison_plot_2x4_without_log.pdf"))
 savefig(joint_2x3, joinpath("figures", "prior_comparison_plot_2x4_without_log_without_betabinomial.pdf"))
+
+
+
+# function make_figs(dists)
+# 	figs = Matrix{Plots.Plot}(undef, 3, length(dists))
+# 	for (i, d) in enumerate(dists)
+# 		@show i, d
+
+# 		# if d isa RandomProcessDistribution
+# 		# 	included = BigInt(0):k
+# 		# else
+# 			included = 0:k
+# 		# end
+# 		lpdf = logpdf_model.(Ref(d), included)
+
+# 		# @assert isapprox(sum(exp, lpdf), 1.0, atol = 1e-4) # <- should also be multiplied with number of models
+
+# 		fig1 = plot(included, lpdf, legend = false);
+# 		if d isa UniformMvUrnDistribution
+# 			ylims!(fig1, (-60, -10));
+# 		end
+# 		xticks!(fig1, 0:5:k);
+# 		xlims!(fig1, (-1, k+1));
+# 		scatter!(fig1, included, lpdf);
+# 		title!(fig1, make_title(d));
+
+# 		result = Matrix{Float64}(undef, length(variables_added), length(pos_included))
+# 		for (i, p) in enumerate(pos_included)
+# 			D = updateSize(d, p)
+# 			for j in eachindex(variables_added)
+# 				result[j, i] = diff_lpdf(D, variables_added[j])
+# 			end
+# 		end
+
+# 		fig2 = plot(pos_included, exp.(result)', label = permutedims(["$p included" for p in variables_added]),
+# 					legend = isone(i) ? :topleft : :none);
+# 		# title!(fig2, "Fig 2 of S & B");
+
+# 		fig3 = plot(pos_included, result', label = permutedims(["$p included" for p in variables_added]),
+# 		legend = isone(i) ? :topleft : :none);
+# 		# title!(fig3, "Fig 2 of S & B (log scale)");
+# 		if d isa UniformMvUrnDistribution
+# 			plot!(fig2, ylims = (0, 2),  yticks = [0, 1, 2])
+# 			plot!(fig3, ylims = (-1, 1), yticks = [-1, 0, 1])
+# 		end
+
+# 		# if i == length(dists)
+# 		# 	plot!(twinx(fig1), tick = nothing, ylabel = "Figure 1 of S & B", ticks = nothing)
+# 		# 	plot!(twinx(fig2), tick = nothing, ylabel = "Figure 2 of S & B", )
+# 		# 	plot!(twinx(fig3), tick = nothing, ylabel = "Figure 3 of S & B (log scale)")
+# 		# end
+
+# 		figs[1, i] = fig1
+# 		figs[2, i] = fig2
+# 		figs[3, i] = fig3
+
+# 	end
+# 	return figs
+# end
