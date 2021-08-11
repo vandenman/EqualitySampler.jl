@@ -92,7 +92,7 @@ examine whether DPP prior is not horribly slow!
 	- [x] Legend: "Gopalan Berry" -> "Gopalan & Berry"
 	- [x] double check colors in bottom plot vs top plot and if they match, mainly for DPP
 - [ ] Figure 3 (Scott & Berger)
-	- [ ] Look at most
+	- [ ] Look at most ??? what did I write here?
 	- [ ] y-axis label should be odds! Copy text from Scott & Berger
 	- [ ] do Beta-binomial (\alpha = k, \beta = 1)
 	- [ ] legend should be "1 inequality added", "2 inequalities added", "5 ...", "10 ..."

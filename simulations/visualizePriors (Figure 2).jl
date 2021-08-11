@@ -17,6 +17,10 @@ import		DataFrames					as DF,
 			CSV
 import Turing.RandomMeasures: DirichletProcess
 
+import Printf
+round_2_decimals(x::Number) = Printf.@sprintf "%.2f" x
+round_2_decimals(x) = x
+
 include("simulations/plotPartitions.jl")
 
 updateDistribution(d::UniformMvUrnDistribution, args) = d
@@ -32,8 +36,8 @@ make_title(::Type{BetaBinomialMvUrnDistribution{Int64}}) = "Beta-binomial prior"
 make_title(::Type{RandomProcessMvUrnDistribution{DirichletProcess{Float64}, Int64}}) = "Dirichlet process prior"
 
 make_label(::Type{UniformMvUrnDistribution{Int64}}, args) = nothing
-make_label(::Type{BetaBinomialMvUrnDistribution{Int64}}, args) = "α=$(args[1]) β=$(args[2])"
-make_label(::Type{RandomProcessMvUrnDistribution{DirichletProcess{Float64}, Int64}}, args) = "α=$(args[1])"
+make_label(::Type{BetaBinomialMvUrnDistribution{Int64}}, args) = "α=$(round_2_decimals(args[1])) β=$(round_2_decimals(args[2]))"
+make_label(::Type{RandomProcessMvUrnDistribution{DirichletProcess{Float64}, Int64}}, args) = "α=$(round_2_decimals(args[1]))"
 
 function get_data(dists)
 
@@ -102,10 +106,10 @@ function get_idx_unique_models(subdf)
 	return [findfirst(==(tmp[j]), subdf[1, :value]) for j in eachindex(tmp)]
 end
 
-# use union of DPP & BetaBinomial
 function make_all_plots(dfg, dfg_incl;
 	inset_size = 0.125,
 	graph_markersize = 4,
+	partition_markersize = 4,
 	graph_markerstroke = 1,
 	ylims = (-9, 0),
 	yticks = 0:-2:-8
@@ -123,7 +127,7 @@ function make_all_plots(dfg, dfg_incl;
 
 	x_axis_plots = plot_model.(x_models)
 	for plt in x_axis_plots
-		plot!(plt, size = (200, 200))
+		plot!(plt, size = (200, 200), markersize = partition_markersize)
 	end
 	# x_axis_plots_data = plot_model_data.(x_models)
 
@@ -159,6 +163,7 @@ function make_all_plots(dfg, dfg_incl;
 
 		plt0 = plot(eachindex(x_idx), y, markershape=:auto, title = make_title(subdf[1, :distribution]),
 					legend = legendpos, labels = labels,
+					markersize = graph_markersize,
 					ylims = ylims, yticks = yticks, xlims = (0, 8), xticks = (1:7, fill("", 7)))
 
 		# (j, x_m) = first(enumerate(x_models))
@@ -213,6 +218,10 @@ function make_all_plots(dfg, dfg_incl;
 			y[:, j] .= subdf_incl[j, :value]
 		end
 
+		if subdf[1, :distribution] <: RandomProcessMvUrnDistribution{DirichletProcess{Float64}, Int64}
+			y = y[:, [2, 1, 3]]
+		end
+
 		# labels = reshape(make_label.(subdf_incl[1, :distribution], subdf_incl[!, :args]), (1, size(subdf_incl, 1)))
 		# if subdf_incl[1, :distribution]<: UniformMvUrnDistribution
 		# 	legendpos = :none
@@ -224,7 +233,8 @@ function make_all_plots(dfg, dfg_incl;
 
 		plt = plot(reverse(x), y, markershape = :auto,# labels = labels,
 				legend = :none,#legendpos,
-				ylims = ylims, yticks = yticks
+				ylims = ylims, yticks = yticks,
+				markersize = graph_markersize
 		)
 
 		plts[2, i] = plt
@@ -245,7 +255,7 @@ dists = (
 	),
 	(
 		dist = DirichletProcessMvUrnDistribution(k, 1),
-		args = ((0.5,), (1.0,), (Symbol("Gopalan Berry"),))
+		args = ((0.5,), (1.0,), (Symbol("Gopalan & Berry"),))
 	)
 )
 
@@ -254,18 +264,17 @@ df_wide_model_probs, df_long_model_probs, df_wide_incl_probs, df_long_incl_probs
 # CSV.write(joinpath("tables", "model_probs_figure_2.csv"), df_wide_model_probs)
 # CSV.write(joinpath("tables", "incl_probs_figure_2.csv"),  df_wide_incl_probs)
 
-# TODO actually remake figure 2
 dfg = DF.groupby(df_long_model_probs, :distribution);
 dfg_incl = DF.groupby(df_long_incl_probs, :distribution);
 
-plts = make_all_plots(dfg, dfg_incl);
-plts = plts[:, [3, 1, 2]]
+plts = make_all_plots(dfg, dfg_incl; graph_markersize = 5);
+plts = plts[:, [3, 2, 1]]
 ylabel!(plts[1, 1], "Log prior probabilty");
 ylabel!(plts[2, 1], "Log prior probabilty");
 xlabel!(plts[1, 2], "Model type");
 xlabel!(plts[2, 2], "No. inequalities");
 plot!(plts[1, 1]; foreground_color_legend = nothing, background_color_legend = nothing);
-plot!(plts[1, 3]; foreground_color_legend = nothing, background_color_legend = nothing);
+plot!(plts[1, 2]; foreground_color_legend = nothing, background_color_legend = nothing);
 plot!(plts[2, 2], bottom_margin = 10mm);
 plot!(plts[1, 1], left_margin = 15mm);
 plot!(plts[2, 1], left_margin = 15mm);

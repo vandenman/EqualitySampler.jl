@@ -1,5 +1,4 @@
-# TODO: isn't GraphRecipes unused?
-using EqualitySampler, Plots, GraphRecipes, Colors, LazySets, Measures
+using EqualitySampler, Plots, Colors, LazySets, Measures
 import StatsBase: countmap
 import OrderedCollections
 
@@ -226,3 +225,58 @@ end
 # for k in 3:6
 # 	plot_modelspace(k, true, false)
 # end
+
+function lexicographic_order(x)
+	res = 0
+	n = length(x)
+	for i in eachindex(x)
+		res += x[n - i + 1] * 10^(i-1)
+	end
+	return res
+end
+
+
+function ordering2(x)
+	# TODO: ensure this is the actual ordering like on wikipedia
+	d = countmap(x)
+	res = Float64(length(x) - length(d))
+
+	v = sort!(collect(values(d)), lt = !isless)
+	# res = 0.0
+	for i in eachindex(v)
+		res += v[i] ./ 10 .^ (i)
+	end
+	res *= 10^length(x)
+	res += lexicographic_order(x)
+	return res
+end
+
+#=
+eqs = count_equalities.(eachcol(models))
+ueqs = unique(eqs)
+idx_unique = [findfirst(==(u), eqs) for u in ueqs]
+tbs = countmap.(eachcol(models[:, [1, 2, 5, 7, 15, 52]]))
+
+
+
+
+
+x1 = models[:, 1]
+x2 = models[:, 2]
+x3 = models[:, 7]
+
+k = 5
+vertical = true
+models = generate_distinct_models(k)
+order = sortperm(ordering.(eachcol(models)), lt = !isless)
+layout, max_rows, max_cols = make_grid(k, vertical)
+w = 100
+
+plots = [plot_model(view(models, :, i); legend=false, border=:none, axis=nothing) for i in order]
+plt = plot(plots..., layout = layout, size = (max_cols*w, max_rows*w))
+
+order2 = sortperm(ordering2.(eachcol(models)), lt = !isless)
+plots2 = [plot_model(view(models, :, i); legend=false, border=:none, axis=nothing) for i in order2]
+plt = plot(plots2..., layout = layout, size = (max_cols*w, max_rows*w))
+
+=#
