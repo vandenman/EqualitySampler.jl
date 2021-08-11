@@ -79,3 +79,33 @@ examine whether DPP prior is not horribly slow!
 
 ### Appendix
 - [x] "BetaBinomial" -> "Beta-Binomial"
+
+
+## 11-08-2021
+- [ ] For all plots
+	- [ ] Change order to DPP, beta-binomial, uniform
+	- [ ] Increase line width in all plots
+	- [ ] Ensure digits have 2 decimals, so 0.50 and not 0.5, 1.00 and not 1.0
+- [ ] Figure 2 (visualizePriors)
+	- [x] change order
+	- [ ] Legend: increase font size and decrease the symbol size
+	- [x] Legend: "Gopalan Berry" -> "Gopalan & Berry"
+	- [x] double check colors in bottom plot vs top plot and if they match, mainly for DPP
+- [ ] Figure 3 (Scott & Berger)
+	- [ ] Look at most
+	- [ ] y-axis label should be odds! Copy text from Scott & Berger
+	- [ ] do Beta-binomial (\alpha = k, \beta = 1)
+	- [ ] legend should be "1 inequality added", "2 inequalities added", "5 ...", "10 ..."
+	- [ ] put legend in Beta-binomial plot (after reordering)
+	- [ ] double check if DPP is not flipped!
+	- [ ] leave top row, let it go to K = 20.
+	- [ ] rescale y-axis for Uniform in both bottom and top row.
+	- [ ] do A-B thingy like in Scott & Berger
+	- [ ] see if the DPP alpha value determines the asymptote.
+- [ ] Figure 5
+	- [ ] Legend title
+	- [ ] Order of columns is incorrect
+	- [ ] rename parameters to $K$ = 5
+	- [ ] x-axis titles and y-axis titles are missing
+	- [ ] rotate x-axis tick labels by 30 degrees
+	- [ ] Bonus: make y-axis go to 0.2 where possible
