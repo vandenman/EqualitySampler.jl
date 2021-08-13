@@ -19,33 +19,43 @@ using EqualitySampler, Plots, Distributions
 import Turing
 import Plots.PlotMeasures: mm
 
+import Printf
+round_2_decimals(x::Number) = Printf.@sprintf "%.2f" x
+round_2_decimals(x) = x
 
 EqualitySampler.logpdf_model_distinct(D::BetaBinomial, no_equalities::Integer) = logpdf(D, no_equalities) - log(binomial(promote(ntrials(D), no_equalities)...))
 diff_lpdf(D, no_inequalities) = logpdf_model_distinct(D, no_inequalities - 1) - logpdf_model_distinct(D, no_inequalities)
 
 updateSize(d::BetaBinomial, k) = BetaBinomial(k, d.α, d.β)
 updateSize(::UniformMvUrnDistribution, k) = UniformMvUrnDistribution(k)
-updateSize(d::BetaBinomialMvUrnDistribution, k) = BetaBinomialMvUrnDistribution(k, d.α, d.β)
+# updateSize(d::BetaBinomialMvUrnDistribution, k) = BetaBinomialMvUrnDistribution(k, d.α, d.β)
+updateSize(d::BetaBinomialMvUrnDistribution, k) = BetaBinomialMvUrnDistribution(k, k, d.β)
 updateSize(d::RandomProcessMvUrnDistribution, k) = RandomProcessMvUrnDistribution(k, d.rpm)
 
-make_title(d::BetaBinomial) = "Beta-binomial α=$(d.α) β=$(d.β)"
+make_title(d::BetaBinomial) = "Beta-binomial α=$(round_2_decimals(d.α)) β=$(round_2_decimals(d.β))"
 make_title(::UniformMvUrnDistribution) = "Uniform"
-make_title(d::BetaBinomialMvUrnDistribution) = "Beta-binomial α=$(d.α) β=$(d.β)"
-make_title(d::RandomProcessMvUrnDistribution) = "Dirichlet Process α=$(d.rpm.α)"
+make_title(d::BetaBinomialMvUrnDistribution) = "Beta-binomial α=$(round_2_decimals(d.α)) β=$(round_2_decimals(d.β))"
+make_title(d::RandomProcessMvUrnDistribution) = "Dirichlet Process α=$(round_2_decimals(d.rpm.α))"
 
 function scottberger_figure_1(d::Distribution, k::Integer = big(30))
 
-	included = 0:k
-	lpdf = logpdf_model_distinct.(Ref(d), included)
+	no_equalities = 0:k
+	lpdf = logpdf_model_distinct.(Ref(d), no_equalities)
+
+	# given K = 5, 5 equalities implies the null model which we want on the left (reverse! is not defined)
+	no_equalities = reverse(no_equalities)
+	if !(d isa UniformMvUrnDistribution)
+		no_equalities = no_equalities .- 1
+	end
 
 	# figure 1
-	plt = plot(included, lpdf, legend = false);
+	plt = plot(no_equalities, lpdf, legend = false);
 	if d isa UniformMvUrnDistribution
 		ylims!(plt, (-60, -10));
 	end
 	xticks!(plt, 0:5:k);
 	xlims!(plt, (-1, k+1));
-	scatter!(plt, included, lpdf);
+	scatter!(plt, no_equalities, lpdf);
 	title!(plt, make_title(d));
 
 	return plt
@@ -78,15 +88,43 @@ function scottberger_figure_2(
 
 end
 
-function matrix_plot(dists, k::Integer, pos_included = 2:2:k; kwargs...)
+function matrix_plot(dists, k::Integer, pos_included = 2:2:k; include_log = false, legend_subplot_idx = nothing, legend_pos = :topleft, kwargs...)
 
-	figures = Matrix{Plots.Plot}(undef, length(dists), 3)
+	figures = Matrix{Plots.Plot}(undef, length(dists), include_log ? 3 : 2)
+	Plots.resetfontsizes()
+	Plots.scalefontsizes(1.6)
+
 	for (i, d) in enumerate(dists)
 		@show i, d
 		figures[i, 1] = scottberger_figure_1(d, k)
 		figures[i, 2] = scottberger_figure_2(d, pos_included; kwargs...)
-		figures[i, 3] = scottberger_figure_2(d, pos_included; give_log = true, kwargs...)
+		if include_log
+			figures[i, 3] = scottberger_figure_2(d, pos_included; give_log = true, kwargs...)
+		end
 	end
+
+	# additional details
+	x_middle = ceil(Int, length(dists) / 2)
+	y_top = 1
+	y_bottom = size(figures, 2)
+	Plots.plot!(figures[x_middle, y_top], xlab = "No. inequalities",    bottom_margin = 5mm);
+	Plots.plot!(figures[x_middle, y_bottom], xlab = "Total no. variables", bottom_margin = 5mm);
+	Plots.plot!(figures[1, y_top], ylab = "Log probability", left_margin = 7mm);
+	Plots.plot!(figures[1, 2], ylab = "Prior odds ratio (smaller / larger)", left_margin = 7mm);
+	if include_log
+		Plots.plot!(figures[1, 3], ylab = "Log prior odds ratio (smaller / larger)", left_margin = 7mm);
+	end
+	if !(legend_subplot_idx isa Bool && !legend_subplot_idx)
+
+		if legend_subplot_idx isa Int && (1 < legend_subplot_idx < length(dists))
+			legend_subplot_x_idx = legend_subplot_idx
+		else
+			legend_subplot_x_idx = x_middle
+		end
+		Plots.plot!(figures[legend_subplot_x_idx, y_bottom]; legend = legend_pos, foreground_color_legend = nothing, background_color_legend = nothing)
+	end
+
+	Plots.resetfontsizes()
 	return figures
 end
 
@@ -96,96 +134,116 @@ function make_jointplot(figures; width::Int = 500, kwargs...)
 	return plot(figures...; layout = (nrows, ncols), size = (ncols * width, nrows * width), kwargs...)
 end
 
-k = BigInt(30)
+function highlight_adjacent_points!(figure, d, x, label = "A", distance = 1.0; color = :grey, coordinates = nothing)
+
+	x_rev = length(d) - 1 .- x
+	A = logpdf_model_distinct.(Ref(d), x_rev)
+
+	if isnothing(coordinates)
+		slope = (A[2] - A[1]) / (x[2] - x[1])
+		intercept = A[2] - x[2] * slope
+		@assert A ≈ collect(x) .* slope .+ intercept
+
+		# transform slope to account for aspectratio
+		xlims = figure.subplots[1][:xaxis][:extrema]
+		ylims = figure.subplots[1][:yaxis][:extrema]
+		aspectratio = (ylims.emax - ylims.emin) / (xlims.emax - xlims.emin)
+		# aspectratio
+
+		μx, μA = mean(x), mean(A)
+		perpendicular_slope = - 1 / (slope / aspectratio)
+		perpendicular_intercept = μA - perpendicular_slope * μx
+		@assert μA ≈ perpendicular_slope * μx + perpendicular_intercept
+
+		function get_x2(d, b, m, x1, y1)
+			discriminant = sqrt(-b^2+d^2+d^2 * m^2-2 * b * m * x1-m^2 * x1^2+2 * b * y1+2 * m * x1 * y1-y1^2)
+			x2_1 = (-b * m + x1 + m * y1 - discriminant) / (1+m^2)
+			x2_2 = (-b * m + x1 + m * y1 + discriminant) / (1+m^2)
+			return x2_1, x2_2
+		end
+
+		x2_options = get_x2(distance, perpendicular_intercept, perpendicular_slope, μx, μA)
+		y2_options = perpendicular_slope .* x2_options .+ perpendicular_intercept
+		@assert all(x->x≈distance,  @. sqrt((x2_options - μx)^2 + (y2_options - μA)^2))
+
+		# xx = 5:.1:15
+		# plot(xx, slope .* xx .+ intercept, aspectratio = :equal)
+		# plot!(xx, perpendicular_slope .* xx .+ perpendicular_intercept)
+		# scatter!([μx], [μA], marker = (5, 1.0, :green))
+		# scatter!([x2], [y2], marker = (5, 1.0, :blue))
+
+		# plt = deepcopy(figure)
+		# plot!(plt, xx, slope .* xx .+ intercept)
+		# plot!(xx, perpendicular_slope .* xx .+ perpendicular_intercept)
+		# scatter!([μx], [μA], marker = (5, 1.0, :green))
+		# scatter!([x2], [y2], marker = (5, 1.0, :blue))
+
+		idx = 2 - (x2_options[1] > μx)
+		x2, y2 = x2_options[idx], y2_options[idx]
+	else
+		@assert length(coordinates) == 2
+		x2, y2 = coordinates
+	end
+
+	plot!(figure, x, A, linecolor = color)
+	scatter!(figure, x, A; marker = (5, 1.0, color))
+	scatter!(figure, [x2], [y2]; marker = (0, 0, :white), series_annotations = [label])
+
+end
+
+function highlight_adjacent_points2!(figure, d, variables_added, label = "A", y_nudge = 0.0; bg_color = :grey)
+
+	D = updateSize(d, length(d))
+	x = fill(Float64(length(D)), length(variables_added))
+	y = exp.(diff_lpdf.(Ref(D), variables_added))
+	scatter!(figure, x, y; marker = (5, 1.0, bg_color), label = "")
+	scatter!(figure, x, y .+ y_nudge; marker = (0, 0, :white), series_annotations = label, label = "")
+
+end
+
+k = BigInt(20)
 variables_added = [1, 2, 5, 10]
 pos_included = 2:2:30
+labels = [" 1 inequality added" " 2 inequalities added" " 5 inequalities added" "10 inequalities added"]
 
 dists = (
 	BetaBinomial(k, 1, 1),
 	DirichletProcessMvUrnDistribution(k, 0.5),
-	UniformMvUrnDistribution(k),
-	BetaBinomialMvUrnDistribution(k, 1, 1)
-	# RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(1.887))
+	BetaBinomialMvUrnDistribution(k, 5, 1),
+	UniformMvUrnDistribution(k)
 )
 
-labels = reshape(["1ˢᵗ", "2ⁿᵈ", "3ʳᵈ", "4ᵗʰ"] .* " inequality added", 1, 4)
-figures = matrix_plot(dists, k; label = labels)
-# beep()
+figures = matrix_plot(dists, k, pos_included; label = labels, legend_subplot_idx = 3)
+joint_2x4 = make_jointplot(figures, legendfont = font(12), titlefont = font(20));
+# savefig(joint_2x4, joinpath("figures", "prior_comparison_plot_2x4_without_log.pdf"))
 
-legend_on!(x)  = plot!(x; legend = :topleft, foreground_color_legend = nothing, background_color_legend = nothing)
-# legend_off!(x) = plot!(x; legend = false)
+variables_added = [1, 2, 5, 10]
+pos_included = 2:2:30
+dists = (
+	DirichletProcessMvUrnDistribution(k, 0.5),
+	BetaBinomialMvUrnDistribution(k, 5, 1),
+	UniformMvUrnDistribution(k)
+)
+figures = matrix_plot(dists, k, pos_included; label = labels, legend_subplot_idx = 3)
+plot!(figures[3, 2], ylim = (0, 2));
 
-Plots.resetfontsizes()
-Plots.scalefontsizes(1.6)
-legend_on!(figures[3, 3])
-joint_3x4 = make_jointplot(figures, legendfont = font(12), titlefont = font(20))
-legend_on!(figures[3, 2])
-Plots.plot!(figures[3, 1], xlab = "No. inequalities",    bottom_margin = 5mm)
-Plots.plot!(figures[3, 2], xlab = "Total no. variables", bottom_margin = 5mm)
-Plots.plot!(figures[2, 1], ylab = "log probability", left_margin = 7mm, yticks = -80:20:0)
-Plots.plot!(figures[2, 2], ylab = "log probability", left_margin = 7mm, yticks = (0:0.1:0.5, lpad.(0:0.1:0.5, 4)))
-joint_2x4 = make_jointplot(figures[:, 1:2], legendfont = font(12), titlefont = font(20))
-joint_2x3 = make_jointplot(figures[2:4, 1:2], legendfont = font(12), titlefont = font(20))
+# add A and B to figures in the top row
+highlight_adjacent_points!(figures[1, 1], dists[1], 0:1, "A");
+highlight_adjacent_points!(figures[1, 1], dists[1], 9:10, "B"; coordinates = (9.8, -43));
+highlight_adjacent_points!(figures[2, 1], dists[2], 0:1, "A");
+highlight_adjacent_points!(figures[2, 1], dists[2], 9:10, "B"; coordinates = (9.25, -31.5));
+# add A and B to figures in the bottom row
+highlight_adjacent_points2!(figures[1, 2], dists[1], [1, 10], ["A", "B"], .03);
+highlight_adjacent_points2!(figures[2, 2], dists[2], [1, 10], ["A", "B"], .8);
 
-savefig(joint_3x4, joinpath("figures", "prior_comparison_plot_3x4_with_log.pdf"))
-savefig(joint_2x4, joinpath("figures", "prior_comparison_plot_2x4_without_log.pdf"))
-savefig(joint_2x3, joinpath("figures", "prior_comparison_plot_2x4_without_log_without_betabinomial.pdf"))
+joint_2x3 = make_jointplot(figures, legendfont = font(12), titlefont = font(20));
+savefig(joint_2x3, joinpath("figures", "prior_comparison_plot_2x3_without_log_without_betabinomial.pdf"))
 
+αs = (0.10, 0.25, 0.50, 1.00, 2.50, 5.00)
+dists = Tuple(DirichletProcessMvUrnDistribution.(k, αs))
+figures = matrix_plot(dists, k, pos_included; label = labels, legend_subplot_idx = 3, legend_pos = :bottomleft)
+joint_2x6 = make_jointplot(figures, legendfont = font(12), titlefont = font(20));
+savefig(joint_2x6, joinpath("figures", "prior_comparison_plot_2x6_without_log_dpp_only.pdf"))
 
-
-# function make_figs(dists)
-# 	figs = Matrix{Plots.Plot}(undef, 3, length(dists))
-# 	for (i, d) in enumerate(dists)
-# 		@show i, d
-
-# 		# if d isa RandomProcessDistribution
-# 		# 	included = BigInt(0):k
-# 		# else
-# 			included = 0:k
-# 		# end
-# 		lpdf = logpdf_model.(Ref(d), included)
-
-# 		# @assert isapprox(sum(exp, lpdf), 1.0, atol = 1e-4) # <- should also be multiplied with number of models
-
-# 		fig1 = plot(included, lpdf, legend = false);
-# 		if d isa UniformMvUrnDistribution
-# 			ylims!(fig1, (-60, -10));
-# 		end
-# 		xticks!(fig1, 0:5:k);
-# 		xlims!(fig1, (-1, k+1));
-# 		scatter!(fig1, included, lpdf);
-# 		title!(fig1, make_title(d));
-
-# 		result = Matrix{Float64}(undef, length(variables_added), length(pos_included))
-# 		for (i, p) in enumerate(pos_included)
-# 			D = updateSize(d, p)
-# 			for j in eachindex(variables_added)
-# 				result[j, i] = diff_lpdf(D, variables_added[j])
-# 			end
-# 		end
-
-# 		fig2 = plot(pos_included, exp.(result)', label = permutedims(["$p included" for p in variables_added]),
-# 					legend = isone(i) ? :topleft : :none);
-# 		# title!(fig2, "Fig 2 of S & B");
-
-# 		fig3 = plot(pos_included, result', label = permutedims(["$p included" for p in variables_added]),
-# 		legend = isone(i) ? :topleft : :none);
-# 		# title!(fig3, "Fig 2 of S & B (log scale)");
-# 		if d isa UniformMvUrnDistribution
-# 			plot!(fig2, ylims = (0, 2),  yticks = [0, 1, 2])
-# 			plot!(fig3, ylims = (-1, 1), yticks = [-1, 0, 1])
-# 		end
-
-# 		# if i == length(dists)
-# 		# 	plot!(twinx(fig1), tick = nothing, ylabel = "Figure 1 of S & B", ticks = nothing)
-# 		# 	plot!(twinx(fig2), tick = nothing, ylabel = "Figure 2 of S & B", )
-# 		# 	plot!(twinx(fig3), tick = nothing, ylabel = "Figure 3 of S & B (log scale)")
-# 		# end
-
-# 		figs[1, i] = fig1
-# 		figs[2, i] = fig2
-# 		figs[3, i] = fig3
-
-# 	end
-# 	return figs
-# end
+plot(1:2, 1:2)
+plot!(1:2, 2:3, label = "")

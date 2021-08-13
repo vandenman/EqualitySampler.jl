@@ -135,22 +135,23 @@ import Combinatorics
 
 		# https://oeis.org/A036040
 		reference = [1, 1, 1, 1, 3, 1, 1, 4, 3, 6, 1, 1, 5, 10, 10, 15, 10, 1, 1, 6, 15, 10, 15, 60, 15, 20, 45, 15, 1, 1, 7, 21, 35, 21, 105, 70, 105, 35, 210, 105, 35, 105, 21, 1, 1, 8, 28, 56, 35, 28, 168, 280, 210, 280, 56, 420, 280, 840, 105, 70, 560, 420, 56, 210, 28, 1, 1, 9, 36, 84, 126, 36, 252]
-		expectation = count_set_partitions_given_partition_size.(1:9)
+		replication = count_set_partitions_given_partition_size.(1:9, true)
 		# the values listed on the OEIS stop after the first few terms of the 9th row
-		expectation = vcat(first.(expectation)...)[1:length(reference)]
-		@test reference == expectation
+		replication = vcat(first.(replication)...)[eachindex(reference)]
+		@test reference == replication
 
 	end
 
-	@testset "compare count_set_partitions_given_partition_size(n) against count_set_partitions_given_partition_size(n, m)" begin
+	# deprecated count_set_partitions_given_partition_size(n, m)
+	# @testset "compare count_set_partitions_given_partition_size(n) against count_set_partitions_given_partition_size(n, m)" begin
 
-		for n in 1:10
-			res_n = count_set_partitions_given_partition_size(n)
-			for m in 1:n
-				res_nm = count_set_partitions_given_partition_size(n, m)
-				@test res_n[1][m] == res_nm[1]
-				@test res_n[2][m] == res_nm[2]
-			end
-		end
-	end
+	# 	for n in 1:6
+	# 		res_n = count_set_partitions_given_partition_size(n)
+	# 		for m in 1:n
+	# 			res_nm = count_set_partitions_given_partition_size(n, m)
+	# 			@test res_n[1][m] == res_nm[1]
+	# 			@test res_n[2][m] == res_nm[2]
+	# 		end
+	# 	end
+	# end
 end

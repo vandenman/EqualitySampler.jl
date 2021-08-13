@@ -99,7 +99,7 @@ end
 # end
 
 log_model_probs_by_incl(d::BetaBinomialMvUrnDistribution) = d._log_model_probs_by_incl
-logpdf_model_distinct(d::BetaBinomialMvUrnDistribution, x::Vector{<:Integer}) = logpdf_model_distinct(d, count_equalities(x))
+logpdf_model_distinct(d::BetaBinomialMvUrnDistribution, x::AbstractVector{<:Integer}) = logpdf_model_distinct(d, count_equalities(x))
 function logpdf_model_distinct(d::BetaBinomialMvUrnDistribution, no_equalities::Integer)
 	in_eqsupport(d, no_equalities) || return -Inf
 	log_model_probs_by_incl(d)[no_equalities + 1]
@@ -193,12 +193,15 @@ function logpdf_model_distinct(d::RandomProcessMvUrnDistribution, x::T) where T<
 
 	U = T <: BigInt ? BigFloat : Float64
 	n = T(length(d))
-	counts, sizes = count_set_partitions_given_partition_size(n)
-	idx = findall(==(n - x), length.(sizes))
 	M = U(d.rpm.α)
 
+	# idx = findall(==(n - x), length.(sizes))
+	target_size = n - x
+	f! = x->filter!(y->length(y) == target_size, x)
+	counts, sizes = count_set_partitions_given_partition_size(f!, n)
+
 	res = U(0.0)
-	for i in idx
+	for i in eachindex(counts)#idx
 		v = length(sizes[i]) * log(M) +
 			SpecialFunctions.logabsgamma(M)[1] -
 			SpecialFunctions.logabsgamma(M + n)[1] +
@@ -206,35 +209,19 @@ function logpdf_model_distinct(d::RandomProcessMvUrnDistribution, x::T) where T<
 
 		res += counts[i] * v
 	end
-	return res / sum(counts[idx])
+	return res / sum(counts)
 end
 
 function logpdf_model_distinct(d::RandomProcessMvUrnDistribution{RPM, T}, x::AbstractVector{<:Integer})  where {RPM<:RandomMeasures.DirichletProcess, T<:Integer}
 
-
 	n = length(d)
 	M = d.rpm.α
-	# k = n - no_equalities # number of unique values
-
 	cc = countmap(x)
 
 	return length(cc) * log(M) +
 		SpecialFunctions.logabsgamma(M)[1] -
 		SpecialFunctions.logabsgamma(M + n)[1] +
 		sum(x->SpecialFunctions.logabsgamma(x)[1], values(cc))
-
-	#=
-		the old implementation below that was based on no_equalities failed because it does not properly distinghuis between
-		the models with equal equalities but different distributions of equalities
-		for example, [1, 1, 2, 2] and [1, 2, 1, 1] received the same probability, although they should not
-
-	n = length(d)
-	M = d.rpm.α
-	k = n - no_equalities
-	return k * log(M) + SpecialFunctions.lgamma(M) - SpecialFunctions.lgamma(M + n)
-	logpdf_incl(d, no_equalities) - log_count_distinct_models_with_incl(length(d), no_equalities)
-
-	=#
 
 end
 

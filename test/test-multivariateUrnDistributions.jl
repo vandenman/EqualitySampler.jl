@@ -1,6 +1,5 @@
 using  Test
-import Distributions, Turing, StatsBase
-
+import Distributions, Turing, StatsBase, Statistics
 #=
 
 	TODO:
@@ -140,9 +139,30 @@ import Distributions, Turing, StatsBase
 
 			eqs = [count_equalities(x) for x in eachcol(m)]
 			ueqs = unique(eqs)
-			expected = [mean(lpdfs[ueqs_i .== eqs]) for ueqs_i in ueqs]
+			expected = [Statistics.mean(lpdfs[ueqs_i .== eqs]) for ueqs_i in ueqs]
 			computed = logpdf_model_distinct.(Ref(d), ueqs)
 			@test expected ≈ computed
+
+		end
+	end
+
+	@testset "logpdf_model_distinct is equal for value and models" begin
+
+		for k in 3:6
+
+			d_u  = UniformMvUrnDistribution(k)
+			d_bb = BetaBinomialMvUrnDistribution(k, k, 1)
+			models = generate_distinct_models(k)
+			equalities = count_equalities.(eachcol(models))
+
+			logprob_d_bb_models     = logpdf_model_distinct.(Ref(d_bb), eachcol(models))
+			logprob_d_bb_equalities = logpdf_model_distinct.(Ref(d_bb), equalities)
+
+			logprob_d_u_models     = logpdf_model_distinct.(Ref(d_u), eachcol(models))
+			logprob_d_u_equalities = logpdf_model_distinct.(Ref(d_u), equalities)
+
+			@test logprob_d_bb_models ≈ logprob_d_bb_equalities
+			@test logprob_d_u_models ≈ logprob_d_u_equalities
 
 		end
 	end
