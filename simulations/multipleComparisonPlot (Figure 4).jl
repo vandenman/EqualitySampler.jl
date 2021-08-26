@@ -28,11 +28,13 @@ if isinteractive()
 	include("simulations/meansModel_Functions.jl")
 	include("simulations/helpersTuring.jl")
 	include("simulations/limitedLogger.jl")
+	include("simulations/customHMCAdaptation.jl")
 else
 	include("silentGeneratedQuantities.jl")
 	include("meansModel_Functions.jl")
 	include("helpersTuring.jl")
 	include("limitedLogger.jl")
+	include("customHMCAdaptation.jl")
 end
 
 function get_priors()

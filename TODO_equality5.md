@@ -104,9 +104,10 @@ examine whether DPP prior is not horribly slow!
 	- [x] do A-B thingy like in Scott & Berger
 	- [x] see if the DPP alpha value determines the asymptote.
 - [ ] Figure 5
-	- [ ] Legend title
-	- [ ] Order of columns is incorrect
-	- [ ] rename parameters to $K$ = 5
-	- [ ] x-axis titles and y-axis titles are missing
-	- [ ] rotate x-axis tick labels by 30 degrees
-	- [ ] Bonus: make y-axis go to 0.2 where possible
+	- [x] Legend title
+	- [x] Legend labels
+	- [x] Order of columns is incorrect
+	- [x] rename parameters to $K$ = 5
+	- [x] x-axis titles and y-axis titles are missing
+	- [x] rotate x-axis tick labels by 30 degrees
+	- [x] Bonus: make y-axis go to 0.2 where possible
