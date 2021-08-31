@@ -15,6 +15,14 @@ include("simulations/helpersTuring.jl")
 
 journal_data = DF.DataFrame(CSV.File(joinpath("simulations", "demos", "data", "journal_data.csv")))
 
+# n_errors = round.(Int, journal_data[!, :errors] .* journal_data[!, :n])
+# loglinear_data = DF.DataFrame(
+# 	journal	= repeat(journal_data[!, :journal], 2),
+# 	error	= repeat(["Yes", "No"], inner=size(journal_data, 1)),
+# 	count	= vcat(n_errors, journal_data[!, :n] .- n_errors)
+# )
+# CSV.write(joinpath("simulations", "demos", "data", "journal_loglinear_data.csv"), loglinear_data)
+
 scatter(journal_data[!, :journal], journal_data[!, :errors], ylims = (0, 1), ylab = "Proportion of statistical reporting errors", label = nothing)
 
 @assert journal_data[!, :errors] ≈ journal_data[!, :perc_articles_with_errors] ./ 100
