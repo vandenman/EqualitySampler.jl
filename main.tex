@@ -85,7 +85,6 @@
 %\author[1]{Eric-Jan Wagenmakers}
 \affil{Department of Psychological Methods, University of Amsterdam}
 
-
 \begin{document}
 \maketitle
 
@@ -354,16 +353,34 @@ Figure~\ref{fig:scott_berger} illustrates the penalty imposed by the priors for 
 
 \subsection{Illustration} \label{sec:illustration}
 \FD{Here we report on the small simulation study, specify the ANOVA model and explain it.}
+Here we illustrate the different penalties imposed by the different priors in a small simulation study. We simulate data from a one-way ANOVA and analyze it using the specification by \textcite{rouder2012default}. The data generating model is as follows
+\begin{align*}
+    X_{ij}              &\sim \mathcal{N}\left(\mu + \sigma\theta_j, \sigma^2\right)\\
+    \mu                 &\sim \mathcal{N}\left(0, 1\right)  \\
+    \sigma^2            &\sim \mathcal{IG}\left(1, 1\right) \\
+    g                   &\sim \mathcal{IG}\left(1/2, 1/2\right) \\
+    \mathbf{\theta}^u   &\sim \mathcal{N}_{K-1}\left(0, g\right)   \\
+    \mathbf{\theta}^c   &\leftarrow \mathbf{Q\theta}^u \\
+    \theta_j            &\leftarrow \text{mean of elements of } \theta^c \text{ in the same partition }\\
+    \rho                &\sim \pi(.).\numberthis
+\end{align*}
+The data $X$ are normally distributed with a grand mean $\mu$, a group specific offset $\theta_j$, and a variance $\sigma^2$. The offsets sum to zero to avoid identification constraints. This achieved by projecting $\mathbf{\theta}^u$ from a $K-1$ dimensional space onto a $K$ dimensional space using the matrix $Q$, which consists of the first $K-1$ columns of an eigendecomposition of a degenerate covariance matrix as defined in \textcite{rouder2012default}.\footnote{Note that this projection is not unique, it can also be achieved with, for example, a QR decomposition, as recommended by Stan \parencite{stanUserManual}} Next, the elements of $\mathbf{\theta}^c$ within the same partition are averaged to obtain $\theta_j$. The unconstrained offsets $\mathbf{\theta}^u$ are assigned a $g$ prior where $g$ itself is assigned an inverse gamma prior with shape and scale equal to \nicefrac{1}{2}. Note that the model reduces to the approach of \textcite{rouder2012default} whenever the partition indicates that all elements are distinct.
 
+In all simulations we simulated from the null model which assumes that all the groups are equal. We drew 100 observations per group and varied the number of groups from to $2, 3, \dots, 10$. For the analysis we considered six priors: (1-3) the Dirichlet process prior (DPP) with $\alpha =0.5$, $\alpha=1.0$, and $\alpha$ set adaptively as done by \textcite{gopalan1998bayesian}, the Beta-binomial prior with $\alpha=K,\,\beta=1.0$ and $\alpha=1.0,\,\beta=1.0$, and the uniform prior. The same data sets was used for all six priors before simulating a new one. Each combination of group size and prior was repeated 100 times. To analyze the data we drew 12 000 MCMC samples and discarded the first 2 000.
+
+To assess the performance of the fitted models we consider the probability of making one or more errors. An error is made when the posterior probability that two groups differ is larger than 0.5 (as the true model assumes that all groups are equal). Figure~\ref{fig:small_simulation} shows the probability of making one or more errors against the number of groups.
 \begin{figure}
     \centering
     \includegraphics[width=\textwidth]{figures/one_or_more_errors2.pdf}
     \caption{Probability of making one or more errors (y-axis) versus the number of groups (x-axis) for different priors.}
     \label{fig:small_simulation}
 \end{figure}
+It is clear that the uniform prior makes many errors as the number of groups increases. In contrast, the Dirichlet Process prior with $\alpha = 0.5$ and the Beta-binomial with $\alpha = K, \beta=1.0$ appear to limit the error rate as the number of groups increases.
 
 \subsection{Simulation Study} \label{sec:simulation}
 \FD{False discovery plot (including the uniform). Main plot here, then all the rest in the appendix. At least 50 iterations per configuration.}
+
+The previous section illustrated the importance of the prior in the error rate when all groups are equal. This section generalizes these findings using a more exhaustive simulation study. We used the same ANOVA model as in the previous section and we varied the total number of groups in $\{5,10\}$ and the sample size in $\{100, 250, 500, 750, 1000, 10000\}$. In addition, we varied the true number of inequalities as a fraction of $K$, $\{20\%, 40\%, 60\%, 80\%\}$. Each unique combinations was repeated 100 times and each generated data set was analyzed with the same six priors as before. 
 
 \begin{figure}
     \centering
@@ -392,7 +409,23 @@ Intrusive memories after a traumatic experience can noticeably affect somebody's
 %\textcite{tong2008too} have five groups rate attractiveness of Facebook users with 100, 300, 500, 700, 900 friends, respectively. Nice example, but a bit dated; it's in JASP.
 
 \subsection{Testing Proportions}
-\textcite{nuijten2016prevalence} investigated a sample of 30,717 articles published between 1985 and 2013 in eight major psychology journals for statistical reporting errors. We reanalyze these data 
+\textcite{nuijten2016prevalence} investigated a sample of 30,717 articles published between 1985 and 2013 in eight major psychology journals for statistical reporting errors. Of interest is, which journals make the same amount of errors, and which make more errors? The model is implemented in the following manner. For journal $j$, the number of statistical errors found is denoted $e_j$ and the number of statistical tests analyzed is denoted $n_j$. We assume that underlying each proportions there is a latent true probability of making an error, $\theta_j$. Thus, the data are modeled as independent binomials, that is, $e_j \sim \mathrm{Binomial}\left(\theta_j, n_j\right)$. Next, we specify a hierarchical level over the partitions to assess for which journals the error probability is equal. This leads to the following model specification:
+\begin{align*}
+    e_j                 &\sim \mathrm{Binomial}\left(\theta_j, n_j\right)\\
+    \theta^u_j          &\sim \mathrm{Beta}\left(1.0, 1.0\right)\\
+    \theta_j            &\leftarrow \theta^u_i \quad\text{ iff } j \in \rho_i\\
+    \rho                &\sim \pi(.).\numberthis
+\end{align*}
+The unconstrained probabilities $\theta^u_j$ are assigned a Beta prior, from which, together with the partitions, the possibly constrained probabilities are created. Two probabilities, $\theta_i$ and $\theta_j$, are equal if and only if their indices appear in the same partition, $\{i, j\} \subseteq \rho_k$ for some $k$. Note that the model reduces to independent binomials whenever the partitions state that all probabilities are distinct.
+
+Figure~\ref{fig:demo_proportions} shows ...
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth]{figures/simulation_results_test_clean_figures/simulation_manuscript.pdf}
+    \caption{The left figure shows the , whereas the right figure shows the posterior means with a Beta-binomial prior over the partitions with $\alpha = 8$ and $\Beta = 1$.}}
+    \label{fig:demo_proportions}
+\end{figure}
 
 \FD{How is the model implemented? Is it like ANOVA, but on proportions? Then it would be log linear analysis. \textcite{gopalan1998bayesian} just compare proportions, for example. It seems that the Bayesian loglinear analysis in JASP (due to Overstall \& Forster) does model averaging, so in a sense it should be very similar to our approach. It also makes more sense conceptually, see the example below.}
 %\textcite{radelet1991choosing} study decisions on death penalties (yes / no) by race of defendant (black / white) and race of victim (black / white). This yields 6 cells, data are in JASP. An interaction in a loglinear model would have a particular effect on the posterior equivalence of groups, so there is some relation here. Let's discuss this.
@@ -408,6 +441,8 @@ Intrusive memories after a traumatic experience can noticeably affect somebody's
 \FD{Also need to discuss factorial designs ... is our approach easily extendable? We could just ignore the factor structure, but maybe some things are a priori unreasonable, can't encode this as of yet.}
 
 \section{Discussion} \label{sec:discussion}
+We introduced a Beta-binomial prior over partitions and used it to inducing equalities among a parameter vector. Furthermore, we compared the Beta-binomial to the previously used Dirichlet process prior. In a simulation, we showed that a Beta-binomial prior with $\alpha=K$ and $\beta = 1$ and Dirichlet process prior with $\alpha = 0.5$ limit the probability of incorrectly claiming that two parameters are unequal, when they are in fact equal. Furthermore, we demonstrated in two (?) examples how this approach of selecting equalities can be introduced in often-used models, most notably as a substitute for post-hoc testing in ANOVAs.
+
 \textcite{kim2009spiked} combine a spike at zero with a DPP. \textcite{curtis2011bayesian} also use a DPP to combine clustering of highly correlated predictors in linear regression with variable selection. \textcite{canale2017pitman} focus on the Pitman-Yor process, which is a generalization of the DPP. \textcite{lu2018reducing} study a powered Chinese restaurant process. \textcite{miller2015microclustering} study a microclustering property, for which the number of data points in a cluster does not grow linearly with the total number of data points (which is assumed by the DP, PY, etc.)
 
 We focused on independent groups, but one could model dependencies using the distance CRP \parencite{blei2011distance}.
