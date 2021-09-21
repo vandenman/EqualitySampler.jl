@@ -83,6 +83,29 @@ function getQ_Stan(K::Integer)::Matrix{Float64}
 	return LA.qr(A).Q[:, 1:K-1]
 end
 
+function getQ_Stan_2(K::Integer)::Vector{Float64}
+	# Stan approach: https://mc-stan.org/docs/2_18/stan-users-guide/parameterizing-centered-vectors.html
+	Q_r = Vector{Float64}(undef, 2K)
+	for i in 1:K
+		Q_r[i]   = -sqrt((K - i) / (K - i + 1.0))
+		Q_r[i+K] = inv(sqrt((K - i) * (K - i + 1)))
+	end
+	return Q_r
+end
+
+function apply_Q_Stan_2(x_raw::Vector{T}, Q_r::Vector{Float64}) where T
+	K = length(x_raw) + 1
+	x = Vector{T}(undef, K)
+	x_aux = zero(T)
+
+	for i in 1:K-1
+	  x[i]  = x_aux + x_raw[i] * Q_r[i]
+	  x_aux = x_aux + x_raw[i] * Q_r[i+K]
+	end
+
+	x[K] = x_aux
+	return x
+end
 
 @model function one_way_anova_full_ss(obs_mean, obs_var, obs_n, Q, ::Type{T} = Float64) where {T}
 
@@ -342,9 +365,24 @@ function sample_model(model, sampler, iterations, burnin, init_theta; kwargs...)
 	return mean_θ_cs, θ_cs, chain, model, sampler
 end
 
+# function sample_true_model(no_params, no_inequalities)
+
+# 	target_inequalities = round(Int, (no_params * no_inequalities) / 100)
+# 	d = BetaBinomialMvUrnDistribution(no_params)
+
+# 	# tweak the inclusion probabilities
+# 	d._log_model_probs_by_incl .= [i == target_inequalities + 1 ? 0.0 : -Inf for i in eachindex(d._log_model_probs_by_incl)]
+# 	u = rand(d)
+
+# 	@assert count_equalities(u) == target_inequalities
+
+# 	return u
+
+# end
+
 function sample_true_model(no_params, no_inequalities)
 
-	target_inequalities = round(Int, (no_params * no_inequalities) / 100)
+	target_inequalities = round(Int, ((no_params - 1)  * no_inequalities) / 100)
 	d = BetaBinomialMvUrnDistribution(no_params)
 
 	# tweak the inclusion probabilities
@@ -356,6 +394,7 @@ function sample_true_model(no_params, no_inequalities)
 	return u
 
 end
+
 
 function get_θ(offset, true_model::Vector{T}) where T<:Integer
 

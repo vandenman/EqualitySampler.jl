@@ -66,6 +66,7 @@ export
 	AbstractMvUrnDistribution,
 	UniformMvUrnDistribution,
 	BetaBinomialMvUrnDistribution,
+	BetaBinomialProcessMvUrnDistribution,
 	RandomProcessMvUrnDistribution,
 	DirichletProcessMvUrnDistribution,
 	PartitionSampler,

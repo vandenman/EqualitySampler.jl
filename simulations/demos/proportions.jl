@@ -1,4 +1,4 @@
-using EqualitySampler, Turing, Plots, FillArrays, Plots.PlotMeasures
+using EqualitySampler, Turing, Plots, FillArrays, Plots.PlotMeasures, Colors
 import	DataFrames		as DF,
 		StatsBase 		as SB,
 		LinearAlgebra	as LA,
@@ -77,10 +77,10 @@ function equality_prob_table(journal_data, samples)
 	)
 end
 
-function plot_observed_against_estimated(observed, estimated; legend = :topleft, xlab = "observed proportion", ylab = "posterior mean", kwargs...)
+function plot_observed_against_estimated(observed, estimated, label; markersize = 1, legend = :topleft, color = permutedims(distinguishable_colors(8, [RGB(1,1,1), RGB(0,0,0)], dropseed=true)), xlab = "Observed proportion", ylab = "Posterior mean", kwargs...)
 	plt = plot(;kwargs...);
 	Plots.abline!(plt, 1, 0, legend = false, color = "black", label = nothing);
-	scatter!(plt, observed', estimated', legend = legend, label = permutedims(journal_data[!, :journal]), ylim = (0, 1), xlim = (0, 1), xlab = xlab, ylab = ylab)
+	scatter!(plt, observed', estimated', legend = legend, label = label, ylim = (0, 1), xlim = (0, 1), xlab = xlab, ylab = ylab, color = color, markersize = markersize)
 	return plt
 end
 
@@ -127,16 +127,22 @@ trace_plots = map(zip(priors, fits)) do (prior, fit)
 end
 joint_trace_plots = plot(trace_plots..., layout = (1, length(priors)), size = (400length(priors), 400))
 
+cols = permutedims(distinguishable_colors(8, [RGB(1,1,1), RGB(0,0,0)], dropseed=true)[1:8])
 retrieval_plots = map(zip(priors, fits)) do (prior, fit)
-	plot_observed_against_estimated(journal_data[!, :errors], fit[:posterior_means]; title = make_title(prior),
-	legend = isnothing(prior) ? :topleft : nothing, foreground_color_legend = nothing, background_color_legend = nothing)
+	plot_observed_against_estimated(journal_data[!, :errors], fit[:posterior_means], permutedims(journal_data[!, :journal]); title = make_title(prior),
+		legend = isnothing(prior) ? :topleft : nothing, foreground_color_legend = nothing, background_color_legend = nothing,
+		markersize = 5, color = cols
+	)
 end
 joint_retrieval_plots = plot(retrieval_plots..., layout = (1, length(priors)), size = (400length(priors), 400))
 joint_retrieval_plots_2x2 = plot(retrieval_plots..., layout = (2, 2), size = (800, 800))
 
+joint_retrieval_plots_full_bb = plot(retrieval_plots[[1, 3]]..., layout = (1, 2), size = (400*2, 400), bottom_margin = 5mm, left_margin = 5mm)
+
 savefig(joint_trace_plots, "figures/demo_proportions_trace_plots.pdf")
 savefig(joint_retrieval_plots, "figures/demo_proportions_retrieval_plots.pdf")
 savefig(joint_retrieval_plots_2x2, "figures/demo_proportions_retrieval_plots_2x2.pdf")
+savefig(joint_retrieval_plots_full_bb, "figures/demo_proportions_retrieval_plots_full_bb.pdf")
 
 # count visited models
 visited = map(zip(priors, fits)) do (prior, fit)
@@ -156,3 +162,14 @@ visited = map(zip(priors, fits)) do (prior, fit)
 end
 
 visited[4][1]
+
+distinguishable_colors(8, [RGB(1,1,1), RGB(0,0,0)], dropseed=true)
+
+vars = 1:10
+cols = distinguishable_colors(length(vars), [RGB(1,1,1), RGB(0,0,0)], dropseed=true)
+pcols = map(col -> (red(col), green(col), blue(col)), cols)
+xs = 0:12
+for i in vars
+    plot(xs, map(x -> rand() + 0.1x - 0.5i, xs), c = pcols[i])
+end
+legend(vars, loc="upper right", bbox_to_anchor=[1.1, 1.])

@@ -112,6 +112,101 @@ end
 
 #endregion
 
+#region BetaBinomialProcessMvUrnDistribution
+struct BetaBinomialProcessMvUrnDistribution{T <: Integer} <: AbstractMvUrnDistribution{T}
+	k::T
+	α::Float64
+	β::Float64
+	_log_model_probs_by_incl::Vector{Float64}
+	function BetaBinomialProcessMvUrnDistribution(k::T, α::Float64 = 1.0, β::Float64 = 1.0) where T<:Integer
+		log_model_probs_by_incl = Distributions.logpdf.(Distributions.BetaBinomial(k - 1, α, β), 0:k - 1) .- log_expected_inclusion_counts(k)
+		new{T}(k, α, β, log_model_probs_by_incl)
+	end
+end
+
+function BetaBinomialProcessMvUrnDistribution(k::Integer, α::Number, β::Number = 1.0)
+	BetaBinomialProcessMvUrnDistribution(k, convert(Float64, α), convert(Float64, β))
+end
+
+log_model_probs_by_incl(d::BetaBinomialProcessMvUrnDistribution) = d._log_model_probs_by_incl
+function logpdf_model_distinct(d::BetaBinomialProcessMvUrnDistribution, no_equalities::Integer)
+	in_eqsupport(d, no_equalities) || return -Inf
+	log_model_probs_by_incl(d)[no_equalities + 1]
+end
+
+function logpdf_incl(d::BetaBinomialProcessMvUrnDistribution, no_equalities::Integer)
+	in_eqsupport(d, no_equalities) || return -Inf
+	log_model_probs_by_incl(d)[no_equalities + 1]
+end
+
+function _pdf_helper!(result, d::BetaBinomialProcessMvUrnDistribution, index, complete_urns)
+
+	k = length(result)
+	if isone(index)
+		fill!(result, 1 / k)
+		return
+	end
+
+	index_already_sampled = 1:index - 1
+	n0 = k
+
+	# no_duplicated = count_equalities(view(urns, index_already_sampled))
+	v_known_urns = view(complete_urns, index_already_sampled)
+	r = length(Set(v_known_urns))
+	n = n0 - (index - r - 1)
+
+	model_probs_by_incl = exp.(EqualitySampler.log_model_probs_by_incl(d))
+
+	num = r * sum(model_probs_by_incl[k] * stirlings2r(n - 1, n0 - k + 1, r    ) for k in 1:n0)
+	den =     sum(model_probs_by_incl[k] * stirlings2r(n    , n0 - k + 1, r + 1) for k in 1:n0)
+	probEquality = num / (num + den)
+
+	# probability of an equality
+	current_counts = countmap(v_known_urns)
+	total_counts = sum(values(current_counts))
+	for (key, val) in current_counts
+		result[key] = probEquality * val / total_counts
+	end
+
+	# probability of an inequality
+	no_inequality_options = (k - length(current_counts)) #length(current_counts) == the number of distinct elements in v_known_urns
+	for i in 1:k
+		if i ∉ v_known_urns
+			result[i] = (1.0 - probEquality) / no_inequality_options
+		end
+	end
+	# inequality_options = setdiff(1:n0, v_known_urns)
+	# result[inequality_options] .= (1.0 - probEquality) ./ length(inequality_options)
+
+	return result
+
+end
+
+function logpdf_model_distinct(d::BetaBinomialProcessMvUrnDistribution, x::AbstractVector{<:Integer})
+
+	# TODO: this is not correct!
+	# logpdf_model_distinct(d, count_equalities(x))
+
+	target_size = n - x
+	f! = x->filter!(y->length(y) == target_size, x)
+	counts, sizes = count_set_partitions_given_partition_size(f!, n)
+
+	res = U(0.0)
+	for i in eachindex(counts)#idx
+		v = length(sizes[i]) * log(M) +
+			SpecialFunctions.logabsgamma(M)[1] -
+			SpecialFunctions.logabsgamma(M + n)[1] +
+			sum(x->SpecialFunctions.logabsgamma(x)[1], sizes[i])
+
+		res += counts[i] * v
+	end
+	return res / sum(counts)
+
+end
+
+
+#endregion
+
 struct RandomProcessMvUrnDistribution{RPM <: Turing.RandomMeasures.AbstractRandomProbabilityMeasure, T <: Integer} <: AbstractMvUrnDistribution{T}
 	k::T
 	rpm::RPM

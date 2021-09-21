@@ -111,3 +111,46 @@ examine whether DPP prior is not horribly slow!
 	- [x] x-axis titles and y-axis titles are missing
 	- [x] rotate x-axis tick labels by 30 degrees
 	- [x] Bonus: make y-axis go to 0.2 where possible
+
+
+# 16-09-2021
+
+- [ ] Paper
+	- [ ] Figure out whether the prediction rule for a Beta-binomial is always a uniform,
+		when drawing the last value conditional on the others.
+	- [ ] Try out the Beta-binomial with the prediction rule from the DPP
+	- [ ] Rewrite section 3.3 to be more clear
+	- [ ] Cut Figure 7
+
+- [ ] Julia
+	- [ ] Look at simplifying the Turing model
+		- [ ] Beta-binomial with weighted categorical jump
+		- [ ] Remove pdf of Urn models from the Turing model (since we already use it in the Gibbs step)
+	- [ ] Remake figure 2 with new Beta-binomial with weighted categorical jump
+	- [ ] Figure 3
+		- [ ] the x-axis of the top figures don't start at 0.
+		- [ ] double check the y-axis of the DPP
+		- [ ] Beta-binomial 5.00 should be 30?
+		- [ ] Why is the DPP alpha not equal to 0.5?
+		- [ ] Increase line thickness and font size
+		- [ ] Legend do p(#9) / p(#10) instead of "10 inequalities added"
+		- [ ] DPP: double check if the prior odds are 1 / \alpha.
+		- [ ] x-axis label: "Number of groups"
+	- [ ] Figure 4
+		- [ ] rerun with more iterations (200)
+		- [ ] side by side
+			- [ ] Left: current figure
+			- [ ] Right: Rate of errors #errors / #total possible errors
+			- [ ] Legend: Change # groups for K
+	- [ ] Figure 5
+		- [ ] k in \alpha = k should be capitalized
+		- [ ] increase font size
+		- [ ] also compute rate of errors
+	- [ ] Big simulation study
+		- [ ] Add 0 % as a category (e.g., H0)
+		- [ ] Change K = 10 => K = 9
+		- [ ] Remove from the simulation:
+			- BB(1, 1)
+			- DPP(1)
+			- DPP(Gopalan & Berry)
+
