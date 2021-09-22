@@ -159,22 +159,45 @@ function _pdf_helper!(result, d::BetaBinomialProcessMvUrnDistribution, index, co
 
 	num = r * sum(model_probs_by_incl[k] * stirlings2r(n - 1, n0 - k + 1, r    ) for k in 1:n0)
 	den =     sum(model_probs_by_incl[k] * stirlings2r(n    , n0 - k + 1, r + 1) for k in 1:n0)
-	probEquality = num / (num + den)
+	# raw_probEquality = num / (num + den)
 
-	# probability of an equality
+	# num_adj = num * (index - 1) / den
+	num_adj = den * (index - 1) / num
+	den_adj = num_adj + index - 1
+	# num_adj satisfies that num_adj / (num_adj + den + j) == num / (num + den)
+	@assert 1.0 - num_adj / den_adj ≈ num / (num + den)
+
+	prob_inequality = num_adj / den_adj
+	# prob_equality   = 1 -
+
 	current_counts = countmap(v_known_urns)
-	total_counts = sum(values(current_counts))
-	for (key, val) in current_counts
-		result[key] = probEquality * val / total_counts
-	end
-
-	# probability of an inequality
-	no_inequality_options = (k - length(current_counts)) #length(current_counts) == the number of distinct elements in v_known_urns
+	no_inequality_options = (k - length(current_counts))
 	for i in 1:k
-		if i ∉ v_known_urns
-			result[i] = (1.0 - probEquality) / no_inequality_options
+		if haskey(current_counts, i)
+			# probability of an equality
+			result[i] = current_counts[i] / den_adj
+		else
+			# probability of an inequality
+			result[i] = prob_inequality / no_inequality_options
 		end
 	end
+	@assert sum(result[collect(keys(current_counts))]) ≈ num / (num + den)
+	@assert sum(result) ≈ 1.0
+	# # TODO: merge the two loops below into one?
+	# # probability of an equality
+	# current_counts = countmap(v_known_urns)
+	# total_counts = index - 1
+	# for (key, val) in current_counts
+	# 	result[key] = probEquality * val / total_counts
+	# end
+
+	# # probability of an inequality
+	# no_inequality_options = (k - length(current_counts)) #length(current_counts) == the number of distinct elements in v_known_urns
+	# for i in 1:k
+	# 	if i ∉ v_known_urns
+	# 		result[i] = (1.0 - probEquality) / no_inequality_options
+	# 	end
+	# end
 	# inequality_options = setdiff(1:n0, v_known_urns)
 	# result[inequality_options] .= (1.0 - probEquality) ./ length(inequality_options)
 
