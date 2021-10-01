@@ -179,6 +179,8 @@ for i in axes(obs, 2)
 	end
 end
 
+
+
 length.(values(obs_structure_dict))
 mean(view(obs_all_model_probs, obs_structure_dict[1]))
 
@@ -212,6 +214,38 @@ hcat(join.(eachcol(all_models[:, all_models_structure_dict[4]])),
 d_dirichlet = DirichletProcessMvUrnDistribution(k, .5)
 pdf_model_distinct(d_dirichlet, [1, 1, 1, 2])
 pdf_model_distinct(d_dirichlet, [1, 1, 3, 1])
+
+function test_ratio(d)
+	EqualitySampler._pdf_helper(d, 3, [1, 1, 1, 2])[1] * EqualitySampler._pdf_helper(d, 4, [1, 1, 1, 2])[2] /
+	(EqualitySampler._pdf_helper(d, 3, [1, 1, 2, 1])[2] * EqualitySampler._pdf_helper(d, 4, [1, 1, 2, 1])[1])
+end
+
+test_ratio(d_betabinomial_process)
+EqualitySampler._pdf_helper(d_betabinomial_process, 3, [1, 1, 1, 2])
+EqualitySampler._pdf_helper(d_betabinomial_process, 4, [1, 1, 1, 2])
+
+EqualitySampler._pdf_helper(d_betabinomial_process, 3, [1, 1, 2, 1])
+EqualitySampler._pdf_helper(d_betabinomial_process, 4, [1, 1, 2, 1])
+
+(
+	EqualitySampler._pdf_helper(d_betabinomial_process, 3, [1, 1, 1, 2])[1] *
+	EqualitySampler._pdf_helper(d_betabinomial_process, 4, [1, 1, 1, 2])[2]
+) / (
+	EqualitySampler._pdf_helper(d_betabinomial_process, 3, [1, 1, 2, 1])[2] *
+	EqualitySampler._pdf_helper(d_betabinomial_process, 4, [1, 1, 2, 1])[1]
+)
+xx = (
+	EqualitySampler._pdf_helper(d_betabinomial_process, 3, [1, 1, 1, 2])[1] *
+	EqualitySampler._pdf_helper(d_betabinomial_process, 4, [1, 1, 1, 2])[2]
+) / EqualitySampler._pdf_helper(d_betabinomial_process, 3, [1, 1, 2, 1])[2]
+
+
+d_betabinomial = BetaBinomialMvUrnDistribution(4)
+test_ratio(d_betabinomial)
+
+pdf_model_distinct(d_betabinomial, [1, 1, 2, 1])
+pdf_model_distinct(d_betabinomial, [1, 1, 1, 2])
+
 
 function sample_dirichlet_manual(n, k, α)
 	result = Matrix{Int}(undef, k, n)

@@ -273,3 +273,28 @@ for (k, v) in tb
 	probs[k] = v / tb_sum
 end
 probs # this looks correct!
+
+
+
+plot(1:k, pdf_incl.(DirichletProcessMvUrnDistribution(k, 1 / k), 1:k))
+
+
+k = 10
+Plots.plot(0:k-1, pdf_incl.(Ref(BetaBinomialMvUrnDistribution(k, k, 1.0)), k-1:-1:0))
+
+k = 10
+Plots.plot(0:k-1, pdf_incl.(Ref(DirichletProcessMvUrnDistribution(k, 0.48)), k-1:-1:0))
+
+k=5
+pdf_incl.(Ref(DirichletProcessMvUrnDistribution(k, 0.48)),  k-1:-1:0)
+
+pdf_incl.(Ref(DirichletProcessMvUrnDistribution(k, 0.355)), k-1:-1:0)
+
+(k^2 + k - 1) / (k^2 + k) / 2
+
+pm0(α, k) = α * factorial(k - 1) / prod(α + j - 1 for j in 1:k)
+pmB(α, k) = α ^ k / prod(α + j - 1 for j in 1:k)
+
+pm0(.48, 5)
+pmB(.48, 5)
+

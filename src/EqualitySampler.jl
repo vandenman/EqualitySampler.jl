@@ -6,6 +6,7 @@ import StatsBase: countmap
 import OrderedCollections: OrderedDict
 import Turing, Turing.RandomMeasures
 import Combinatorics
+import Statistics
 
 # for BayesFactor
 import QuadGK
@@ -13,6 +14,10 @@ import QuadGK
 export
 	NormalSuffStat,
 	MvNormalSuffStat,
+	MvNormalDenseSuffStat,
+	MvNormalCholDenseSuffStat,
+	get_normal_dense_suff_stats,
+	get_normal_dense_chol_suff_stats,
 	AbstractConditionalUrnDistribution,
 	UniformConditionalUrnDistribution,
 	BetaBinomialConditionalUrnDistribution,
