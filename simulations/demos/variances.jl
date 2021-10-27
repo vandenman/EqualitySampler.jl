@@ -1,3 +1,9 @@
+#=
+
+	TODO: use the functions from EqualitySampler now that they're in the package!
+
+=#
+
 using EqualitySampler, Turing, Plots, FillArrays, Plots.PlotMeasures, Colors
 using Chain
 using MCMCChains
@@ -6,14 +12,98 @@ import	DataFrames		as DF,
 		LinearAlgebra	as LA,
 		NamedArrays		as NA,
 		CSV
-import DynamicPPL: @submodel
+import DynamicPPL: @submodel, VarInfo
+import Distributions
 
 import Printf
 round_2_decimals(x::Number) = Printf.@sprintf "%.2f" x
 round_2_decimals(x) = x
 
-include("simulations/silentGeneratedQuantities.jl")
-include("simulations/helpersTuring.jl")
+# include("simulations/helpersTuring.jl")
+# function parameters_to_vec(partition, nt)
+# 	v = Vector{Float64}(undef, sum(length, nt))
+# 	start = 1
+# 	for (key::Symbol, val::Union{Float64, Vector{Float64}, Vector{Int}}) in zip(keys(nt), nt)
+# 		if key === :partition
+# 			v[start:start+length(partition) - 1] .= Float64.(partition)
+# 			start += length(partition) - 1
+# 		else
+# 			if val isa Vector{Float64}
+# 				v[start:start+length(val) - 1] .= val
+# 				start += length(val) - 1
+# 			elseif val isa Float64
+# 				v[start] = val
+# 				start += 1
+# 			else
+# 				throw(DomainError("unexpected type in tuple", nt))
+# 			end
+# 		end
+# 	end
+# 	return v
+# end
+
+# function get_logπ(model, other_params)
+# 	vari = VarInfo(model)
+# 	logπ_internal = Turing.Inference.gen_logπ(vari, DynamicPPL.SampleFromPrior(), model)
+# 	return function logπ(partition, nt)
+# 		# @show partition, nt
+# 		v = parameters_to_vec(partition, NamedTuple{other_params}(nt))
+# 		logπ_internal(v)
+# 	end
+# end
+
+# function get_logπ2(model)
+# 	vari = VarInfo(model)
+# 	return function logπ(partition, nt)
+# 		DynamicPPL.setval!(vari, partition, DynamicPPL.VarName(:partition))
+# 		for (key, val) in zip(keys(nt), nt)
+# 			if key !== :partition
+# 				DynamicPPL.setval!(vari, val, DynamicPPL.VarName(key))
+# 			end
+# 		end
+# 		DynamicPPL.logjoint(model, vari)
+# 	end
+# end
+
+function get_logπ(model)
+	vari = VarInfo(model)
+	mt = vari.metadata
+	return function logπ(partition, nt)
+		DynamicPPL.setval!(vari, partition, DynamicPPL.VarName(:partition))
+		for (key, val) in zip(keys(nt), nt)
+			if key !== :partition
+				indices = mt[key].vns
+				if !(val isa Vector)
+					DynamicPPL.setval!(vari, val, indices[1])
+				else
+					ranges = mt[key].ranges
+					for i in eachindex(indices)
+						DynamicPPL.setval!(vari, val[ranges[i]], indices[i])
+					end
+				end
+			end
+		end
+		DynamicPPL.logjoint(model, vari)
+	end
+end
+
+
+
+function average_equality_constraints!(ρ::AbstractVector{<:Real}, partition::AbstractVector{<:Integer})
+	idx_vecs = [Int[] for _ in eachindex(partition)]
+	@inbounds for i in eachindex(partition)
+		push!(idx_vecs[partition[i]], i)
+	end
+
+	@inbounds for idx in idx_vecs
+		isempty(idx) && continue
+		ρ[idx] .= mean(ρ[idx])
+	end
+	return ρ
+end
+
+average_equality_constraints(ρ::AbstractVector{<:Real}, partition::AbstractVector{<:Integer}) = average_equality_constraints!(copy(ρ), partition)
+
 
 function logpdf_mv_normal_suffstat(x̄, S, n, μ, Σ)
 	if !LA.isposdef(Σ)
@@ -61,8 +151,10 @@ data_w = permutedims(Matrix(df_w))
 # see https://github.com/TuringLang/Turing.jl/issues/1629
 quad_form_diag(M, v) = LA.Symmetric((v .* v') .* (M .+ M') ./ 2)
 
-# although a MANOVA means "Multiple Analysis of Variance", here we mean that we compare the variance
+# although MANOVA means "Multiple Analysis of Variance", here we mean that we are actually comparing variances and not means
 @model function varianceMANOVA(data_m, data_w, η = 1.0)
+
+	# this model specification does not work because the
 
 	n_m, n_w = size(data_m, 2), size(data_w, 2)
 	p = size(data_m, 1)
@@ -81,7 +173,7 @@ quad_form_diag(M, v) = LA.Symmetric((v .* v') .* (M .+ M') ./ 2)
 	σ_m = τ .* view(ρ,   1: p)
 	σ_w = τ .* view(ρ, p+1:2p)
 
-	# TODO: form the cholesky decompositions instead of full covariance matrices?
+	# this fails in Turing, it's better to form the cholesky decompositions instead of the full covariance matrices
 	Σ_m = quad_form_diag(R_m, σ_m)
 	Σ_w = quad_form_diag(R_w, σ_w)
 
@@ -97,19 +189,60 @@ quad_form_diag(M, v) = LA.Symmetric((v .* v') .* (M .+ M') ./ 2)
 	for i in 1:n_w
 		data_w[:, i] ~ MvNormal(μ_w, Σ_w)
 	end
-	# for col in eachcol(data_m)
-	# 	col ~ MvNormal(μ_m, Σ_m)
-	# end
-
-	# for col in eachcol(data_w)
-	# 	col ~ MvNormal(μ_w, Σ_w)
-	# end
 
 	return (σ_m, σ_w, Σ_m, Σ_w)
 
 end
 
-@model function varianceMANOVA_suffstat(obs_mean_m, obs_cov_chol_m, n_m, obs_mean_w, obs_cov_chol_w, n_w, η = 1.0, ::Type{T} = Float64) where T
+# @model function manual_lkj(K, eta, give_cholesky::Bool = true, ::Type{T} = Float64) where T
+@model function manual_lkj(K, eta, ::Type{T} = Float64) where T
+
+	alpha = eta + (K - 2) / 2
+	r_tmp ~ Beta(alpha, alpha)
+
+	r12 = 2 * r_tmp - 1
+	R = Matrix{T}(undef, K, K)
+	R[1, 1] = one(T)
+	R[1, 2] = r12
+	R[2, 2] = sqrt(one(T) - r12^2.0)
+
+	if K > 2
+
+		y = Vector{T}(undef, K-2)
+		z = Vector{Vector{T}}(undef, K-2)
+		# @show y, z
+		for m in 2:K-1
+
+			i = m - 1
+			alpha -= 0.5
+			y[i] ~ Beta(m / 2, alpha)
+			z[i] ~ MvNormal(ones(m))
+
+			R[1:m, m+1] .= sqrt(y[i]) .* z[i] ./ LA.norm(z[i])
+			# does not work because of https://github.com/JuliaDiff/ForwardDiff.jl/issues/175
+			# R[1:m, m+1] .= sqrt(y[i]) .* LA.normalize(z[i])
+			R[m+1, m+1] = sqrt(1 - y[i])
+
+		end
+	end
+
+	# return give_cholesky ? LA.UpperTriangular(R) : LA.UpperTriangular(R)'LA.UpperTriangular(R)
+	return LA.UpperTriangular(R)
+
+end
+
+mod_manual_LKJ = manual_lkj(5, 1.0)
+spl = NUTS()
+chn = sample(mod_manual_LKJ, spl, 100)
+
+# see https://discourse.julialang.org/t/turing-jl-warnings-when-running-generated-quantities/64698/2
+gen = generated_quantities(mod_manual_LKJ, Turing.MCMCChains.get_sections(chn, :parameters))
+gen[1]'gen[1]
+# Rs = map(x-> x'x, gen) # all correlation matrices
+
+
+@model function varianceMANOVA_suffstat(obs_mean_m, obs_cov_chol_m, n_m, obs_mean_w, obs_cov_chol_w, n_w,
+					partition = nothing, η = 1.0, ::Type{T} = Float64) where T
 
 	p = size(data_m, 1)
 
@@ -119,22 +252,16 @@ end
 	ρ ~ Dirichlet(ones(2p))
 	τ ~ InverseGamma(0.1, 0.1)
 
-	# apply the equality model here to ρ.
-	σ_m = τ .* view(ρ,   1: p)
-	σ_w = τ .* view(ρ, p+1:2p)
+	ρ_constrained = isnothing(partition) ? ρ : average_equality_constraints(ρ, partition)
 
-	# TODO: form the cholesky decompositions instead of full covariance matrices?
-	# R_m ~ LKJ(p, η)
-	# R_w ~ LKJ(p, η)
-	# Σ_m = quad_form_diag(R_m, σ_m)
-	# Σ_w = quad_form_diag(R_w, σ_w)
+	σ_m = τ .* view(ρ_constrained,   1: p)
+	σ_w = τ .* view(ρ_constrained, p+1:2p)
 
-	R_chol_m = @submodel $(Symbol("manual_lkj")) manual_lkj(p, 1.0, false, T)
-	R_chol_w = @submodel $(Symbol("manual_lkj")) manual_lkj(p, 1.0, false, T)
+	R_chol_m = @submodel $(Symbol("manual_lkj")) manual_lkj(p, η, T)
+	R_chol_w = @submodel $(Symbol("manual_lkj")) manual_lkj(p, η, T)
 	Σ_chol_m = LA.UpperTriangular(R_chol_m * LA.Diagonal(σ_m))
 	Σ_chol_w = LA.UpperTriangular(R_chol_w * LA.Diagonal(σ_w))
 	if LA.det(Σ_chol_m) < eps(T) || LA.det(Σ_chol_w) < eps(T)
-		# @show R_chol_m, R_chol_w, σ_m, σ_w
 		Turing.@addlogprob! -Inf
 		return (σ_m, σ_w, Σ_chol_m, Σ_chol_w)
 	end
@@ -143,6 +270,16 @@ end
 	Turing.@addlogprob! logpdf_mv_normal_chol_suffstat(obs_mean_w, obs_cov_chol_w, n_w, μ_w, Σ_chol_w)
 
 	return (σ_m, σ_w, Σ_chol_m, Σ_chol_w)
+
+end
+
+@model function varianceMANOVA_suffstat_equality_selector(obs_mean_m, obs_cov_chol_m, n_m, obs_mean_w, obs_cov_chol_w, n_w,
+	partition_prior, η = 1.0, ::Type{T} = Float64) where T
+
+	partition ~ partition_prior
+	(σ_m, σ_w, Σ_chol_m, Σ_chol_w) = @submodel $(Symbol("varianceMANOVA_suffstat")) varianceMANOVA_suffstat(obs_mean_m, obs_cov_chol_m, n_m, obs_mean_w, obs_cov_chol_w, n_w, partition, η, T)
+
+	return (σ_m, σ_w, Σ_chol_m, Σ_chol_w, partition)
 
 end
 
@@ -165,14 +302,10 @@ LA.isposdef(obs_cov_w)
 
 # ff = Distributions.suffstats(Distributions.MvNormal, data_m)
 
-
-logpdf_mv_normal_suffstat(obs_mean_m, obs_cov_m, n_m, obs_mean_m, obs_cov_m)
-loglikelihood(MvNormal(obs_mean_m, obs_cov_m), data_m)
+@assert logpdf_mv_normal_suffstat(obs_mean_m, obs_cov_m, n_m, obs_mean_m, obs_cov_m) ≈ loglikelihood(MvNormal(obs_mean_m, obs_cov_m), data_m)
 
 mod_var_ss_full = varianceMANOVA_suffstat(obs_mean_m, obs_cov_chol_m, n_m, obs_mean_w, obs_cov_chol_w, n_w)
-spl = NUTS()#HMC(0.00, 20)
-chn = sample(mod_var_ss_full, spl, 1_000)
-
+chn_full = sample(mod_var_ss_full, NUTS(), 5_000)
 gen = generated_quantities(mod_var_ss_full, Turing.MCMCChains.get_sections(chn, :parameters))
 
 function triangular_to_vec(x::LA.UpperTriangular{T, Matrix{T}}) where T
@@ -187,7 +320,6 @@ function triangular_to_vec(x::LA.UpperTriangular{T, Matrix{T}}) where T
 	end
 	result
 end
-triangular_to_vec(Σ_chol_m)
 
 post_mean_μ_m      = vec(mean(group(chn, :μ_m).value.data, dims = 1))
 post_mean_μ_w      = vec(mean(group(chn, :μ_w).value.data, dims = 1))
@@ -196,75 +328,143 @@ post_mean_σ_w      = mean(x[2] for x in gen)
 post_mean_Σ_chol_m = mean(triangular_to_vec(x[3]) for x in gen)
 post_mean_Σ_chol_w = mean(triangular_to_vec(x[4]) for x in gen)
 
-hcat(post_mean_μ_m, obs_mean_m, post_mean_μ_m .- obs_mean_m)
-hcat(post_mean_μ_w, obs_mean_w, post_mean_μ_w .- obs_mean_w)
-hcat(post_mean_σ_m, obs_sd_m,   post_mean_σ_m .- obs_sd_m)
-hcat(post_mean_σ_w, obs_sd_w,   post_mean_σ_w .- obs_sd_w)
-hcat(post_mean_Σ_chol_m, obs_cov_chol_m, post_mean_Σ_chol_m .- obs_cov_chol_w)
-hcat(post_mean_Σ_chol_w, obs_cov_chol_w, post_mean_Σ_chol_w .- obs_cov_chol_m)
+temp_hcat(x, y) = hcat(x, y, x .- y)
 
-	vec(mean(group(chn, :μ_m).value.data, dims = 1)),
-	obs_mean_m
+temp_hcat(post_mean_μ_m, obs_mean_m)
+temp_hcat(post_mean_μ_w, obs_mean_w)
+temp_hcat(post_mean_σ_m, obs_sd_m)
+temp_hcat(post_mean_σ_w, obs_sd_w)
+temp_hcat(post_mean_Σ_chol_m, triangular_to_vec(obs_cov_chol_m))
+temp_hcat(post_mean_Σ_chol_w, triangular_to_vec(obs_cov_chol_w))
+
+
+
+partition_prior = BetaBinomialMvUrnDistribution(10, 10, 1)
+mod_var_ss_eq = varianceMANOVA_suffstat_equality_selector(obs_mean_m, obs_cov_chol_m, n_m, obs_mean_w, obs_cov_chol_w, n_w, partition_prior)
+
+# adapted from https://discourse.julialang.org/t/get-list-of-parameters-from-turing-model/66278/8
+continuous_params = filter(!=(:partition), DynamicPPL.syms(DynamicPPL.VarInfo(mod_var_ss_eq)))
+spl = Gibbs(
+	HMC(0.0, 20, continuous_params...),
+	GibbsConditional(:partition, EqualitySampler.PartitionSampler(10, get_logπ(mod_var_ss_eq)))
 )
-vec(gen[1][3])
-hcat(
-	mean(triangular_to_vec(x[3]) for x in gen),
-	triangular_to_vec(obs_cov_chol_m)
-)
-hcat(
-	mean(triangular_to_vec(x[4]) for x in gen),
-	triangular_to_vec(obs_cov_chol_w)
-)
+chn = sample(mod_var_ss_eq, spl, 1000)
+gen = generated_quantities(mod_var_ss_eq, Turing.MCMCChains.get_sections(chn, :parameters))
 
-
-(R_chol_m, R_chol_w, σ_m, σ_w) = ([1.0 -0.13700879180205505 -0.08709729528087903 -0.3526799851828268 -0.16609925852289315; -0.13700879180205505 1.0 0.7407414513582602 -0.31073702850840296 0.30865624629527866; -0.08709729528087903 0.7407414513582602 1.0000000000000002 -0.7602533797542129 -0.15000458911847728; -0.3526799851828268 -0.31073702850840296 -0.7602533797542129 0.9999999999999997 0.3900196787215228; -0.16609925852289315 0.30865624629527866 -0.15000458911847728 0.3900196787215228 1.0], [1.0 0.5962534059779934 -0.6800277351005118 -0.6052380263598311 0.47085671210089225; 0.5962534059779934 1.0 -0.4905423968004018 -0.5554234031799439 0.4034820781085538; -0.6800277351005118 -0.4905423968004018 1.0 0.5475132489358331 -0.2224925538132741; -0.6052380263598311 -0.5554234031799439 0.5475132489358331 1.0 -0.023161513325564098; 0.47085671210089225 0.4034820781085538 -0.2224925538132741 -0.023161513325564098 1.0000000000000002], [2.035829896214002, 0.08430108193964772, 0.05838618921404039, 0.64830633613398, 0.09253287689002059], [0.2177831522501285, 0.4199858167724204, 0.35158292355918797, 0.532944130429116, 0.09521255833014333])
-
-mod_var_full = varianceMANOVA(data_m, data_w)
-spl = HMC(0.01, 10)
-chn = sample(mod_var_full, spl, 1_000)
-
-
-@model function manual_lkj(K, eta, give_cholesky::Bool = true, ::Type{T} = Float64) where T
-
-	alpha = eta + (K - 2) / 2
-	r_tmp ~ Beta(alpha, alpha)
-
-	r12 = 2 * r_tmp - 1
-	R = Matrix{T}(undef, K, K)
-	R[1, 1] = one(T)
-	R[1, 2] = r12
-	R[2, 2] = sqrt(one(T) - r12^2)
-
-	if K > 2
-
-		y = Vector{T}(undef, K-2)
-		z = Vector{Vector{T}}(undef, K-2)
-
-		for m in 2:K-1
-
-			i = m - 1
-			alpha -= 0.5
-			y[i] ~ Beta(m / 2, alpha)
-			z[i] ~ MvNormal(ones(m))
-
-			R[1:m, m+1] .= sqrt(y[i]) .* z[i] ./ sqrt(sum(x->x^2, z[i]))
-			R[m+1, m+1] = sqrt(1 - y[i])
-
-		end
-	end
-
-	return give_cholesky ? LA.UpperTriangular(R) : LA.UpperTriangular(R)'LA.UpperTriangular(R)
-
+partition_samples = Matrix{Int}(undef, length(gen[1][end]), length(gen))
+for i in eachindex(gen)
+	partition_samples[:, i] .= reduce_model(gen[i][end])
 end
 
-mod_manual_LKJ = manual_lkj(5, 1.0)
-spl = HMC(0.0, 20)# NUTS()
-chn = sample(mod_manual_LKJ, spl, 100)
 
-# see https://discourse.julialang.org/t/turing-jl-warnings-when-running-generated-quantities/64698/2
-gen = generated_quantities(mod_manual_LKJ, Turing.MCMCChains.get_sections(chn, :parameters))
-gen[1]'gen[1]
-# Rs = map(x-> x'x, gen) # all correlation matrices
+# let's test the model on simulated data
+n, p = 1000, 5
+
+μ_1 = randn(p)
+μ_2 = randn(p)
+τ   = 1.0
+partition = rand(UniformMvUrnDistribution(2p))
+ρ_constrained = average_equality_constraints(rand(Dirichlet(ones(2p))), partition)
+σ_1, σ_2 = τ .* view(ρ_constrained,   1: p), τ .* view(ρ_constrained, p+1:2p)
+
+R_chol_1, R_chol_2 = rand(Distributions.LKJCholesky(p, 1.0), 2)
+Σ_chol_1, Σ_chol_2 = LA.UpperTriangular(R_chol_1.U * LA.Diagonal(σ_1)), LA.UpperTriangular(R_chol_2.U * LA.Diagonal(σ_2))
+Σ_1, Σ_2 = Σ_chol_1'Σ_chol_1, Σ_chol_2'Σ_chol_2
+
+D_1, D_2 = MvNormal(μ_1, Σ_1), MvNormal(μ_2, Σ_2)
+data_1, data_2 = rand(D_1, n), rand(D_2, n)
+
+obs_mean_1, obs_cov_1, n_1 = get_suff_stats(data_1)
+obs_mean_2, obs_cov_2, n_2 = get_suff_stats(data_2)
+obs_sd_1 = sqrt.(LA.diag(obs_cov_1))
+obs_sd_2 = sqrt.(LA.diag(obs_cov_2))
+obs_cov_chol_1 = LA.cholesky(obs_cov_1).U
+obs_cov_chol_2 = LA.cholesky(obs_cov_2).U
+
+mod_var_ss_full = varianceMANOVA_suffstat(obs_mean_1, obs_cov_chol_1, n_1, obs_mean_2, obs_cov_chol_2, n_2)
+chn_full = sample(mod_var_ss_full, NUTS(), 2_000)
+gen = generated_quantities(mod_var_ss_full, Turing.MCMCChains.get_sections(chn, :parameters))
+
+post_mean_μ_1      = vec(mean(group(chn, :μ_m).value.data, dims = 1))
+post_mean_μ_2      = vec(mean(group(chn, :μ_w).value.data, dims = 1))
+post_mean_σ_1      = mean(x[1] for x in gen)
+post_mean_σ_2      = mean(x[2] for x in gen)
+post_mean_Σ_chol_1 = mean(triangular_to_vec(x[3]) for x in gen)
+post_mean_Σ_chol_2 = mean(triangular_to_vec(x[4]) for x in gen)
+
+temp_hcat(x, y) = hcat(x, y, x .- y)
+
+temp_hcat(post_mean_μ_1, obs_mean_1)
+temp_hcat(post_mean_μ_2, obs_mean_2)
+temp_hcat(post_mean_σ_1, obs_sd_1)
+temp_hcat(post_mean_σ_2, obs_sd_2)
+temp_hcat(post_mean_Σ_chol_1, triangular_to_vec(obs_cov_chol_1))
+temp_hcat(post_mean_Σ_chol_2, triangular_to_vec(obs_cov_chol_2))
+
+temp_hcat(post_mean_μ_1, μ_1)
+temp_hcat(post_mean_μ_2, μ_2)
+temp_hcat(post_mean_σ_1, σ_1)
+temp_hcat(post_mean_σ_2, σ_2)
+temp_hcat(post_mean_Σ_chol_1, triangular_to_vec(Σ_chol_1))
+temp_hcat(post_mean_Σ_chol_2, triangular_to_vec(Σ_chol_2))
+
+
+@model function gdemo_0(z0)
+	x  ~ Normal(0, 1)
+	z0 ~ Normal(x, 1)
+	return x
+end
+
+@model function gdemo_1(z1)
+	x = @submodel gdemo_0 gdemo_0(z1)
+	y ~ Normal(0, 1)
+	z1 ~ Normal(x + y)
+	return x, y
+end
+
+@model function gdemo_2(z2)
+	x, y = @submodel gdemo_1 gdemo_1(z2)
+	z ~ Normal(0, 1)
+	z2 ~ Normal(x + y + z)
+	return x, y, z
+end
+
+# 0 submodels
+sample(gdemo_0(2), HMC(0.05, 20), 100)
+sample(gdemo_0(2), NUTS(), 100)
+
+
+# 1 nested submodel
+gdemo_1_instance = gdemo_1()
+spl = HMC(0.0, 20)
+chn = sample(gdemo_1_instance, spl, 100)
+gen = generated_quantities(gdemo_1_instance, Turing.MCMCChains.get_sections(chn, :parameters))
+
+# 1 nested submodel - gibbs sampler
+spl = Gibbs(HMC(0.05, 20, Symbol("gdemo_0.x")), HMC(0.05, 20, :y))
+chn = sample(gdemo_1_instance, spl, 100)
+
+# 2 nested submodels
+gdemo_2_instance = gdemo_2()
+spl = HMC(0.0, 20)
+chn = sample(gdemo_2_instance, spl, 100)
+
+# 2 nested submodel - gibbs sampler
+spl = Gibbs(HMC(0.05, 20, Symbol("gdemo_1.gdemo_0.x")), HMC(0.05, 20, Symbol("gdemo_1.y")), HMC(0.05, 20, :z))
+chn = sample(gdemo_2_instance, spl, 10)
+
+
+spl = Gibbs(
+	HMC(0.0, 20, Symbol("gdemo_2.gdemo_3.z")),
+	HMC(0.0, 20, Symbol("gdemo_2.y")),
+	HMC(0.0, 20, :z)
+)
+chn = sample(gdemo_1_instance, spl, 100)
+
+
+
+# not sure what was going on below here
+
 
 @model function mvnormal_manual(obs_mean, obs_cov_chol, n, ::Type{T} = Float64) where T
 
@@ -411,3 +611,122 @@ logpdf_mv_normal_chol_suffstat(obs_mean, obs_cov_chol, n, μ_test, Σ_chol)
 @btime logpdf_mv_normal_suffstat(obs_mean, obs_cov, n, μ_test, Σ_test)
 @btime logpdf_mv_normal_chol_suffstat(obs_mean, obs_cov_chol, n, μ_test, Σ_chol)
 #endregion
+
+
+@model function mmm(d, eta)
+	R ~ LKJCholesky(d, eta)
+end
+
+m_instance = mmm(3, 1.0)
+samps = sample(m_instance, NUTS(), 100)
+
+using LinearAlgebra
+import DynamicPPL, Bijectors
+### ---------------- DynamicPPL stuff -----------------------------
+
+DynamicPPL.vectorize(d::LKJCholesky, r::Cholesky) =  copy(vec( r.factors ))
+
+
+function DynamicPPL.reconstruct(d::LKJCholesky, val::AbstractVector)
+    return  LinearAlgebra.Cholesky(reshape(copy(val), size(d)), 'L', 0)
+end
+
+
+
+### ---------------- Bijector stuff -----------------------------
+
+struct LKJCholBijector <: Bijector{2} end
+
+function (b::LKJCholBijector)(x::Cholesky)
+    return LinearAlgebra.Cholesky(Array(_link_w_lkj_chol(x.U.data)') + zero(x.U.data), 'L', 0)
+end
+
+(b::LKJCholBijector)(X::AbstractArray{<:Cholesky}) = map(b, X)
+
+function (ib::Inverse{<:LKJCholBijector})(y::Cholesky)
+    return LinearAlgebra.Cholesky(Array(_inv_link_w_lkj_chol(y.U.data)'), 'L', 0)
+end
+
+(ib::Inverse{<:LKJCholBijector})(Y::AbstractArray{<:Cholesky}) = map(ib, Y)
+
+
+function Bijectors.logabsdetjac(::Inverse{LKJCholBijector}, y::Cholesky)
+    K = LinearAlgebra.checksquare(y)
+
+    result = float(zero(eltype(y)))
+    for j in 2:K, i in 1:(j - 1)
+        @inbounds abs_y_i_j = abs((y.L)[i, j])
+        result += (K - i + 1) * (logtwo - (abs_y_i_j + StatsFuns.log1pexp(-2 * abs_y_i_j)))
+    end
+
+    return result
+end
+function Bijectors.logabsdetjac(b::LKJCholBijector, X::Cholesky)
+    #=
+    It may be more efficient if we can use un-contraint value to prevent call of b
+    It's recommended to directly call
+    `logabsdetjac(::Inverse{CorrBijector}, y::AbstractMatrix{<:Real})`
+    if possible.
+    =#
+    return -Bijectors.logabsdetjac(inv(b), (b(X)))
+end
+function Bijectors.logabsdetjac(b::LKJCholBijector, X::AbstractArray{<:Cholesky})
+    return Bijectors.mapvcat(X) do x
+        Bijectors.logabsdetjac(b, x)
+    end
+end
+
+
+
+
+function _inv_link_w_lkj_chol(y)
+    K = LinearAlgebra.checksquare(y)
+    w = zero(y)
+
+    @inbounds for j in 1:K
+        w[1, j] = 1
+        for i in 2:j
+            z = tanh(y[i-1, j])
+            tmp = w[i-1, j]
+
+            w[i-1, j] = z * tmp
+
+            w[i, j] = tmp * sqrt(1 - min(typeof(z)(oneminsq), z^2))
+        end
+        for i in (j+1):K
+            w[i, j] = 0
+        end
+    end
+    return w
+end
+
+
+function _link_w_lkj_chol(w)
+    K = LinearAlgebra.checksquare(w)
+
+    z = similar(w) # z is also UpperTriangular.
+    # Some zero filling can be avoided. Though diagnoal is still needed to be filled with zero.
+
+    # This block can't be integrated with loop below, because w[1,1] != 0.
+    @inbounds z[1, 1] = 0
+
+    @inbounds for j=2:K
+        tmp_w = max(typeof(w[1,j])(-onemin), min(typeof(w[1,j])(onemin), w[1, j]))
+        z[1, j] = atanh(tmp_w)
+        tmp = sqrt(1 - tmp_w^2)
+        for i in 2:(j - 1)
+            p = w[i, j] / tmp
+            p = max(typeof(p)(-onemin), min(typeof(p)(onemin), p))
+
+            tmp *= sqrt(1 - p^2)
+            z[i, j] = atanh(p)
+        end
+        z[j, j] = 0
+    end
+    return z
+end
+
+Bijectors.bijector(d::LKJCholesky) = LKJCholBijector()
+
+
+Turing.Utilities.FlattenIterator(name, value::Cholesky) = Turing.Utilities.FlattenIterator(Symbol(name), Array(value.L))

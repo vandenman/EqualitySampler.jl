@@ -118,7 +118,7 @@ examine whether DPP prior is not horribly slow!
 - [ ] Paper
 	- [ ] Figure out whether the prediction rule for a Beta-binomial is always a uniform,
 		when drawing the last value conditional on the others.
-	- [ ] Try out the Beta-binomial with the prediction rule from the DPP
+	- [x] Try out the Beta-binomial with the prediction rule from the DPP
 	- [ ] Rewrite section 3.3 to be more clear
 	- [ ] Cut Figure 7
 
@@ -126,7 +126,8 @@ examine whether DPP prior is not horribly slow!
 	- [ ] Look at simplifying the Turing model
 		- [ ] Beta-binomial with weighted categorical jump
 		- [ ] Remove pdf of Urn models from the Turing model (since we already use it in the Gibbs step)
-	- [ ] Remake figure 2 with new Beta-binomial with weighted categorical jump
+	- [x] Remake figure 2 with new Beta-binomial with weighted categorical jump
+		- [x] did not work out
 	- [ ] Figure 3
 		- [ ] the x-axis of the top figures don't start at 0.
 		- [ ] double check the y-axis of the DPP

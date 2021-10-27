@@ -2,24 +2,16 @@
 # just a hack for GibbsConditional
 
 mutable struct PartitionSampler <: Distributions.DiscreteMultivariateDistribution
-	# counter::Int
 	size::Int
 	nextValues::Vector{Int}
 	logposterior::Function
-	# PartitionSampler(size::Int, logposterior::Function) = new(0, size, ones(Int, size), logposterior)
 	PartitionSampler(size::Int, logposterior::Function) = new(size, ones(Int, size), logposterior)
 end
 
 Base.rand(::Random.AbstractRNG, d::PartitionSampler) = d.nextValues
 
 function (o::PartitionSampler)(c)
-	# @show c
-	# o.counter += 1
-	# if o.counter > length(c.partition)
-	# 	o.counter = 0
-	# end
 	o.nextValues = sample_next_values(c, o)
-
 	return o
 end
 
@@ -32,6 +24,7 @@ function sample_next_values(c, o)
 	cache_value = -Inf # defined here to extend the scope beyond the if statement and for loop
 
 	for j in eachindex(probvec)
+
 		# originalValue = nextValues[j]
 		for i in eachindex(probvec)
 
