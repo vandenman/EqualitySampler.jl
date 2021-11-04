@@ -16,6 +16,11 @@ import DynamicPPL: @submodel, VarInfo
 import Distributions
 
 import Printf
+
+#region functions
+
+include("simulations/helpersTuring.jl")
+
 round_2_decimals(x::Number) = Printf.@sprintf "%.2f" x
 round_2_decimals(x) = x
 
@@ -87,8 +92,6 @@ function get_logπ(model)
 	end
 end
 
-
-
 function average_equality_constraints!(ρ::AbstractVector{<:Real}, partition::AbstractVector{<:Integer})
 	idx_vecs = [Int[] for _ in eachindex(partition)]
 	@inbounds for i in eachindex(partition)
@@ -133,23 +136,141 @@ function logpdf_mv_normal_chol_suffstat(x̄, S_chol::LA.UpperTriangular, n, μ, 
 	)
 end
 
-big5_data = DF.DataFrame(CSV.File(joinpath("simulations", "demos", "data", "personality_variability.csv")))
-
-df_m = @chain big5_data begin
-	DF.filter(:sex => ==("male"), _)
-	DF.select(_, setdiff(names(_), vcat("sex", filter(startswith("self_"), names(_)))))
-end
-
-df_w = @chain big5_data begin
-	DF.filter(:sex => ==("female"), _)
-	DF.select(_, setdiff(names(_), vcat("sex", filter(startswith("self_"), names(_)))))
-end
-
-data_m = permutedims(Matrix(df_m))
-data_w = permutedims(Matrix(df_w))
-
 # see https://github.com/TuringLang/Turing.jl/issues/1629
 quad_form_diag(M, v) = LA.Symmetric((v .* v') .* (M .+ M') ./ 2)
+
+get_suff_stats(x) = begin
+	n = size(x, 2)
+	obs_mean = vec(mean(x, dims = 2))
+	obs_cov  = cov(x') .* ((n - 1) / n)
+	return obs_mean, obs_cov, n
+end
+
+function triangular_to_vec(x::LA.UpperTriangular{T, Matrix{T}}) where T
+	# essentially vec(x) but without the zeros
+	p = size(x, 1)
+	result = Vector{T}(undef, p * (p + 1) ÷ 2)
+	idx = 1
+	for i in 1:p
+		for j in 1:i
+			result[idx] = x[j, i]
+			idx += 1
+		end
+	end
+	result
+end
+
+function extract_means_continuous_params(model, chn)
+
+	gen = generated_quantities(model, Turing.MCMCChains.get_sections(chn, :parameters))
+
+	vi = VarInfo(mod_var_ss_eq)
+	mt = vi.metadata
+	# handles submodels
+	mu_keys = sort(collect(filter(x->occursin("μ", string(x)), keys(mt))))
+
+	return (
+		μ_1 = vec(mean(group(chn, mu_keys[1]).value.data, dims = 1)),
+		μ_2 = vec(mean(group(chn, mu_keys[2]).value.data, dims = 1)),
+		σ_1 = mean(x[1] for x in gen),
+		σ_2 = mean(x[2] for x in gen),
+		Σ_1 = mean(triangular_to_vec(x[3]) for x in gen),
+		Σ_2 = mean(triangular_to_vec(x[4]) for x in gen)
+	)
+end
+
+function extract_partition_samples(model, chn)
+
+	gen = generated_quantities(model, Turing.MCMCChains.get_sections(chn, :parameters))
+	partition_samples = Matrix{Int}(undef, length(gen[1][end]), length(gen))
+	for i in eachindex(gen)
+		partition_samples[:, i] .= reduce_model(gen[i][end])
+	end
+	return partition_samples
+end
+
+#endregion
+
+#region Turing models
+
+# @model function manual_lkj(K, eta, give_cholesky::Bool = true, ::Type{T} = Float64) where T
+@model function manual_lkj(K, eta, ::Type{T} = Float64) where T
+
+	alpha = eta + (K - 2) / 2
+	r_tmp ~ Beta(alpha, alpha)
+
+	r12 = 2 * r_tmp - 1
+	R = Matrix{T}(undef, K, K)
+	R[1, 1] = one(T)
+	R[1, 2] = r12
+	R[2, 2] = sqrt(one(T) - r12^2.0)
+
+	if K > 2
+
+		y = Vector{T}(undef, K-2)
+		z = Vector{Vector{T}}(undef, K-2)
+		# @show y, z
+		for m in 2:K-1
+
+			i = m - 1
+			alpha -= 0.5
+			y[i] ~ Beta(m / 2, alpha)
+			z[i] ~ MvNormal(ones(m))
+
+			R[1:m, m+1] .= sqrt(y[i]) .* z[i] ./ LA.norm(z[i])
+			# does not work because of https://github.com/JuliaDiff/ForwardDiff.jl/issues/175
+			# R[1:m, m+1] .= sqrt(y[i]) .* LA.normalize(z[i])
+			R[m+1, m+1] = sqrt(1 - y[i])
+
+		end
+	end
+
+	# return give_cholesky ? LA.UpperTriangular(R) : LA.UpperTriangular(R)'LA.UpperTriangular(R)
+	return LA.UpperTriangular(R)
+
+end
+
+# TODO: consider manual_lkj2 instead of manual_lkj
+@model function manual_lkj2(K, eta, ::Type{T} = Float64) where T
+
+	alpha = eta + (K - 2) / 2
+	r_tmp ~ Beta(alpha, alpha)
+
+	r12 = 2 * r_tmp - 1
+	R = Matrix{T}(undef, K, K)
+	R[1, 1] = one(T)
+	R[1, 2] = r12
+	R[2, 2] = sqrt(one(T) - r12^2.0)
+
+	if K > 2
+
+		y = Vector{T}(undef, K-2)
+		# z = Vector{Vector{T}}(undef, K-2)
+		z ~ MvNormal(ones(K * (K - 1) ÷ 2 - 1))
+		z_idx = 0
+		# @show y, z
+		for m in 2:K-1
+
+			z_i = view(z, z_idx + 1:z_idx + m)
+			z_idx += m
+
+			i = m - 1
+			alpha -= 0.5
+			y[i] ~ Beta(m / 2, alpha)
+
+			# R[1:m, m+1] .= sqrt(y[i]) .* z[i] ./ LA.norm(z[i])
+			R[1:m, m+1] .= sqrt(y[i]) .* z_i ./ LA.norm(z_i)
+			# LA.normalize does not work because of https://github.com/JuliaDiff/ForwardDiff.jl/issues/175
+			# R[1:m, m+1] .= sqrt(y[i]) .* LA.normalize(z[i])
+			R[m+1, m+1] = sqrt(1 - y[i])
+
+		end
+	end
+
+	# return give_cholesky ? LA.UpperTriangular(R) : LA.UpperTriangular(R)'LA.UpperTriangular(R)
+	return LA.UpperTriangular(R)
+
+end
 
 # although MANOVA means "Multiple Analysis of Variance", here we mean that we are actually comparing variances and not means
 @model function varianceMANOVA(data_m, data_w, η = 1.0)
@@ -194,53 +315,6 @@ quad_form_diag(M, v) = LA.Symmetric((v .* v') .* (M .+ M') ./ 2)
 
 end
 
-# @model function manual_lkj(K, eta, give_cholesky::Bool = true, ::Type{T} = Float64) where T
-@model function manual_lkj(K, eta, ::Type{T} = Float64) where T
-
-	alpha = eta + (K - 2) / 2
-	r_tmp ~ Beta(alpha, alpha)
-
-	r12 = 2 * r_tmp - 1
-	R = Matrix{T}(undef, K, K)
-	R[1, 1] = one(T)
-	R[1, 2] = r12
-	R[2, 2] = sqrt(one(T) - r12^2.0)
-
-	if K > 2
-
-		y = Vector{T}(undef, K-2)
-		z = Vector{Vector{T}}(undef, K-2)
-		# @show y, z
-		for m in 2:K-1
-
-			i = m - 1
-			alpha -= 0.5
-			y[i] ~ Beta(m / 2, alpha)
-			z[i] ~ MvNormal(ones(m))
-
-			R[1:m, m+1] .= sqrt(y[i]) .* z[i] ./ LA.norm(z[i])
-			# does not work because of https://github.com/JuliaDiff/ForwardDiff.jl/issues/175
-			# R[1:m, m+1] .= sqrt(y[i]) .* LA.normalize(z[i])
-			R[m+1, m+1] = sqrt(1 - y[i])
-
-		end
-	end
-
-	# return give_cholesky ? LA.UpperTriangular(R) : LA.UpperTriangular(R)'LA.UpperTriangular(R)
-	return LA.UpperTriangular(R)
-
-end
-
-mod_manual_LKJ = manual_lkj(5, 1.0)
-spl = NUTS()
-chn = sample(mod_manual_LKJ, spl, 100)
-
-# see https://discourse.julialang.org/t/turing-jl-warnings-when-running-generated-quantities/64698/2
-gen = generated_quantities(mod_manual_LKJ, Turing.MCMCChains.get_sections(chn, :parameters))
-gen[1]'gen[1]
-# Rs = map(x-> x'x, gen) # all correlation matrices
-
-
 @model function varianceMANOVA_suffstat(obs_mean_m, obs_cov_chol_m, n_m, obs_mean_w, obs_cov_chol_w, n_w,
 					partition = nothing, η = 1.0, ::Type{T} = Float64) where T
 
@@ -283,82 +357,32 @@ end
 
 end
 
-get_suff_stats(x) = begin
-	n = size(x, 2)
-	obs_mean = vec(mean(x, dims = 2))
-	obs_cov  = cov(x') .* ((n - 1) / n)
-	return obs_mean, obs_cov, n
-end
+#endregion
 
-obs_mean_m, obs_cov_m, n_m = get_suff_stats(data_m)
-obs_mean_w, obs_cov_w, n_w = get_suff_stats(data_w)
-obs_sd_m = sqrt.(LA.diag(obs_cov_m))
-obs_sd_w = sqrt.(LA.diag(obs_cov_w))
-obs_cov_chol_m = LA.cholesky(obs_cov_m).U
-obs_cov_chol_w = LA.cholesky(obs_cov_w).U
+#region test LKJ prior
 
-LA.isposdef(obs_cov_m)
-LA.isposdef(obs_cov_w)
+mod_manual_LKJ1 = manual_lkj(5, 1.0)
+spl = NUTS()
+chn = sample(mod_manual_LKJ1, spl, 1000)
+MCMCChains.wall_duration(chn)
 
-# ff = Distributions.suffstats(Distributions.MvNormal, data_m)
+# see https://discourse.julialang.org/t/turing-jl-warnings-when-running-generated-quantities/64698/2
+gen = generated_quantities(mod_manual_LKJ1, Turing.MCMCChains.get_sections(chn, :parameters))
+gen[1]'gen[1]
+# Rs = map(x-> x'x, gen) # all correlation matrices
 
-@assert logpdf_mv_normal_suffstat(obs_mean_m, obs_cov_m, n_m, obs_mean_m, obs_cov_m) ≈ loglikelihood(MvNormal(obs_mean_m, obs_cov_m), data_m)
+mod_manual_LKJ2 = manual_lkj2(5, 1.0)
+chn2 = sample(mod_manual_LKJ2, spl, 1000)
+MCMCChains.wall_duration(chn2)
 
-mod_var_ss_full = varianceMANOVA_suffstat(obs_mean_m, obs_cov_chol_m, n_m, obs_mean_w, obs_cov_chol_w, n_w)
-chn_full = sample(mod_var_ss_full, NUTS(), 5_000)
-gen = generated_quantities(mod_var_ss_full, Turing.MCMCChains.get_sections(chn, :parameters))
+# @btime sample(mod_manual_LKJ1, spl, 1000) # 417.321 ms (2148844 allocations: 325.71 MiB)
+# @btime sample(mod_manual_LKJ2, spl, 1000) # 387.839 ms (1765899 allocations: 293.76 MiB)
 
-function triangular_to_vec(x::LA.UpperTriangular{T, Matrix{T}}) where T
-	p = size(x, 1)
-	result = Vector{T}(undef, p * (p + 1) ÷ 2)
-	idx = 1
-	for i in 1:p
-		for j in 1:i
-			result[idx] = x[j, i]
-			idx += 1
-		end
-	end
-	result
-end
+#endregion
 
-post_mean_μ_m      = vec(mean(group(chn, :μ_m).value.data, dims = 1))
-post_mean_μ_w      = vec(mean(group(chn, :μ_w).value.data, dims = 1))
-post_mean_σ_m      = mean(x[1] for x in gen)
-post_mean_σ_w      = mean(x[2] for x in gen)
-post_mean_Σ_chol_m = mean(triangular_to_vec(x[3]) for x in gen)
-post_mean_Σ_chol_w = mean(triangular_to_vec(x[4]) for x in gen)
-
-temp_hcat(x, y) = hcat(x, y, x .- y)
-
-temp_hcat(post_mean_μ_m, obs_mean_m)
-temp_hcat(post_mean_μ_w, obs_mean_w)
-temp_hcat(post_mean_σ_m, obs_sd_m)
-temp_hcat(post_mean_σ_w, obs_sd_w)
-temp_hcat(post_mean_Σ_chol_m, triangular_to_vec(obs_cov_chol_m))
-temp_hcat(post_mean_Σ_chol_w, triangular_to_vec(obs_cov_chol_w))
-
-
-
-partition_prior = BetaBinomialMvUrnDistribution(10, 10, 1)
-mod_var_ss_eq = varianceMANOVA_suffstat_equality_selector(obs_mean_m, obs_cov_chol_m, n_m, obs_mean_w, obs_cov_chol_w, n_w, partition_prior)
-
-# adapted from https://discourse.julialang.org/t/get-list-of-parameters-from-turing-model/66278/8
-continuous_params = filter(!=(:partition), DynamicPPL.syms(DynamicPPL.VarInfo(mod_var_ss_eq)))
-spl = Gibbs(
-	HMC(0.0, 20, continuous_params...),
-	GibbsConditional(:partition, EqualitySampler.PartitionSampler(10, get_logπ(mod_var_ss_eq)))
-)
-chn = sample(mod_var_ss_eq, spl, 1000)
-gen = generated_quantities(mod_var_ss_eq, Turing.MCMCChains.get_sections(chn, :parameters))
-
-partition_samples = Matrix{Int}(undef, length(gen[1][end]), length(gen))
-for i in eachindex(gen)
-	partition_samples[:, i] .= reduce_model(gen[i][end])
-end
-
-
+#region simulated data
 # let's test the model on simulated data
-n, p = 1000, 5
+n, p = 10_000, 5
 
 μ_1 = randn(p)
 μ_2 = randn(p)
@@ -381,34 +405,146 @@ obs_sd_2 = sqrt.(LA.diag(obs_cov_2))
 obs_cov_chol_1 = LA.cholesky(obs_cov_1).U
 obs_cov_chol_2 = LA.cholesky(obs_cov_2).U
 
-mod_var_ss_full = varianceMANOVA_suffstat(obs_mean_1, obs_cov_chol_1, n_1, obs_mean_2, obs_cov_chol_2, n_2)
-chn_full = sample(mod_var_ss_full, NUTS(), 2_000)
-gen = generated_quantities(mod_var_ss_full, Turing.MCMCChains.get_sections(chn, :parameters))
+observed_values = (obs_mean_1, obs_mean_2, obs_sd_1, obs_sd_2, triangular_to_vec(obs_cov_chol_1), triangular_to_vec(obs_cov_chol_2))
+true_values     = (μ_1, μ_2, σ_1, σ_2, triangular_to_vec(Σ_chol_1), triangular_to_vec(Σ_chol_2))
 
-post_mean_μ_1      = vec(mean(group(chn, :μ_m).value.data, dims = 1))
-post_mean_μ_2      = vec(mean(group(chn, :μ_w).value.data, dims = 1))
+mod_var_ss_full = varianceMANOVA_suffstat(obs_mean_1, obs_cov_chol_1, n_1, obs_mean_2, obs_cov_chol_2, n_2)
+chn_full = sample(mod_var_ss_full, NUTS(), 5_000)
+gen = generated_quantities(mod_var_ss_full, Turing.MCMCChains.get_sections(chn_full, :parameters))
+
+post_mean_μ_1      = vec(mean(group(chn_full, :μ_m).value.data, dims = 1))
+post_mean_μ_2      = vec(mean(group(chn_full, :μ_w).value.data, dims = 1))
 post_mean_σ_1      = mean(x[1] for x in gen)
 post_mean_σ_2      = mean(x[2] for x in gen)
 post_mean_Σ_chol_1 = mean(triangular_to_vec(x[3]) for x in gen)
 post_mean_Σ_chol_2 = mean(triangular_to_vec(x[4]) for x in gen)
 
+function plot_retrieval(obs, estimate, nms)
+	@assert length(obs) == length(estimate) == length(nms)
+	plts = Vector{Plots.Plot}(undef, length(obs))
+	for (i, (o, e, nm)) in enumerate(zip(obs, estimate, nms))
+		plt = scatter(o, e, title = nm, legend = false)
+		Plots.abline!(plt, 1, 0)
+		plts[i] = plt
+	end
+	nr = isqrt(length(obs))
+	nc = ceil(Int, length(obs) / nr)
+	plot(plts..., layout = (nr, nc))
+end
+plot_retrieval(
+	observed_values,
+	(post_mean_μ_1, post_mean_μ_2, post_mean_σ_1, post_mean_σ_2, post_mean_Σ_chol_1, post_mean_Σ_chol_2),
+	("μ_1", "μ_2", "σ_1", "σ_2", "Σ_1", "Σ_2")
+)
+
+plot_retrieval(
+	true_values,
+	(post_mean_μ_1, post_mean_μ_2, post_mean_σ_1, post_mean_σ_2, post_mean_Σ_chol_1, post_mean_Σ_chol_2),
+	("μ_1", "μ_2", "σ_1", "σ_2", "Σ_1", "Σ_2")
+)
+
+# temp_hcat(x, y) = hcat(x, y, x .- y)
+# temp_hcat(post_mean_μ_1, obs_mean_1)
+# temp_hcat(post_mean_μ_2, obs_mean_2)
+# temp_hcat(post_mean_σ_1, obs_sd_1)
+# temp_hcat(post_mean_σ_2, obs_sd_2)
+# temp_hcat(post_mean_Σ_chol_1, triangular_to_vec(obs_cov_chol_1))
+# temp_hcat(post_mean_Σ_chol_2, triangular_to_vec(obs_cov_chol_2))
+
+# temp_hcat(post_mean_μ_1, μ_1)
+# temp_hcat(post_mean_μ_2, μ_2)
+# temp_hcat(post_mean_σ_1, σ_1)
+# temp_hcat(post_mean_σ_2, σ_2)
+# temp_hcat(post_mean_Σ_chol_1, triangular_to_vec(Σ_chol_1))
+# temp_hcat(post_mean_Σ_chol_2, triangular_to_vec(Σ_chol_2))
+
+partition_prior = BetaBinomialMvUrnDistribution(p, p, 1)
+mod_var_ss_eq = varianceMANOVA_suffstat_equality_selector(obs_mean_1, obs_cov_chol_1, n_1, obs_mean_2, obs_cov_chol_2, n_2, partition_prior)
+continuous_params = filter(!=(:partition), DynamicPPL.syms(DynamicPPL.VarInfo(mod_var_ss_eq)))
+spl = Gibbs(
+	HMC(0.0, 20, continuous_params...),
+	GibbsConditional(:partition, EqualitySampler.PartitionSampler(10, get_logπ(mod_var_ss_eq)))
+)
+chn_eq = sample(mod_var_ss_eq, spl, 5_000)
+
+post_means_eq = extract_means_continuous_params(mod_var_ss_eq, chn_eq)
+plot_retrieval(observed_values, post_means_eq, string.(keys(post_means_eq)))
+
+partition_samples = extract_partition_samples(mod_var_ss_eq, chn_eq)
+
+compute_post_prob_eq()
+
+
+#endregion
+
+#region data example
+big5_data = DF.DataFrame(CSV.File(joinpath("simulations", "demos", "data", "personality_variability.csv")))
+
+df_m = @chain big5_data begin
+	DF.filter(:sex => ==("male"), _)
+	DF.select(_, setdiff(names(_), vcat("sex", filter(startswith("self_"), names(_)))))
+end
+
+df_w = @chain big5_data begin
+	DF.filter(:sex => ==("female"), _)
+	DF.select(_, setdiff(names(_), vcat("sex", filter(startswith("self_"), names(_)))))
+end
+
+data_m = permutedims(Matrix(df_m))
+data_w = permutedims(Matrix(df_w))
+
+obs_mean_m, obs_cov_m, n_m = get_suff_stats(data_m)
+obs_mean_w, obs_cov_w, n_w = get_suff_stats(data_w)
+obs_sd_m = sqrt.(LA.diag(obs_cov_m))
+obs_sd_w = sqrt.(LA.diag(obs_cov_w))
+obs_cov_chol_m = LA.cholesky(obs_cov_m).U
+obs_cov_chol_w = LA.cholesky(obs_cov_w).U
+
+LA.isposdef(obs_cov_m)
+LA.isposdef(obs_cov_w)
+
+@assert logpdf_mv_normal_suffstat(obs_mean_m, obs_cov_m, n_m, obs_mean_m, obs_cov_m) ≈ loglikelihood(MvNormal(obs_mean_m, obs_cov_m), data_m)
+
+mod_var_ss_full = varianceMANOVA_suffstat(obs_mean_m, obs_cov_chol_m, n_m, obs_mean_w, obs_cov_chol_w, n_w)
+chn_full = sample(mod_var_ss_full, NUTS(), 5_000)
+gen = generated_quantities(mod_var_ss_full, Turing.MCMCChains.get_sections(chn, :parameters))
+
+post_mean_μ_m      = vec(mean(group(chn, :μ_m).value.data, dims = 1))
+post_mean_μ_w      = vec(mean(group(chn, :μ_w).value.data, dims = 1))
+post_mean_σ_m      = mean(x[1] for x in gen)
+post_mean_σ_w      = mean(x[2] for x in gen)
+post_mean_Σ_chol_m = mean(triangular_to_vec(x[3]) for x in gen)
+post_mean_Σ_chol_w = mean(triangular_to_vec(x[4]) for x in gen)
+
 temp_hcat(x, y) = hcat(x, y, x .- y)
 
-temp_hcat(post_mean_μ_1, obs_mean_1)
-temp_hcat(post_mean_μ_2, obs_mean_2)
-temp_hcat(post_mean_σ_1, obs_sd_1)
-temp_hcat(post_mean_σ_2, obs_sd_2)
-temp_hcat(post_mean_Σ_chol_1, triangular_to_vec(obs_cov_chol_1))
-temp_hcat(post_mean_Σ_chol_2, triangular_to_vec(obs_cov_chol_2))
+temp_hcat(post_mean_μ_m, obs_mean_m)
+temp_hcat(post_mean_μ_w, obs_mean_w)
+temp_hcat(post_mean_σ_m, obs_sd_m)
+temp_hcat(post_mean_σ_w, obs_sd_w)
+temp_hcat(post_mean_Σ_chol_m, triangular_to_vec(obs_cov_chol_m))
+temp_hcat(post_mean_Σ_chol_w, triangular_to_vec(obs_cov_chol_w))
 
-temp_hcat(post_mean_μ_1, μ_1)
-temp_hcat(post_mean_μ_2, μ_2)
-temp_hcat(post_mean_σ_1, σ_1)
-temp_hcat(post_mean_σ_2, σ_2)
-temp_hcat(post_mean_Σ_chol_1, triangular_to_vec(Σ_chol_1))
-temp_hcat(post_mean_Σ_chol_2, triangular_to_vec(Σ_chol_2))
+partition_prior = BetaBinomialMvUrnDistribution(10, 10, 1)
+mod_var_ss_eq = varianceMANOVA_suffstat_equality_selector(obs_mean_m, obs_cov_chol_m, n_m, obs_mean_w, obs_cov_chol_w, n_w, partition_prior)
 
+# adapted from https://discourse.julialang.org/t/get-list-of-parameters-from-turing-model/66278/8
+continuous_params = filter(!=(:partition), DynamicPPL.syms(DynamicPPL.VarInfo(mod_var_ss_eq)))
+spl = Gibbs(
+	HMC(0.0, 20, continuous_params...),
+	GibbsConditional(:partition, EqualitySampler.PartitionSampler(10, get_logπ(mod_var_ss_eq)))
+)
+chn = sample(mod_var_ss_eq, spl, 1000)
+gen = generated_quantities(mod_var_ss_eq, Turing.MCMCChains.get_sections(chn, :parameters))
 
+partition_samples = Matrix{Int}(undef, length(gen[1][end]), length(gen))
+for i in eachindex(gen)
+	partition_samples[:, i] .= reduce_model(gen[i][end])
+end
+
+#endregion
+
+#region other random stuff, maybe delete this?
 @model function gdemo_0(z0)
 	x  ~ Normal(0, 1)
 	z0 ~ Normal(x, 1)
@@ -730,3 +866,4 @@ Bijectors.bijector(d::LKJCholesky) = LKJCholBijector()
 
 
 Turing.Utilities.FlattenIterator(name, value::Cholesky) = Turing.Utilities.FlattenIterator(Symbol(name), Array(value.L))
+#endregion
