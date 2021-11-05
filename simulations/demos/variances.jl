@@ -108,33 +108,33 @@ end
 average_equality_constraints(ρ::AbstractVector{<:Real}, partition::AbstractVector{<:Integer}) = average_equality_constraints!(copy(ρ), partition)
 
 
-function logpdf_mv_normal_suffstat(x̄, S, n, μ, Σ)
-	if !LA.isposdef(Σ)
-		@show Σ
-		return -Inf
-	end
-	d = length(x̄)
-	return (
-		-n / 2 * (
-			d * log(2pi) +
-			LA.logdet(Σ) +
-			(x̄ .- μ)' / Σ * (x̄ .- μ) +
-			LA.tr(Σ \ S)
-		)
-	)
-end
+# function logpdf_mv_normal_suffstat(x̄, S, n, μ, Σ)
+# 	if !LA.isposdef(Σ)
+# 		@show Σ
+# 		return -Inf
+# 	end
+# 	d = length(x̄)
+# 	return (
+# 		-n / 2 * (
+# 			d * log(2pi) +
+# 			LA.logdet(Σ) +
+# 			(x̄ .- μ)' / Σ * (x̄ .- μ) +
+# 			LA.tr(Σ \ S)
+# 		)
+# 	)
+# end
 
-function logpdf_mv_normal_chol_suffstat(x̄, S_chol::LA.UpperTriangular, n, μ, Σ_chol::LA.UpperTriangular)
-	d = length(x̄)
-	return (
-		-n / 2 * (
-			d * log(2pi) +
-			2LA.logdet(Σ_chol) +
-			sum(x->x^2, (x̄ .- μ)' / Σ_chol) +
-			sum(x->x^2, S_chol / Σ_chol)
-		)
-	)
-end
+# function logpdf_mv_normal_chol_suffstat(x̄, S_chol::LA.UpperTriangular, n, μ, Σ_chol::LA.UpperTriangular)
+# 	d = length(x̄)
+# 	return (
+# 		-n / 2 * (
+# 			d * log(2pi) +
+# 			2LA.logdet(Σ_chol) +
+# 			sum(x->x^2, (x̄ .- μ)' / Σ_chol) +
+# 			sum(x->x^2, S_chol / Σ_chol)
+# 		)
+# 	)
+# end
 
 # see https://github.com/TuringLang/Turing.jl/issues/1629
 quad_form_diag(M, v) = LA.Symmetric((v .* v') .* (M .+ M') ./ 2)
@@ -193,45 +193,7 @@ end
 
 #region Turing models
 
-# @model function manual_lkj(K, eta, give_cholesky::Bool = true, ::Type{T} = Float64) where T
 @model function manual_lkj(K, eta, ::Type{T} = Float64) where T
-
-	alpha = eta + (K - 2) / 2
-	r_tmp ~ Beta(alpha, alpha)
-
-	r12 = 2 * r_tmp - 1
-	R = Matrix{T}(undef, K, K)
-	R[1, 1] = one(T)
-	R[1, 2] = r12
-	R[2, 2] = sqrt(one(T) - r12^2.0)
-
-	if K > 2
-
-		y = Vector{T}(undef, K-2)
-		z = Vector{Vector{T}}(undef, K-2)
-		# @show y, z
-		for m in 2:K-1
-
-			i = m - 1
-			alpha -= 0.5
-			y[i] ~ Beta(m / 2, alpha)
-			z[i] ~ MvNormal(ones(m))
-
-			R[1:m, m+1] .= sqrt(y[i]) .* z[i] ./ LA.norm(z[i])
-			# does not work because of https://github.com/JuliaDiff/ForwardDiff.jl/issues/175
-			# R[1:m, m+1] .= sqrt(y[i]) .* LA.normalize(z[i])
-			R[m+1, m+1] = sqrt(1 - y[i])
-
-		end
-	end
-
-	# return give_cholesky ? LA.UpperTriangular(R) : LA.UpperTriangular(R)'LA.UpperTriangular(R)
-	return LA.UpperTriangular(R)
-
-end
-
-# TODO: consider manual_lkj2 instead of manual_lkj
-@model function manual_lkj2(K, eta, ::Type{T} = Float64) where T
 
 	alpha = eta + (K - 2) / 2
 	r_tmp ~ Beta(alpha, alpha)
@@ -324,6 +286,7 @@ end
 	μ_w ~ MvNormal(ones(Float64, p))
 
 	ρ ~ Dirichlet(ones(2p))
+	#Todo improper prior
 	τ ~ InverseGamma(0.1, 0.1)
 
 	ρ_constrained = isnothing(partition) ? ρ : average_equality_constraints(ρ, partition)
@@ -333,6 +296,7 @@ end
 
 	R_chol_m = @submodel $(Symbol("manual_lkj")) manual_lkj(p, η, T)
 	R_chol_w = @submodel $(Symbol("manual_lkj")) manual_lkj(p, η, T)
+
 	Σ_chol_m = LA.UpperTriangular(R_chol_m * LA.Diagonal(σ_m))
 	Σ_chol_w = LA.UpperTriangular(R_chol_w * LA.Diagonal(σ_w))
 	if LA.det(Σ_chol_m) < eps(T) || LA.det(Σ_chol_w) < eps(T)
@@ -356,27 +320,6 @@ end
 	return (σ_m, σ_w, Σ_chol_m, Σ_chol_w, partition)
 
 end
-
-#endregion
-
-#region test LKJ prior
-
-mod_manual_LKJ1 = manual_lkj(5, 1.0)
-spl = NUTS()
-chn = sample(mod_manual_LKJ1, spl, 1000)
-MCMCChains.wall_duration(chn)
-
-# see https://discourse.julialang.org/t/turing-jl-warnings-when-running-generated-quantities/64698/2
-gen = generated_quantities(mod_manual_LKJ1, Turing.MCMCChains.get_sections(chn, :parameters))
-gen[1]'gen[1]
-# Rs = map(x-> x'x, gen) # all correlation matrices
-
-mod_manual_LKJ2 = manual_lkj2(5, 1.0)
-chn2 = sample(mod_manual_LKJ2, spl, 1000)
-MCMCChains.wall_duration(chn2)
-
-# @btime sample(mod_manual_LKJ1, spl, 1000) # 417.321 ms (2148844 allocations: 325.71 MiB)
-# @btime sample(mod_manual_LKJ2, spl, 1000) # 387.839 ms (1765899 allocations: 293.76 MiB)
 
 #endregion
 

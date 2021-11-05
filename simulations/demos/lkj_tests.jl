@@ -86,14 +86,16 @@ for i in eachindex(plts)
 
 	K, η, ρs = results[i]
 	density_estimate = kde(view(ρs, :, 1); npoints = 2^12, boundary = (-1, 1))
-	plt = plot(density_estimate.x, density_estimate.density, title = "K = $K, η = $η", legend = isone(i) ? :outerright : false,
+	plt = plot(density_estimate.x, density_estimate.density, title = "K = $K, η = $η", legend = false,
 	           label = "sampled")
 	plot!(plt, xcoords, dlkjcorr_marginal.(xcoords, K, η), label = "theoretical")
 	plts[i] = plt
 
 end
 
-plot(plts..., layout = (length(Ks), length(ηs)))
+legend = plot([0 0], showaxis = false, grid = false, label = ["sampled" "theoretical"], axis = nothing);
+plot(plts..., legend, layout = @layout [grid(3,3) a{0.2w}])
+# plot(plts..., layout = (length(Ks), length(ηs)))
 
 # use the LKJ to fit a normal
 
@@ -122,7 +124,7 @@ x = rand(MvNormal(true_means, true_S), n)
 		return (R_chol, )
 	end
 	Sigma = Sigma_chol'Sigma_chol
-	
+
 
 	for i in 1:n
 		x[:, i] ~ MvNormal(means, Sigma)

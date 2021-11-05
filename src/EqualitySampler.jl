@@ -78,7 +78,11 @@ export
 
 	dpp_find_α,
 
-	bayes_factor_one_way_anova
+	bayes_factor_one_way_anova,
+
+	# Jeffreys priors for variances and sds
+	JeffreysPriorStandardDeviation,
+	JeffreysPriorVariance
 
 	#,
 	# maybe these shouldn't be exported, at least, the lookup of the name of the turing samples shouldn't be done in there
@@ -96,6 +100,7 @@ include("PdfDirichletProcess.jl")
 include("bayesFactors.jl")
 include("PartitionSampler.jl")
 include("findDPPalpha.jl")
+include("JeffreysPrior.jl")
 
 
 end
