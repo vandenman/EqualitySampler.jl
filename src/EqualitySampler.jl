@@ -14,10 +14,12 @@ import QuadGK
 export
 	NormalSuffStat,
 	MvNormalSuffStat,
+	logpdf_mv_normal_suffstat,
 	MvNormalDenseSuffStat,
 	MvNormalCholDenseSuffStat,
 	get_normal_dense_suff_stats,
 	get_normal_dense_chol_suff_stats,
+	logpdf_mv_normal_chol_suffstat,
 	AbstractConditionalUrnDistribution,
 	UniformConditionalUrnDistribution,
 	BetaBinomialConditionalUrnDistribution,

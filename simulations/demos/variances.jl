@@ -1,9 +1,3 @@
-#=
-
-	TODO: use the functions from EqualitySampler now that they're in the package!
-
-=#
-
 using EqualitySampler, Turing, Plots, FillArrays, Plots.PlotMeasures, Colors
 using Chain
 using MCMCChains
@@ -280,7 +274,7 @@ end
 @model function varianceMANOVA_suffstat(obs_mean_m, obs_cov_chol_m, n_m, obs_mean_w, obs_cov_chol_w, n_w,
 					partition = nothing, η = 1.0, ::Type{T} = Float64) where T
 
-	p = size(data_m, 1)
+	p = length(obs_mean_m)
 
 	μ_m ~ MvNormal(ones(Float64, p))
 	μ_w ~ MvNormal(ones(Float64, p))
@@ -294,8 +288,8 @@ end
 	σ_m = τ .* view(ρ_constrained,   1: p)
 	σ_w = τ .* view(ρ_constrained, p+1:2p)
 
-	R_chol_m = @submodel $(Symbol("manual_lkj")) manual_lkj(p, η, T)
-	R_chol_w = @submodel $(Symbol("manual_lkj")) manual_lkj(p, η, T)
+	R_chol_m = @submodel $(Symbol("manual_lkj_m")) manual_lkj(p, η, T)
+	R_chol_w = @submodel $(Symbol("manual_lkj_w")) manual_lkj(p, η, T)
 
 	Σ_chol_m = LA.UpperTriangular(R_chol_m * LA.Diagonal(σ_m))
 	Σ_chol_w = LA.UpperTriangular(R_chol_w * LA.Diagonal(σ_w))
