@@ -140,7 +140,8 @@ function get_suff_stats(df)
 end
 
 function get_θ_cs(model, chain)
-	gen = generated_quantities2(model, chain)
+	gen = generated_quantities(model, Turing.MCMCChains.get_sections(chain, :parameters))
+	# gen = generated_quantities2(model, chain)
 	θ_cs = Matrix{Float64}(undef, length(first(gen[1])), length(gen))
 	for i in eachindex(gen)
 		θ_cs[:, i] = gen[i][1]

@@ -143,7 +143,7 @@ examine whether DPP prior is not horribly slow!
 		- [ ] side by side
 			- [ ] Left: current figure
 			- [ ] Right: Rate of errors #errors / #total possible errors
-			- [ ] Legend: Change # groups for K
+			- [x] Legend: Change # groups for K
 	- [ ] Figure 5
 		- [ ] k in \alpha = k should be capitalized
 		- [ ] increase font size

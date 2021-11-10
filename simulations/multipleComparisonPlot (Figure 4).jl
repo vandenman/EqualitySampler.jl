@@ -24,13 +24,11 @@ import Suppressor
 import Random
 
 if isinteractive()
-	include("simulations/silentGeneratedQuantities.jl")
 	include("simulations/meansModel_Functions.jl")
 	include("simulations/helpersTuring.jl")
 	include("simulations/limitedLogger.jl")
 	include("simulations/customHMCAdaptation.jl")
 else
-	include("silentGeneratedQuantities.jl")
 	include("meansModel_Functions.jl")
 	include("helpersTuring.jl")
 	include("limitedLogger.jl")
@@ -42,7 +40,6 @@ function get_priors()
 		(n_groups)->UniformMvUrnDistribution(n_groups),
 		(n_groups)->BetaBinomialMvUrnDistribution(n_groups),
 		(n_groups)->BetaBinomialMvUrnDistribution(n_groups, n_groups, 1.0),
-		# (n_groups)->BetaBinomialMvUrnDistribution(n_groups, 1.0, n_groups),
 		(n_groups)->DirichletProcessMvUrnDistribution(n_groups, 0.5),
 		(n_groups)->DirichletProcessMvUrnDistribution(n_groups, 1),
 		(n_groups)->DirichletProcessMvUrnDistribution(n_groups, :Gopalan_Berry)
@@ -75,7 +72,7 @@ function prop_incorrect(x)
 end
 
 function get_resultsdir()
-	results_dir = joinpath("simulations", "results_multiplecomparisonsplot", "jls_files")
+	results_dir = joinpath("simulations", "results_multiplecomparisonsplot_200", "jls_files")
 	!ispath(results_dir) && mkpath(results_dir)
 	return results_dir
 end
@@ -85,7 +82,7 @@ make_filename(results_dir, r, i) = joinpath(results_dir, "repeat_$(r)_groups_$(i
 function run_simulation()
 
 	n_obs_per_group = 100
-	repeats = 100
+	repeats = 200
 	groups = 2:10
 
 	sim_opts = Iterators.product(1:repeats, eachindex(groups))
@@ -155,7 +152,7 @@ if !isinteractive()
 	exit()
 end
 
-repeats = 100
+repeats = 200
 groups = 2:10
 len_priors = length(get_priors())
 sim_opts = Iterators.product(1:repeats, eachindex(groups))
@@ -202,7 +199,7 @@ end
 
 size(results)
 
-labels = ["Uniform" "Beta-binomial α=1, β=1" "Beta-binomial α=# groups, β=1" "DPP α=0.5" "DPP α=1.0" "DPP α=Gopalan & Berry"]
+labels = ["Uniform" "Beta-binomial α=1, β=1" "Beta-binomial α=K, β=1" "DPP α=0.5" "DPP α=1" "DPP α=Gopalan & Berry"]
 keep = eachindex(labels)#[1, 2, 3, 5]
 labels = reshape(labels[1, keep], 1, length(keep))
 
