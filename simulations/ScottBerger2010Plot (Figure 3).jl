@@ -39,14 +39,11 @@ make_title(d::RandomProcessMvUrnDistribution) = "Dirichlet Process α=$(round_2_
 
 function scottberger_figure_1(d::Distribution, k::Integer = big(30))
 
-	no_equalities = 0:k
+	no_equalities = 0:k-1
 	lpdf = logpdf_model_distinct.(Ref(d), no_equalities)
 
-	# given K = 5, 5 equalities implies the null model which we want on the left (reverse! is not defined)
+	# We reverse the number of equalities, add one, and label it the number of inequalities
 	no_equalities = reverse(no_equalities)
-	if !(d isa UniformMvUrnDistribution)
-		no_equalities = no_equalities .- 1
-	end
 
 	# figure 1
 	plt = plot(no_equalities, lpdf, legend = false);
@@ -107,8 +104,8 @@ function matrix_plot(dists, k::Integer, pos_included = 2:2:k; include_log = fals
 	x_middle = ceil(Int, length(dists) / 2)
 	y_top = 1
 	y_bottom = size(figures, 2)
-	Plots.plot!(figures[x_middle, y_top], xlab = "No. inequalities",    bottom_margin = 5mm);
-	Plots.plot!(figures[x_middle, y_bottom], xlab = "Total no. variables", bottom_margin = 5mm);
+	Plots.plot!(figures[x_middle, y_top], xlab = "Number of inequalities",    bottom_margin = 5mm);
+	Plots.plot!(figures[x_middle, y_bottom], xlab = "Number of groups", bottom_margin = 5mm);
 	Plots.plot!(figures[1, y_top], ylab = "Log probability", left_margin = 7mm);
 	Plots.plot!(figures[1, 2], ylab = "Prior odds ratio (smaller / larger)", left_margin = 7mm);
 	if include_log
@@ -204,12 +201,13 @@ end
 k = BigInt(20)
 variables_added = [1, 2, 5, 10]
 pos_included = 2:2:30
-labels = [" 1 inequality added" " 2 inequalities added" " 5 inequalities added" "10 inequalities added"]
+# labels = [" 1 inequality added" " 2 inequalities added" " 5 inequalities added" "10 inequalities added"]
+labels = ["p(#0) / p(#1)" "p(#1) / p(#2)" "p(#4) / p(#5)" "p(#9) / p(#10)"]
 
 dists = (
 	BetaBinomial(k, 1, 1),
 	DirichletProcessMvUrnDistribution(k, 0.5),
-	BetaBinomialMvUrnDistribution(k, 5, 1),
+	BetaBinomialMvUrnDistribution(k, Int(k), 1),
 	UniformMvUrnDistribution(k)
 )
 
@@ -221,11 +219,14 @@ variables_added = [1, 2, 5, 10]
 pos_included = 2:2:30
 dists = (
 	DirichletProcessMvUrnDistribution(k, 0.5),
-	BetaBinomialMvUrnDistribution(k, 5, 1),
+	BetaBinomialMvUrnDistribution(k, Int(k), 1),
 	UniformMvUrnDistribution(k)
 )
 figures = matrix_plot(dists, k, pos_included; label = labels, legend_subplot_idx = 3)
 plot!(figures[3, 2], ylim = (0, 2));
+plot!(figures[1, 1], ylim = (-60, 0), yticks = [-60, -40, -20, 0]);
+joint_2x3 = make_jointplot(figures, legendfont = font(12), titlefont = font(20), tickfont = 12);
+savefig(joint_2x3, joinpath("figures", "prior_comparison_plot_2x3_without_log_without_betabinomial.pdf"))
 
 # add A and B to figures in the top row
 highlight_adjacent_points!(figures[1, 1], dists[1], 0:1, "A");
@@ -236,8 +237,8 @@ highlight_adjacent_points!(figures[2, 1], dists[2], 9:10, "B"; coordinates = (9.
 highlight_adjacent_points2!(figures[1, 2], dists[1], [1, 10], ["A", "B"], .03);
 highlight_adjacent_points2!(figures[2, 2], dists[2], [1, 10], ["A", "B"], .8);
 
-joint_2x3 = make_jointplot(figures, legendfont = font(12), titlefont = font(20));
-savefig(joint_2x3, joinpath("figures", "prior_comparison_plot_2x3_without_log_without_betabinomial.pdf"))
+joint_2x3_with_points = make_jointplot(figures, legendfont = font(12), titlefont = font(20), guidefont = font(18), tickfont = font(12));
+savefig(joint_2x3_with_points, joinpath("figures", "prior_comparison_plot_2x3_without_log_without_betabinomial_with_points.pdf"))
 
 αs = (0.10, 0.25, 0.50, 1.00, 2.50, 5.00)
 dists = Tuple(DirichletProcessMvUrnDistribution.(k, αs))
@@ -245,5 +246,5 @@ figures = matrix_plot(dists, k, pos_included; label = labels, legend_subplot_idx
 joint_2x6 = make_jointplot(figures, legendfont = font(12), titlefont = font(20));
 savefig(joint_2x6, joinpath("figures", "prior_comparison_plot_2x6_without_log_dpp_only.pdf"))
 
-plot(1:2, 1:2)
-plot!(1:2, 2:3, label = "")
+pdf_model_distinct.(dists, 0)
+round.(exp.(diff_lpdf.(dists, 1)); digits = 2)

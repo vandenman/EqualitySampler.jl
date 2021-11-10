@@ -123,20 +123,21 @@ examine whether DPP prior is not horribly slow!
 	- [ ] Cut Figure 7
 
 - [ ] Julia
-	- [ ] Look at simplifying the Turing model
-		- [ ] Beta-binomial with weighted categorical jump
-		- [ ] Remove pdf of Urn models from the Turing model (since we already use it in the Gibbs step)
+	- [x] Look at simplifying the Turing model
+		- [x] Beta-binomial with weighted categorical jump
+		- [x] Remove pdf of Urn models from the Turing model (since we already use it in the Gibbs step)
 	- [x] Remake figure 2 with new Beta-binomial with weighted categorical jump
 		- [x] did not work out
 	- [ ] Figure 3
-		- [ ] the x-axis of the top figures don't start at 0.
-		- [ ] double check the y-axis of the DPP
-		- [ ] Beta-binomial 5.00 should be 30?
-		- [ ] Why is the DPP alpha not equal to 0.5?
+		- [x] the x-axis of the top figures don't start at 0.
+		- [x] double check the y-axis of the DPP
+		- [x] Beta-binomial 5.00 should be 30?
+		- [x] Why is the DPP alpha not equal to 0.5?
 		- [ ] Increase line thickness and font size
-		- [ ] Legend do p(#9) / p(#10) instead of "10 inequalities added"
-		- [ ] DPP: double check if the prior odds are 1 / \alpha.
-		- [ ] x-axis label: "Number of groups"
+		- [x] Legend do p(#9) / p(#10) instead of "10 inequalities added"
+		- [x] DPP: double check if the prior odds are 1 / \alpha.
+			- They are \alpha, see last bit of code in ...(Figure 3).jl
+		- [x] x-axis label: "Number of groups"
 	- [ ] Figure 4
 		- [ ] rerun with more iterations (200)
 		- [ ] side by side
