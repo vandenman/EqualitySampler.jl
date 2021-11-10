@@ -10,8 +10,12 @@ Distributions.maximum(::AbstractJeffreysPrior) = Inf
 Distributions.insupport(::AbstractJeffreysPrior, x::Real)			= x > zero(x)
 pdf(d::AbstractJeffreysPrior, x::Real) = exp(logpdf(d, x))
 
+# required for compatability with Turing
+Bijectors.bijector(::AbstractJeffreysPrior) = Bijectors.Log{0}()
+
 struct JeffreysPriorStandardDeviation <: AbstractJeffreysPrior end
-logpdf(d::JeffreysPriorStandardDeviation, x::Real) = Distributions.insupport(d, x) ? -log(x) : -Inf
+Distributions.logpdf(d::JeffreysPriorStandardDeviation, x::Real) = Distributions.insupport(d, x) ? -log(x) : -Inf
 
 struct JeffreysPriorVariance <: AbstractJeffreysPrior end
-logpdf(d::JeffreysPriorStandardDeviation, x::Real) = Distributions.insupport(d, x) ? -2log(x) : -Inf
+Distributions.logpdf(d::JeffreysPriorVariance, x::Real) = Distributions.insupport(d, x) ? -2log(x) : -Inf
+

@@ -5,6 +5,7 @@ import Distributions, Random, LinearAlgebra, Memoize, SpecialFunctions, Optim
 import StatsBase: countmap
 import OrderedCollections: OrderedDict
 import Turing, Turing.RandomMeasures
+import Bijectors
 import Combinatorics
 import Statistics
 
