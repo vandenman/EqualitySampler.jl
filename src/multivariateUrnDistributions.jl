@@ -307,7 +307,11 @@ function logpdf_incl(d::RandomProcessMvUrnDistribution, no_equalities::Integer)
 	# return result
 end
 
-function logpdf_model_distinct(d::RandomProcessMvUrnDistribution, x::T) where T<:Integer
+function logpdf_model_distinct(d::RandomProcessMvUrnDistribution{W, T}, x::U) where {T<:Integer, U<:Integer, W}
+	logpdf_model_distinct(d::RandomProcessMvUrnDistribution{W, T}, convert(T, x))
+end
+
+function logpdf_model_distinct(d::RandomProcessMvUrnDistribution{W, T}, x::T) where {T<:Integer, W}
 
 	U = T <: BigInt ? BigFloat : Float64
 	n = T(length(d))
