@@ -217,8 +217,19 @@ mu2 = dropdims(mean(try2, dims = 3), dims = 3)[keep, :]
 p2 = make_figure(groups, permutedims(mu2), "P(errors)", labels)
 
 figsize = (700, 500)
+
+# using PlotlyJS
+plotlyjs()
+p12 = plot(plot(p1), plot(p2, legend = false), size = (1500, 500))
+
+
 figdir = joinpath("figures")
 savefig(plot(p1, size = figsize), joinpath(figdir, "one_or_more_errors2.png"))
 # savefig(plot(p2, size = figsize), joinpath(figdir, "errors.png"))
 savefig(plot(p1, size = figsize), joinpath(figdir, "one_or_more_errors2.pdf"))
 # savefig(plot(p2, size = figsize), joinpath(figdir, "errors.pdf"))
+
+savefig(plot(p12, size = (1400, 500)), joinpath(figdir, "multipleComparisonPlot_side_by_side.pdf"))
+savefig(plot(p12, size = (1400, 500)), joinpath(figdir, "multipleComparisonPlot_side_by_side.png"))
+
+plotl
