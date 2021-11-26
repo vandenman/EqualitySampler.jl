@@ -29,5 +29,5 @@ Distributions.logpdf(d::JeffreysPriorVariance, x::Real) = Distributions.insuppor
 	Therefore, we "sample" from d<:AbstractJeffreysPrior as a transformation of sampling from the real line.
 	Note that valid sampling is actually impossible.
 """
-Distributions.rand(rng::AbstractRNG, ::JeffreysPriorStandardDeviation) = exp(rand(rng, Turing.Flat()))
-Distributions.rand(rng::AbstractRNG, ::JeffreysPriorVariance)          = exp(rand(rng, Turing.Flat()))^2
+Distributions.rand(rng::Random.AbstractRNG, ::JeffreysPriorStandardDeviation) = exp(rand(rng, Turing.Flat()))
+Distributions.rand(rng::Random.AbstractRNG, ::JeffreysPriorVariance)          = exp(rand(rng, Turing.Flat()))^2
