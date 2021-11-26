@@ -19,3 +19,15 @@ Distributions.logpdf(d::JeffreysPriorStandardDeviation, x::Real) = Distributions
 struct JeffreysPriorVariance <: AbstractJeffreysPrior end
 Distributions.logpdf(d::JeffreysPriorVariance, x::Real) = Distributions.insupport(d, x) ? -2log(x) : -Inf
 
+"""
+	following, https://en.wikipedia.org/wiki/Jeffreys_prior#Gaussian_distribution_with_standard_deviation_parameter
+	we have that:
+
+	Equivalently, the Jeffreys prior for log(σ) = ∫ dσ / σ is the unnormalized uniform distribution
+	on the real line, and thus this distribution is also known as the logarithmic prior.
+
+	Therefore, we "sample" from d<:AbstractJeffreysPrior as a transformation of sampling from the real line.
+	Note that valid sampling is actually impossible.
+"""
+Distributions.rand(rng::AbstractRNG, ::JeffreysPriorStandardDeviation) = exp(rand(rng, Turing.Flat()))
+Distributions.rand(rng::AbstractRNG, ::JeffreysPriorVariance)          = exp(rand(rng, Turing.Flat()))^2
