@@ -2,7 +2,7 @@ function myloglikelihood(n, b, ρ, τ)
 
 	prec = ρ .* (τ * length(n))
 	out =
-		-logpdf(Distributions.InverseGamma(1, 1), τ) +
+		-Distributions.logpdf(Distributions.InverseGamma(1, 1), τ) +
 		-log(τ) +
 		sum(n .* log.(prec)) +
 		-0.5 * sum(prec .* b)

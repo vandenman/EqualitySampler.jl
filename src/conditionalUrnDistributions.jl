@@ -112,7 +112,7 @@ Distributions.maximum(d::AbstractConditionalUrnDistribution{T}) where T = T(leng
 Base.length(d::AbstractConditionalUrnDistribution) = length(d.urns)
 
 Distributions.logpdf(::AbstractConditionalUrnDistribution, x::Real) = -Inf
-Distributions.pdf(d::AbstractConditionalUrnDistribution{T}, x::Real) where T = exp(logpdf(d, x))
+Distributions.pdf(d::AbstractConditionalUrnDistribution{T}, x::Real) where T = exp(Distributions.logpdf(d, x))
 function Distributions.logpdf(d::AbstractConditionalUrnDistribution{T}, x::T) where T <: Integer
 	Distributions.insupport(d, x) || return -Inf
 	return log(_pdf(d)[x])

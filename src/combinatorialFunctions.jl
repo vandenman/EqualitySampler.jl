@@ -95,12 +95,12 @@ Base cases for stirlings2. Returns a tuple of (base_case_found::Bool, value::T).
 """
 function stirlings2_base_cases(n::T, k::T) where T <: Integer
 
-	n < zero(T) || k < zero(T) 			&&		return (true, 0)
+	n < zero(T) || k < zero(T) 			&&		return (true, zero(T))
 	k > n								&&		return (true, zero(T))
 	n == k								&&		return (true, one(T))
 	n == zero(T) || k == zero(T)		&&		return (true, zero(T))
 	k == n - 1							&&		return (true, binomial(n, T(2)))
-	k == T(2)							&&		return (true, 2^(n-1) - 1)
+	k == T(2)							&&		return (true, T(2^(n-1) - 1))
 
 	if n <= _r_stirling2r_N_MAX
 		index = _stirling2r_index(n, k, zero(T))

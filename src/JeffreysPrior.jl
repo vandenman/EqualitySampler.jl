@@ -8,7 +8,8 @@ Distributions.minimum(::AbstractJeffreysPrior) = 0.0
 Distributions.maximum(::AbstractJeffreysPrior) = Inf
 
 Distributions.insupport(::AbstractJeffreysPrior, x::Real)			= x > zero(x)
-pdf(d::AbstractJeffreysPrior, x::Real) = exp(logpdf(d, x))
+
+Distributions.pdf(d::AbstractJeffreysPrior, x::Real) = exp(Distributions.logpdf(d, x))
 
 # required for compatability with Turing
 Bijectors.bijector(::AbstractJeffreysPrior) = Bijectors.Log{0}()

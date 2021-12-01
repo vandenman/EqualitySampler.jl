@@ -205,29 +205,6 @@ function _pdf_helper!(result, d::BetaBinomialProcessMvUrnDistribution, index, co
 
 end
 
-function logpdf_model_distinct(d::BetaBinomialProcessMvUrnDistribution, x::AbstractVector{<:Integer})
-
-	# TODO: this is not correct!
-	# logpdf_model_distinct(d, count_equalities(x))
-
-	target_size = n - x
-	f! = x->filter!(y->length(y) == target_size, x)
-	counts, sizes = count_set_partitions_given_partition_size(f!, n)
-
-	res = U(0.0)
-	for i in eachindex(counts)#idx
-		v = length(sizes[i]) * log(M) +
-			SpecialFunctions.logabsgamma(M)[1] -
-			SpecialFunctions.logabsgamma(M + n)[1] +
-			sum(x->SpecialFunctions.logabsgamma(x)[1], sizes[i])
-
-		res += counts[i] * v
-	end
-	return res / sum(counts)
-
-end
-
-
 #endregion
 
 struct RandomProcessMvUrnDistribution{RPM <: Turing.RandomMeasures.AbstractRandomProbabilityMeasure, T <: Integer} <: AbstractMvUrnDistribution{T}
@@ -256,7 +233,7 @@ function Distributions._rand!(rng::Random.AbstractRNG, d::RandomProcessMvUrnDist
 end
 
 get_process(rpm::RandomMeasures.AbstractRandomProbabilityMeasure, ::Vector{Int}) = rpm
-get_process(rpm::RandomMeasures.PitmanYorProcess, nk::Vector{Int}) = PitmanYorProcess(rpm.d, rpm.θ, sum(!iszero, nk))
+get_process(rpm::RandomMeasures.PitmanYorProcess, nk::Vector{Int}) = RandomMeasures.PitmanYorProcess(rpm.d, rpm.θ, sum(!iszero, nk))
 
 # TODO: there has to be a more efficient way to compute nk!
 function _sample_process!(rng::Random.AbstractRNG, rpm::RandomMeasures.AbstractRandomProbabilityMeasure, x::AbstractVector)

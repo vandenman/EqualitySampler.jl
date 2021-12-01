@@ -298,9 +298,19 @@ for (i, k) in enumerate(ks)
 
 end
 
-make_jointplot(plts, legendfont = font(12), titlefont = font(20));
+make_jointplot(plts, legendfontsize = 12, titlefontsize = 16, tickfont = 12, guidefontsize = 16);
 
-plot(plts..., layout = grid(6, 12))
+plot(plts...; layout = (6, 12))
 
 # savefig(joint_2x6, joinpath("figures", "prior_comparison_plot_2x6_without_log_dpp_only.pdf"))
+
+@report_call logpdf(UniformMvUrnDistribution(5), [1, 2, 3, 4, 5])
+
+
+k = big(30)
+scatter(reverse(0:k), logpdf.(Ref(BetaBinomial(k, k, 1)), 0:k))
+scatter(reverse(0:k-1), logpdf_model_distinct.(Ref(BetaBinomialMvUrnDistribution(k, k, 1)), 0:k-1))
+
+scatter(reverse(0:k-1), logpdf_model.(Ref(BetaBinomialMvUrnDistribution(k, k, 1)), 0:k-1))
+
 

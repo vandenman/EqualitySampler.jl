@@ -167,3 +167,17 @@ examine whether DPP prior is not horribly slow!
   - [x] proportion of errors.
 - [ ] make DPP prior_comparison for different K (5, 10, 15, 20, 25, 30)
 - [ ] add a row where we don't use lopdf_distinct_model but logpdf_model
+	- this made no sense at all.
+
+
+# 01 - 12 - 2021
+
+- [ ] Figure 2, don't use distinct models but with re
+- [ ] Figure 3
+  - [ ] do both rows use the same distinct/ non-distinct models?
+  - [ ] really double check bottom left panel!
+  - [ ] top middle panel should be monotonically decreasing?
+  - [ ] double check BetaBinomial with
+  ```julia
+  log_model_probs_by_incl = Distributions.logpdf.(Distributions.BetaBinomial(k - 1, α, β), 0:k - 1) .- log_expected_inclusion_counts(k)
+  ```
