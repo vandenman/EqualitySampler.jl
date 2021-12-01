@@ -163,7 +163,7 @@ examine whether DPP prior is not horribly slow!
 - [x] Figure 3
   - [x] K = 30 for both rows.
   - [x] same x-axis (title + breaks) for both panels
-- [ ] Figure 4
-  - [ ] proportion of errors.
+- [x] Figure 4
+  - [x] proportion of errors.
 - [ ] make DPP prior_comparison for different K (5, 10, 15, 20, 25, 30)
 - [ ] add a row where we don't use lopdf_distinct_model but logpdf_model

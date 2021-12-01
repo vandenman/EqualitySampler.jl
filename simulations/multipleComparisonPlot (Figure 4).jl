@@ -7,7 +7,7 @@ if !isinteractive()
 	Pkg.activate(".")
 end
 
-using EqualitySampler, Turing, DynamicPPL, FillArrays, Plots
+using EqualitySampler, Turing, DynamicPPL, FillArrays, Plots, Plots.PlotMeasures
 
 import	StatsBase 			as SB,
 		LinearAlgebra 		as LA,
@@ -23,17 +23,10 @@ import StatsModels: @formula
 import Suppressor
 import Random
 
-# if isinteractive()
-# 	include("simulations/meansModel_Functions.jl")
-# 	include("simulations/helpersTuring.jl")
-# 	include("simulations/limitedLogger.jl")
-# 	include("simulations/customHMCAdaptation.jl")
-# else
-	include("meansModel_Functions.jl")
-	include("helpersTuring.jl")
-	include("limitedLogger.jl")
-	include("customHMCAdaptation.jl")
-# end
+include("meansModel_Functions.jl")
+include("helpersTuring.jl")
+include("limitedLogger.jl")
+include("customHMCAdaptation.jl")
 
 function get_priors()
 	return (
@@ -198,9 +191,9 @@ function make_figure(x, y, ylab, labels; shapes = :auto, kwargs...)
 end
 
 # using PlotlyJS
-plotlyjs()
+# plotlyjs()
 
-gr()
+# gr()
 size(results)
 
 labels = ["Uniform" "Beta-binomial α=1, β=1" "Beta-binomial α=K, β=1" "DPP α=0.5" "DPP α=1" "DPP α=Gopalan & Berry"]
@@ -218,20 +211,27 @@ plot!(p1, xlabel = "Number of groups", xticks = 2:10, xlim = (2, 10), ylim = (0,
 
 try2 = prop_incorrect.(results_big)
 mu2 = dropdims(mean(try2, dims = 3), dims = 3)[keep, :]
-p2 = make_figure(groups, permutedims(mu2), "P(errors)", labels)
-
+p2 = make_figure(groups, permutedims(mu2), "Proportion of errors", labels; shapes = shapes)
+plot!(p2, xlabel = "Number of groups", xticks = 2:10, xlim = (2, 10), ylim = (0, 1), widen = true)
 figsize = (700, 500)
 
-p12 = plot(plot(p1, legend = true), plot(p2, legend = false), size = (1500, 500))
+bottom_margin = 5mm
+left_margin   = 5mm
+p1_2 = plot(p1, legend = (0.085, .95),	bottom_margin = bottom_margin, left_margin = left_margin)
+
+p12 = plot(
+	plot(p1, legend = (0.085, .95),	bottom_margin = bottom_margin, left_margin = left_margin),
+	plot(p2, legend = false,		bottom_margin = bottom_margin, left_margin = left_margin),
+	size = (1500, 500), legendfontsize = 12, titlefontsize = 16, tickfont = 12, guidefontsize = 16
+);
 
 
 figdir = "figures"
-savefig(plot(p1, size = figsize), joinpath(figdir, "one_or_more_errors2.png"))
+# savefig(plot(p1, size = figsize), joinpath(figdir, "one_or_more_errors2.png"))
 # savefig(plot(p2, size = figsize), joinpath(figdir, "errors.png"))
-savefig(plot(p1, size = figsize), joinpath(figdir, "one_or_more_errors2.pdf"))
+# savefig(plot(p1, size = figsize), joinpath(figdir, "one_or_more_errors2.pdf"))
 # savefig(plot(p2, size = figsize), joinpath(figdir, "errors.pdf"))
 
-savefig(plot(p12, size = (1400, 500)), joinpath(figdir, "multipleComparisonPlot_side_by_side.pdf"))
-savefig(plot(p12, size = (1400, 500)), joinpath(figdir, "multipleComparisonPlot_side_by_side.png"))
+savefig(plot(p12, size = (1000, 500)), joinpath(figdir, "multipleComparisonPlot_side_by_side.pdf"))
+# savefig(plot(p12, size = (1000, 500)), joinpath(figdir, "multipleComparisonPlot_side_by_side.png"))
 
-plotl
