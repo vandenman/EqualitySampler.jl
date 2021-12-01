@@ -99,7 +99,7 @@ function stirlings2_base_cases(n::T, k::T) where T <: Integer
 	k > n								&&		return (true, zero(T))
 	n == k								&&		return (true, one(T))
 	n == zero(T) || k == zero(T)		&&		return (true, zero(T))
-	k == n - 1							&&		return (true, binomial(n, T(2)))
+	k == n - 1							&&		return (true, T(binomial(n, T(2))))
 	k == T(2)							&&		return (true, T(2^(n-1) - 1))
 
 	if n <= _r_stirling2r_N_MAX
@@ -425,11 +425,11 @@ function unsignedstirlings1_base_cases(n::T, k::T) where T <: Integer
 	n == k == zero(T)					&& return (true, one(T))
 	n == zero(T) || k == zero(T)		&& return (true, zero(T))
 	n == k								&& return (true, one(T))
-	k == one(T)							&& return (true, factorial(n - 1))
+	k == one(T)							&& return (true, T(factorial(n - 1)))
 	k == 2								&& return (true, round(T, factorial(n - 1) * sum(i->1/i, 1:n-1)))
-	k == n - 1							&& return (true, binomial(n, 2))
-	k == n - 2							&& return (true, div((3 * n - 1) * binomial(n, 3), 4))
-	k == n - 3							&& return (true, binomial(n, 2) * binomial(n, 4))
+	k == n - 1							&& return (true, T(binomial(n, 2)))
+	k == n - 2							&& return (true, T(div((3 * n - 1) * binomial(n, 3), 4)))
+	k == n - 3							&& return (true, T(binomial(n, 2) * binomial(n, 4)))
 
 	return(false, zero(T))
 end

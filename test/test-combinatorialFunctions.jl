@@ -154,4 +154,21 @@ import Combinatorics
 	# 		end
 	# 	end
 	# end
+
+	@testset "return types are inferred" begin
+
+		n0 = 3
+		k0 = 2
+		r0 = 1
+		for T in (Int, BigInt, Int128)
+			n, k, r = T(n0), T(k0), T(r0)
+
+
+			@inferred stirlings2(n, k)
+			@inferred stirlings2r(n, k, r)
+			@inferred bellnumr(n, r)
+			@inferred unsignedstirlings1(n, k)
+
+		end
+	end
 end
