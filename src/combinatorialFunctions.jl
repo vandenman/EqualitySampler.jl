@@ -121,7 +121,7 @@ Compute the logarithm of the Stirlings numbers of the second kind with an explic
 function logstirlings2(n::T, k::T) where T <: Integer
 
 	succes, value = stirlings2_base_cases(n, k)
-	succes && value >= zero(T) && return log(Float64(value))
+	succes && value >= zero(T) && return log(value)
 
 	logvalues = Vector{Float64}(undef, k)
 	for j in 1:k
@@ -243,7 +243,7 @@ function logstirlings2r(n::T, k::T, r::T) where T <: Integer
 	iszero(r) && return logstirlings2(n, k)
 
 	succes, value = stirlings2r_base_cases(n, k, r)
-	succes && value >= zero(T) && return log(Float64(value))
+	succes && value >= zero(T) && return log(value)
 
 	return logsumexp_batch(map(j->stirlings2rExplLogTerm(n, k, r, j), 1:n-r))
 
@@ -471,7 +471,7 @@ function logunsignedstirlings1(n::T, k::T) where T <: Integer
 	n >= 2 && k == 2			&& return SpecialFunctions.logfactorial(n - 1) + log(sum(i->1/i, 1:n-1))
 
 	succes, value = unsignedstirlings1_base_cases(n, k)
-	succes && value >= zero(T) && return log(Float64(value))
+	succes && value >= zero(T) && return log(value)
 
 	# this is more accurate than the stirlings1ExplLogTerm which introduces floating point errors for some reason
 	return Float64(log(unsignedstirlings1(BigInt(n), BigInt(k))))
