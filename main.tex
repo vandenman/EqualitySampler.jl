@@ -95,18 +95,19 @@
 
 \section*{Todos}
 \begin{itemize}
+    \item Check $\alpha$ to prior odds mapping. \checkmark
+    \item Create rate of errors figure and add it to Figure 4 (as a right panel). Have $\alpha = K$. Change Figure 3 to Number of groups. \checkmark
+    \item Run 200 iterations for Figure 4. \checkmark
+    \item Figure out the relationship between monotonically decreasing DP and $\alpha$. \checkmark
+    \item There is a contradiction between Figure 3 and 4 w.r.t. $\alpha \leq 1$ having a penalty or not. Don checks computations.
     \item Figure out whether Equation (9) else is the same as Equation (6) else.
     \item Simplify uniform prior description.
-    \item Fix Figure 3: Show log probability of 0, plot BB(30, 1), check y-axis scale of DP, increase line thickness and font size, adjust legend $P(\#0) / P(\#1)$, show DP with $\alpha = 0.50$.
-    \item Check $\alpha$ to prior odds mapping.
-    \item Create rate of errors figure and add it to Figure 4 (as a right panel). Have $\alpha = K$. Change Figure 3 to Number of groups.
-    \item Run 200 iterations for Figure 4.
+    \item Fix Figure 3: BB(30, 1) everywhere, increase line thickness and font size.
     \item Adjust small things in Figure 5 (font size, axis labels and titles, $\alpha = K$).
     \item Create Figure 5 with rate of errors.
     \item Rerun simulation study with $K = 9$ so that you have [2/8, 4/8, 6/8, 8/8] equalities out of the $K - 1 = 8$ equalities.
     \item Tension between uniform prior in Figure 5 (all equalities) and Figure 4 $K = 5$.
-    \item Figure out the relationship between monotonically decreasing DP and $\alpha$.
-    \item Fabian: Find variance example.
+    \item Fabian: Find variance example. \checkmark
     \item Fabian: Adjust interpretation of Figure 3. \checkmark
     \item Fabian: Adjust simulation study specification text. \checkmark
 \end{itemize}
@@ -354,8 +355,8 @@ While the blue line shows the prior odds of going from the null model to a model
 Here we illustrate the different multiplicity penalties that the different priors impose using a small simulation study. We simulate data from a one-way ANOVA model and analyze it using the specification by \textcite{rouder2012default}. The data generating model is as follows:
 \begin{align*}
     Y_{ij}              &\sim \mathcal{N}\left(\mu + \sigma\theta_j, \sigma^2\right)\\
-    \mu                 &\sim \mathcal{N}\left(0, 1\right)  \\
-    \sigma^2            &\sim \mathcal{IG}\left(1, 1\right) \\
+    \mu                 &\propto 1  \\
+    \sigma^2            &\propto 1 / \sigma^2 \\
     g                   &\sim \mathcal{IG}\left(\nicefrac{1}{2}, \nicefrac{1}{2}\right) \\
     \vec{\theta}^u   &\sim \mathcal{N}_{K-1}\left(0, g\right)   \\
     \vec{\theta}^c   &\leftarrow \mathbf{Q}\vec{\theta}^u \\
@@ -364,12 +365,14 @@ Here we illustrate the different multiplicity penalties that the different prior
 \end{align*}
 The data are normally distributed with a grand mean $\mu$, a group specific offset $\theta_j$, and a variance $\sigma^2$. The offsets sum to zero to avoid identification constraints. This is achieved by projecting $\vec{\theta}^u$ from a $K-1$ dimensional space onto a $K$ dimensional space using the matrix $Q$, which consists of the first $K-1$ columns of an eigendecomposition of a degenerate covariance matrix as defined in \textcite{rouder2012default}.\footnote{Note that this projection is not unique. It can also be achieved with, for example, a QR decomposition, as recommended by the \textcite{stanUserManual}.} Next, the elements of $\vec{\theta}^c$ within the same partition are averaged to obtain $\theta_j$. The unconstrained offsets $\vec{\theta}^u$ are assigned a $g$ prior where $g$ itself is assigned an inverse gamma prior with shape and scale equal to \nicefrac{1}{2} \parencite{liang2008mixtures}. Note that the model reduces to the approach of \textcite{rouder2012default} whenever the partition indicates that all elements are distinct.
 
+\FD{Changing $\alpha$ scales bottom row in Figure 3 – describe this! Top BB is models, not model classes (that's why it's not monotonically decreasing)}
+
 We simulated from the null model which assumes that all the groups are equal, drawing 100 observations per group and varying the number of groups $K \in [2, 3, \dots, 10]$, repeating each combination 100 times. For the analysis we considered six priors: the Dirichlet process prior (DPP) with $\alpha = 0.50$, $\alpha = 1$, and $\alpha$ set adaptively to have equal prior mass assigned to the model with all equalities and the model with all inequalities (i.e., $p(\mathcal{H}_0) = p(\mathcal{H}_1)$), as done by \textcite{gopalan1998bayesian}; the beta-binomial prior with $\alpha = K , \, \beta = 1$ and $\alpha = 1, \, \beta = 1$; and the uniform prior. We used our methodology as described in Section \ref{sec:method-description}, drawing 12,000 MCMC samples and discarding the first 2,000 as a burn-in.
 
 To assess how well the respective priors adjust for multiplicity, we calculated how frequently the posterior probability that any two groups differ is larger than 0.50, noting that the true model assumes that all groups are equal. Figure~\ref{fig:small_simulation} shows the probability of making one or more such errors as a function of the number of groups.
 \begin{figure}
     \centering
-    \includegraphics[width=0.90\textwidth]{figures/one_or_more_errors2.pdf}
+    \includegraphics[width=0.90\textwidth]{figures//multipleComparisonPlot_side_by_side.pdf}
     \caption{Probability of making one or more errors (left) and rate of errors (right) as a function of the number of groups $K$ for different priors; see main text for details.}
     \label{fig:small_simulation}
 \end{figure}
