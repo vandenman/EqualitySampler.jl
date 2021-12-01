@@ -123,7 +123,7 @@ function logstirlings2(n::T, k::T) where T <: Integer
 	succes, value = stirlings2_base_cases(n, k)
 	succes && value >= zero(T) && return log(value)
 
-	logvalues = Vector{Float64}(undef, k)
+	logvalues = Vector{T isa BigInt ? BigFloat : Float64}(undef, k)
 	for j in 1:k
 		logvalues[j] = stirlings2ExplLogTerm(n, k, j)
 	end
@@ -316,19 +316,19 @@ function bellnumr_base_cases(n::T, r::T) where T <: Integer
 
 	# base cases
 	n == 0		&& 		return (true, 		one(T))
-	n == 1		&&		return (true, 		r + 1)
+	n == 1		&&		return (true, 		T(r + 1))
 	# https://oeis.org/A002522 offset by 1
-	n == 2 		&& 		return (true, 		(r + 1)^2 + 1)
+	n == 2 		&& 		return (true, 		T((r + 1)^2 + 1))
 	# https://oeis.org/A005491 offset by 1
-	n == 3		&&		return (true, 		(r + 1)^3 + 3(r + 1) + 1)
+	n == 3		&&		return (true, 		T((r + 1)^3 + 3(r + 1) + 1))
 	# https://oeis.org/A005492 simplify equations for a(n)
-	n == 4	&&			return (true, 		15 + r * (20 + r * (12 + r * (4 + r))))
+	n == 4	&&			return (true, 		T(15 + r * (20 + r * (12 + r * (4 + r)))))
 
 	if 0 <= r < size(_bellnumr_table_BigInt, 1) && 5 <= n < size(_bellnumr_table_BigInt, 2) &&
 		return (true, T(_bellnumr_table_BigInt[r+1, n-4]))
 	end
 
-	return (false, 		zero(T))
+	return (false,		zero(T))
 end
 
 #endregion
@@ -426,7 +426,7 @@ function unsignedstirlings1_base_cases(n::T, k::T) where T <: Integer
 	n == zero(T) || k == zero(T)		&& return (true, zero(T))
 	n == k								&& return (true, one(T))
 	k == one(T)							&& return (true, factorial(n - 1))
-	k == 2								&& return (true, round(Int, factorial(n - 1) * sum(i->1/i, 1:n-1)))
+	k == 2								&& return (true, round(T, factorial(n - 1) * sum(i->1/i, 1:n-1)))
 	k == n - 1							&& return (true, binomial(n, 2))
 	k == n - 2							&& return (true, div((3 * n - 1) * binomial(n, 3), 4))
 	k == n - 3							&& return (true, binomial(n, 2) * binomial(n, 4))
@@ -474,7 +474,11 @@ function logunsignedstirlings1(n::T, k::T) where T <: Integer
 	succes && value >= zero(T) && return log(value)
 
 	# this is more accurate than the stirlings1ExplLogTerm which introduces floating point errors for some reason
-	return Float64(log(unsignedstirlings1(BigInt(n), BigInt(k))))
+	res = log(unsignedstirlings1(BigInt(n), BigInt(k)))
+	if !(T isa BigInt)
+		res = Float64(res)
+	end
+	return res
 	# terms = map(r->stirlings1ExplLogTerm(n, k, r), 0:n-k)
 	# return alternating_logsumexp_batch(terms)
 end
