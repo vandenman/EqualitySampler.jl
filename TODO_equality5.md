@@ -138,11 +138,11 @@ examine whether DPP prior is not horribly slow!
 		- [x] DPP: double check if the prior odds are 1 / \alpha.
 			- They are \alpha, see last bit of code in ...(Figure 3).jl
 		- [x] x-axis label: "Number of groups"
-	- [ ] Figure 4
-		- [ ] rerun with more iterations (200)
-		- [ ] side by side
-			- [ ] Left: current figure
-			- [ ] Right: Rate of errors #errors / #total possible errors
+	- [x] Figure 4
+		- [x] rerun with more iterations (200)
+		- [x] side by side
+			- [x] Left: current figure
+			- [x] Right: Rate of errors #errors / #total possible errors
 			- [x] Legend: Change # groups for K
 	- [ ] Figure 5
 		- [ ] k in \alpha = k should be capitalized
@@ -156,3 +156,14 @@ examine whether DPP prior is not horribly slow!
 			- DPP(1)
 			- DPP(Gopalan & Berry)
 
+
+# 17 - 11 - 2021
+
+- [ ] Make individual plots and combine these with minipage in LaTeX ?
+- [x] Figure 3
+  - [x] K = 30 for both rows.
+  - [x] same x-axis (title + breaks) for both panels
+- [ ] Figure 4
+  - [ ] proportion of errors.
+- [ ] make DPP prior_comparison for different K (5, 10, 15, 20, 25, 30)
+- [ ] add a row where we don't use lopdf_distinct_model but logpdf_model

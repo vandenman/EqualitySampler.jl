@@ -1,8 +1,9 @@
 import OrderedCollections: OrderedDict
 import StatsBase: countmap
+import MCMCChains
 
-get_eq_ind_nms(samples) = filter(x->startswith(string(x), "partition"), samples.name_map.parameters)
-function get_eq_samples(samples)
+get_eq_ind_nms(samples::MCMCChains.Chains) = filter(x->startswith(string(x), "partition"), samples.name_map.parameters)
+function get_eq_samples(samples::MCMCChains.Chains)
 	eq_ind_nms = get_eq_ind_nms(samples)
 	s = size(samples[eq_ind_nms])
 	return reshape(samples[eq_ind_nms].value.data, :, s[2])
@@ -12,11 +13,11 @@ end
 """
 	compute the proportion of samples where partition[i] == partition[j] ∀i, j
 """
-function compute_post_prob_eq(samples)
-	samps = get_eq_samples(samples)
-	n_samps, n_groups = size(samps)
+compute_post_prob_eq(chn::MCMCChains.Chains) = compute_post_prob_eq(get_eq_samples(chn))
+function compute_post_prob_eq(partition_samples::AbstractMatrix)
+	n_samps, n_groups = size(partition_samples)
 	probs = zeros(Float64, n_groups, n_groups)
-	for row in eachrow(samps)
+	for row in eachrow(partition_samples)
 		for j in eachindex(row)
 			idx = j .+ findall(==(row[j]), row[j+1:end])
 			probs[idx, j] .+= 1.0
@@ -28,11 +29,12 @@ end
 """
 	compute how often each model is visited
 """
-function compute_model_counts(chn, add_missing_models::Bool = true)
-	eq_samples = get_eq_samples(chn)
-	res = countmap(vec(mapslices(x->join(reduce_model(Int.(x))), eq_samples, dims = 2)))
+compute_model_counts(chn::MCMCChains.Chains, add_missing_models::Bool = true) = compute_model_counts(get_eq_samples(chn), add_missing_models)
+
+function compute_model_counts(partition_samples::AbstractMatrix, add_missing_models::Bool = true)
+	res = countmap(vec(mapslices(x->join(reduce_model(Int.(x))), partition_samples, dims = 2)))
 	if add_missing_models
-		k = size(eq_samples)[2]
+		k = size(partition_samples)[2]
 		expected_size = count_distinct_models(k)
 		if length(res) != expected_size
 			allmodels = vec(mapslices(x->join(reduce_model(x)), generate_distinct_models(k), dims = 1))
@@ -49,7 +51,7 @@ end
 """
 	compute the posterior probability of each model
 """
-function compute_model_probs(chn, add_missing_models::Bool = true)
+function compute_model_probs(chn::Union{MCMCChains.Chains, AbstractMatrix}, add_missing_models::Bool = true)
 	count_models = compute_model_counts(chn, add_missing_models)
 	total_visited = sum(values(count_models))
 	probs_models = Dict{String, Float64}()
@@ -62,10 +64,10 @@ end
 """
 	compute the posterior probability of including 0, ..., k-1 equalities in the model
 """
-function compute_incl_probs(chn; add_missing_inclusions::Bool = true)
-	eq_samples = get_eq_samples(chn)
-	k = size(eq_samples)[2]
-	inclusions_per_model = vec(mapslices(x->k - length(Set(x)), eq_samples, dims = 2))
+compute_incl_probs(chn::MCMCChains.Chains; add_missing_inclusions::Bool = true) = compute_incl_probs(get_eq_samples(chn); add_missing_inclusions=add_missing_inclusions)
+function compute_incl_probs(partition_samples::AbstractMatrix; add_missing_inclusions::Bool = true)
+	k = size(partition_samples)[2]
+	inclusions_per_model = vec(mapslices(x->k - length(Set(x)), partition_samples, dims = 2))
 	count = countmap(inclusions_per_model)
 	if add_missing_inclusions && length(count) != k
 		for i in 1:k
@@ -87,7 +89,7 @@ function counts2probs(counts::Dict{T, Int}) where T
 end
 
 
-function get_posterior_means_mu_sigma(model, chn)
+function get_posterior_means_mu_sigma(model, chn::MCMCChains.Chains)
 	s = summarystats(chn)
 	μ = s.nt.mean[startswith.(string.(s.nt.parameters), "μ")]
 	gen = generated_quantities(model, chn)

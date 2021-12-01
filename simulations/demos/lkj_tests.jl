@@ -108,7 +108,12 @@ true_sd     = collect(1.0:p)
 true_S_chol = true_R_chol.U * Diagonal(true_sd)
 true_S      = true_S_chol'true_S_chol
 
-x = rand(MvNormal(true_means, true_S), n)
+using PDMats
+
+PDMat(Cholesky(true_S_chol, :U, 0))
+
+
+x = rand(MvNormal(true_means, PDMat(true_S_chol)), n)
 
 @model function mvnormal_turing(x, η, ::Type{T} = Float64) where T
 

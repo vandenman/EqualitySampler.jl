@@ -23,17 +23,17 @@ import StatsModels: @formula
 import Suppressor
 import Random
 
-if isinteractive()
-	include("simulations/meansModel_Functions.jl")
-	include("simulations/helpersTuring.jl")
-	include("simulations/limitedLogger.jl")
-	include("simulations/customHMCAdaptation.jl")
-else
+# if isinteractive()
+# 	include("simulations/meansModel_Functions.jl")
+# 	include("simulations/helpersTuring.jl")
+# 	include("simulations/limitedLogger.jl")
+# 	include("simulations/customHMCAdaptation.jl")
+# else
 	include("meansModel_Functions.jl")
 	include("helpersTuring.jl")
 	include("limitedLogger.jl")
 	include("customHMCAdaptation.jl")
-end
+# end
 
 function get_priors()
 	return (
@@ -197,6 +197,10 @@ function make_figure(x, y, ylab, labels; shapes = :auto, kwargs...)
 	)
 end
 
+# using PlotlyJS
+plotlyjs()
+
+gr()
 size(results)
 
 labels = ["Uniform" "Beta-binomial α=1, β=1" "Beta-binomial α=K, β=1" "DPP α=0.5" "DPP α=1" "DPP α=Gopalan & Berry"]
@@ -218,12 +222,10 @@ p2 = make_figure(groups, permutedims(mu2), "P(errors)", labels)
 
 figsize = (700, 500)
 
-# using PlotlyJS
-plotlyjs()
-p12 = plot(plot(p1), plot(p2, legend = false), size = (1500, 500))
+p12 = plot(plot(p1, legend = true), plot(p2, legend = false), size = (1500, 500))
 
 
-figdir = joinpath("figures")
+figdir = "figures"
 savefig(plot(p1, size = figsize), joinpath(figdir, "one_or_more_errors2.png"))
 # savefig(plot(p2, size = figsize), joinpath(figdir, "errors.png"))
 savefig(plot(p1, size = figsize), joinpath(figdir, "one_or_more_errors2.pdf"))
