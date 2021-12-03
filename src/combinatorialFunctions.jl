@@ -23,7 +23,7 @@ function alternating_logsumexp_batch(x::AbstractVector{T}) where T <: Number
 		sign *= -1
 	end
 	# TODO: come up with something better than this fallback!
-	if result < 0.0
+	if result < zero(T)
 		@warn "alternating_logsumexp_batch failed which likely introduced numerical errors."
 		return T(log(sum(value->exp(BigFloat(value)), x)))
 	else
@@ -123,7 +123,7 @@ function logstirlings2(n::T, k::T) where T <: Integer
 	succes, value = stirlings2_base_cases(n, k)
 	succes && value >= zero(T) && return log(value)
 
-	logvalues = Vector{T isa BigInt ? BigFloat : Float64}(undef, k)
+	logvalues = Vector{T === BigInt ? BigFloat : Float64}(undef, k)
 	for j in 1:k
 		logvalues[j] = stirlings2ExplLogTerm(n, k, j)
 	end
