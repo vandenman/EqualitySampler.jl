@@ -123,10 +123,7 @@ function logstirlings2(n::T, k::T) where T <: Integer
 	succes, value = stirlings2_base_cases(n, k)
 	succes && value >= zero(T) && return log(value)
 
-	logvalues = Vector{T === BigInt ? BigFloat : Float64}(undef, k)
-	for j in 1:k
-		logvalues[j] = stirlings2ExplLogTerm(n, k, j)
-	end
+	logvalues = map(j->stirlings2ExplLogTerm(n, k, j), one(T):k)
 	return alternating_logsumexp_batch(logvalues) - SpecialFunctions.logfactorial(k)
 
 end
@@ -159,7 +156,7 @@ function stirlings2r(n::T, k::T, r::T, ::Type{ExplicitStrategy}) where T <: Inte
 	succes, value = stirlings2r_base_cases(n, k, r)
 	succes && return value
 
-	return sum(j->stirlings2rExplTerm(n, k, r, j), 1:n-r)
+	return sum(j->stirlings2rExplTerm(n, k, r, j), one(T):n-r)
 
 end
 
@@ -245,7 +242,7 @@ function logstirlings2r(n::T, k::T, r::T) where T <: Integer
 	succes, value = stirlings2r_base_cases(n, k, r)
 	succes && value >= zero(T) && return log(value)
 
-	return logsumexp_batch(map(j->stirlings2rExplLogTerm(n, k, r, j), 1:n-r))
+	return logsumexp_batch(map(j->stirlings2rExplLogTerm(n, k, r, j), one(T):n-r))
 
 end
 

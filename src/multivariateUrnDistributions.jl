@@ -81,10 +81,8 @@ struct BetaBinomialMvUrnDistribution{T <: Integer} <: AbstractMvUrnDistribution{
 	k::T
 	α::Float64
 	β::Float64
-	_log_model_probs_by_incl::Vector{Float64}
 	function BetaBinomialMvUrnDistribution(k::T, α::Float64 = 1.0, β::Float64 = 1.0) where T<:Integer
-		log_model_probs_by_incl = Distributions.logpdf.(Distributions.BetaBinomial(k - 1, α, β), 0:k - 1) .- log_expected_inclusion_counts(k)
-		new{T}(k, α, β, log_model_probs_by_incl)
+		new{T}(k, α, β)
 	end
 end
 
@@ -98,7 +96,9 @@ end
 # 	# Distributions.logpdf(Distributions.BetaBinomial(length(d) - 1, d.α, d.β), count_equalities(x))
 # end
 
-log_model_probs_by_incl(d::BetaBinomialMvUrnDistribution) = d._log_model_probs_by_incl
+function log_model_probs_by_incl(d::BetaBinomialMvUrnDistribution{T}) where T
+	Distributions.logpdf.(Distributions.BetaBinomial(d.k - one(T), d.α, d.β), zero(T):d.k - one(T)) .- log_expected_inclusion_counts(d.k)
+end
 logpdf_model_distinct(d::BetaBinomialMvUrnDistribution, x::AbstractVector{<:Integer}) = logpdf_model_distinct(d, count_equalities(x))
 function logpdf_model_distinct(d::BetaBinomialMvUrnDistribution, no_equalities::Integer)
 	in_eqsupport(d, no_equalities) || return -Inf
@@ -195,7 +195,7 @@ end
 
 function logpdf_model_distinct(d::RandomProcessMvUrnDistribution{W, T}, x::T) where {T<:Integer, W}
 
-	U = T <: BigInt ? BigFloat : Float64
+	U = T === BigInt ? BigFloat : Float64
 	n = T(length(d))
 	M = U(d.rpm.α)
 
