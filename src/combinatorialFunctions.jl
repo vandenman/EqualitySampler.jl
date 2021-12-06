@@ -80,8 +80,6 @@ end
 
 stirlings2(n::T, k::T, ::Type{RecursiveStrategy}) where T <: Integer = stirlings2_recursive(n, k)
 
-# required for memoize
-# Memoize.@memoize
 function stirlings2_recursive(n::T, k::T) where T <: Integer
 
 	succes, value = stirlings2_base_cases(n, k)
@@ -165,7 +163,7 @@ _stirlings2r_precompute(n::T, k::T, r::T) where T <: Integer = sum(j->_stirlings
 stirlings2r(n::T, k::T, r::T, ::Type{RecursiveStrategy}) where T <: Integer = stirlings2r_recursive(n, k, r)
 
 # required for memoization
-Memoize.@memoize function stirlings2r_recursive(n::T, k::T, r::T) where T <: Integer
+function stirlings2r_recursive(n::T, k::T, r::T) where T <: Integer
 
 	succes, value = stirlings2r_base_cases(n, k, r)
 	succes && return value
@@ -433,7 +431,6 @@ end
 
 unsignedstirlings1(n::T, k::T, ::Type{RecursiveStrategy}) where T <: Integer = unsignedstirlings1_recursive(n, k)
 
-# Memoize.@memoize
 function unsignedstirlings1_recursive(n::T, k::T) where T <: Integer
 
 	succes, value = unsignedstirlings1_base_cases(n, k)

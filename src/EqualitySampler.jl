@@ -1,7 +1,7 @@
 module EqualitySampler
 
 import Base: length
-import Distributions, Random, LinearAlgebra, Memoize, SpecialFunctions, Optim
+import Distributions, Random, LinearAlgebra, SpecialFunctions, Optim
 import StatsBase: countmap
 import OrderedCollections: OrderedDict
 import Turing, Turing.RandomMeasures
