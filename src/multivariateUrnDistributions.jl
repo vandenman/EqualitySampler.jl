@@ -41,7 +41,7 @@ function logpdf_incl(d::AbstractMvUrnDistribution, no_equalities::T) where T<:In
 		T <: BigInt && return BigFloat(-Inf)
 		return -Inf
 	end
-	logpdf_model_distinct(d, no_equalities) + log_count_distinct_models_with_incl(k, no_equalities)# + log_count_combinations(k, k - no_equalities)
+	logpdf_model_distinct(d, no_equalities) + log_count_distinct_models_with_no_equalities(k, no_equalities)# + log_count_combinations(k, k - no_equalities)
 end
 
 pdf_incl(d::AbstractMvUrnDistribution,  no_equalities) = exp(logpdf_incl(d,  no_equalities))

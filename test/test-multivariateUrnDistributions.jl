@@ -66,7 +66,7 @@ import Distributions, Turing, StatsBase, Statistics
 						# no. equalities is insufficient for model probabilities for DPP
 						if !(d isa RandomProcessMvUrnDistribution)
 							model_probs  = pdf_model.(Ref(d), 0:k-1)
-							model_counts = count_distinct_models_with_incl.(k, 0:k-1) .* count_combinations.(k, k .- (0:k-1))
+							model_counts = count_distinct_models_with_no_equalities.(k, 0:k-1) .* count_combinations.(k, k .- (0:k-1))
 
 							# dividing inclusion probabilities by model size frequency gives the model probabilities
 							@test efficient_incl_probs ./ model_counts ≈ model_probs

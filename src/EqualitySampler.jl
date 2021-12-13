@@ -41,9 +41,9 @@ export
 
 	count_combinations,
 	count_distinct_models,
-	count_models_with_incl,
-	count_distinct_models_with_incl,
-	log_count_distinct_models_with_incl,
+	count_models_with_no_equalities,
+	count_distinct_models_with_no_equalities,
+	log_count_distinct_models_with_no_equalities,
 	count_equalities,
 	reduce_model,
 	reduce_model_dpp,

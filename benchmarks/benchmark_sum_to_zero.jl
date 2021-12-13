@@ -45,7 +45,7 @@ p1 / sum(p1)
 
 pdf_model_distinct.(Ref(D), count_equalities.(us))
 
-oo = pdf_model_distinct.(Ref(D), count_equalities.(us)) .* count_distinct_models_with_incl.(k, count_equalities.(us))
+oo = pdf_model_distinct.(Ref(D), count_equalities.(us)) .* count_distinct_models_with_no_equalities.(k, count_equalities.(us))
 oo ./ sum(oo)
 
 ccc = 1 ./ count_combinations.(us)
