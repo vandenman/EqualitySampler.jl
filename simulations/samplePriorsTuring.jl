@@ -90,7 +90,7 @@ function _sample_process_turing(model; no_samples::Int = 100_000)
 		sampled_models[:, i] .= reduce_model(Int.(samples.value.data[i, 2:nc]))
 	end
 	empirical_model_probs     = empirical_model_probabilities(sampled_models)
-	empirical_inclusion_probs = empirical_inclusion_probabilities(sampled_models)
+	empirical_inclusion_probs = empirical_equality_probabilities(sampled_models)
 	return empirical_model_probs, empirical_inclusion_probs, sampled_models
 
 end
@@ -140,6 +140,6 @@ end
 # ref = UniformConditionalUrnDistribution(ones(Int, k), 1)
 
 # empirical_model_probs     = empirical_model_probabilities(samps)
-# empirical_inclusion_probs = empirical_inclusion_probabilities(samps)
+# empirical_inclusion_probs = empirical_equality_probabilities(samps)
 
 # pjoint = visualize_eq_samples(ref, empirical_model_probs, empirical_inclusion_probs)

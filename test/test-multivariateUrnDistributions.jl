@@ -39,10 +39,10 @@ import Distributions, Turing, StatsBase, Statistics
 
 		@testset "Distribution $(dist[:dist])" begin
 
-			for args in dist[:args]
+			for args in dist.args
 
 				k = first(args)
-				d = dist[:dist](args...)
+				d = dist.dist(args...)
 				# m0 = generate_distinct_models(k)
 				m = generate_all_models(k)
 
@@ -50,23 +50,24 @@ import Distributions, Turing, StatsBase, Statistics
 
 					@testset "pdf sums to 1, inclusion probabilities match, model probabilities match " begin
 
-						s = vec([count_equalities(collect(col)) for col in m])
-						indices = [findall(==(i), s) for i in 0:k-1]
+						s = vec([count_parameters(collect(col)) for col in m])
+						indices = [findall(==(i), s) for i in 1:k]
 
 						probs = vec([Distributions.pdf(d, collect(col)) for col in m])
 						# pdf over all models sums to 1.0
 						@test sum(probs) ≈ 1.0
 
 						brute_force_incl_probs = [sum(probs[indices[i]]) for i in 1:k]
-						efficient_incl_probs = [pdf_incl(d, i-1) for i in 1:k]
+						efficient_incl_probs = [pdf_incl(d, i) for i in 1:k]
 
 						# direct computation of inclusion probabilities (which is more efficient) equals brute force computation of inclusion probabilities
 						@test efficient_incl_probs ≈ brute_force_incl_probs
 
 						# no. equalities is insufficient for model probabilities for DPP
 						if !(d isa RandomProcessMvUrnDistribution)
-							model_probs  = pdf_model.(Ref(d), 0:k-1)
-							model_counts = count_distinct_models_with_no_equalities.(k, 0:k-1) .* count_combinations.(k, k .- (0:k-1))
+							model_probs  = pdf_model.(Ref(d), 1:k)
+							model_counts = count_distinct_models_with_no_parameters.(k, 1:k) .* count_combinations.(k, 1:k)
+							# model_counts = count_distinct_models_with_no_equalities.(k, 0:k-1) .* count_combinations.(k, k .- (0:k-1))
 
 							# dividing inclusion probabilities by model size frequency gives the model probabilities
 							@test efficient_incl_probs ./ model_counts ≈ model_probs
@@ -94,7 +95,7 @@ import Distributions, Turing, StatsBase, Statistics
 							expected_model_probs      = [exp(EqualitySampler.logpdf_model_distinct(d, reduce_model_dpp(parse.(Int, split(model, ""))))) for model in keys(tmp)]
 						end
 
-						empirical_inclusion_probs = collect(values(empirical_inclusion_probabilities(samples)))
+						empirical_inclusion_probs = collect(values(empirical_no_parameters_probabilities(samples)))
 						expected_inclusion_probs  = expected_inclusion_probabilities(d)
 
 						rtol = 0.15 + 0.02k # TODO: something better than this.
@@ -107,7 +108,7 @@ import Distributions, Turing, StatsBase, Statistics
 						@testset "Batch computations match individual ones" begin
 
 							expected = log_expected_inclusion_probabilities(d)
-							observed = logpdf_incl.(Ref(d), 0:length(d) - 1)
+							observed = logpdf_incl.(Ref(d), 1:length(d))
 
 							@test isapprox(expected, observed)
 
@@ -153,16 +154,16 @@ import Distributions, Turing, StatsBase, Statistics
 			d_u  = UniformMvUrnDistribution(k)
 			d_bb = BetaBinomialMvUrnDistribution(k, k, 1)
 			models = generate_distinct_models(k)
-			equalities = count_equalities.(eachcol(models))
+			parameters = count_parameters.(eachcol(models))
 
 			logprob_d_bb_models     = logpdf_model_distinct.(Ref(d_bb), eachcol(models))
-			logprob_d_bb_equalities = logpdf_model_distinct.(Ref(d_bb), equalities)
+			logprob_d_bb_parameters = logpdf_model_distinct.(Ref(d_bb), parameters)
 
 			logprob_d_u_models     = logpdf_model_distinct.(Ref(d_u), eachcol(models))
-			logprob_d_u_equalities = logpdf_model_distinct.(Ref(d_u), equalities)
+			logprob_d_u_parameters = logpdf_model_distinct.(Ref(d_u), parameters)
 
-			@test logprob_d_bb_models ≈ logprob_d_bb_equalities
-			@test logprob_d_u_models ≈ logprob_d_u_equalities
+			@test logprob_d_bb_models ≈ logprob_d_bb_parameters
+			@test logprob_d_u_models ≈ logprob_d_u_parameters
 
 		end
 	end

@@ -43,7 +43,7 @@ D = UniformConditionalUrnDistribution(urns, 1)
 sampled_models = simulate_from_distribution(nrand, D)
 
 empirical_model_probs     = empirical_model_probabilities(sampled_models)
-empirical_inclusion_probs = empirical_inclusion_probabilities(sampled_models)
+empirical_inclusion_probs = empirical_equality_probabilities(sampled_models)
 
 pjoint = visualize_eq_samples(D, empirical_model_probs, empirical_inclusion_probs)
 # png(pjoint, "modelspace uniform $k.png")
@@ -54,7 +54,7 @@ D = BetaBinomialConditionalUrnDistribution(urns, 1, 1, 1)
 sampled_models = simulate_from_distribution(nrand, D)
 
 empirical_model_probs     = empirical_model_probabilities(sampled_models)
-empirical_inclusion_probs = empirical_inclusion_probabilities(sampled_models)
+empirical_inclusion_probs = empirical_equality_probabilities(sampled_models)
 
 pjoint = visualize_eq_samples(D, empirical_model_probs, empirical_inclusion_probs)
 

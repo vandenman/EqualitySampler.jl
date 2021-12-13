@@ -1,3 +1,5 @@
+# TODO: this entire file needs to be refactored!
+
 """
 	reduce a model to a unique representation. For example, [2, 2, 2] -> [1, 1, 1]
 """
@@ -103,6 +105,8 @@ end
 
 count_equalities(urns::AbstractVector{T}) where T <: Integer = length(urns) - length(Set(urns))
 count_equalities(urns::AbstractString) = length(urns) - length(Set(urns))
+
+count_parameters(urns::U) where U <: Union{AbstractVector{<:Integer}, AbstractString} = length(Set(urns))
 
 #region AbstractConditionalUrnDistribution
 abstract type AbstractConditionalUrnDistribution{T} <: Distributions.DiscreteUnivariateDistribution where T <: Integer end
@@ -230,7 +234,7 @@ struct BetaBinomialConditionalUrnDistribution{T, U<:AbstractVector{T}} <: Abstra
 		one(T) <= index <= n || throw(DomainError(urns, "condition: 0 <= index <= length(urns) is violated"))
 		0.0 <= α || throw(DomainError(α, "condition: 0 <= α is violated"))
 		0.0 <= β || throw(DomainError(β, "condition: 0 <= β is violated"))
-		log_model_probs_by_incl = Distributions.logpdf.(Distributions.BetaBinomial(n - 1, α, β), 0:n - 1) .- log_expected_inclusion_counts(n)
+		log_model_probs_by_incl = Distributions.logpdf.(Distributions.BetaBinomial(n - 1, α, β), 0:n - 1) .- log_expected_equality_counts(n)
 		new{T, U}(urns, index, α, β, log_model_probs_by_incl)
 	end
 end
@@ -265,9 +269,15 @@ function _pdf_helper!(result, d::T, index, complete_urns) where T<:Union{BetaBin
 
 	model_probs_by_incl = exp.(log_model_probs_by_incl(d))
 
-	num = r * sum(model_probs_by_incl[k] * stirlings2r(n - 1, n0 - k + 1, r    ) for k in 1:n0)
-	den =     sum(model_probs_by_incl[k] * stirlings2r(n    , n0 - k + 1, r + 1) for k in 1:n0)
+	# no. parameters
+	num = r * sum(model_probs_by_incl[k] * stirlings2r(n - 1, k, r    ) for k in 1:n0)
+	den =     sum(model_probs_by_incl[k] * stirlings2r(n    , k, r + 1) for k in 1:n0)
 	probEquality = num / (num + den)
+
+	# no. equalities
+	# num = r * sum(model_probs_by_incl[k] * stirlings2r(n - 1, n0 - k + 1, r    ) for k in 1:n0)
+	# den =     sum(model_probs_by_incl[k] * stirlings2r(n    , n0 - k + 1, r + 1) for k in 1:n0)
+	# probEquality = num / (num + den)
 
 	# probability of an equality
 	known = reduce_model(v_known_urns)
@@ -285,25 +295,25 @@ end
 #endregion
 
 #region expected model + inclusion probabilities
-function expected_model_probabilities(k::Int)
+function expected_model_probabilities(k::Integer)
 	x = count_distinct_models(k)
-	return fill(1 / x, x)
+	return fill(one(k) / x, x)
 end
-expected_inclusion_counts(k::Integer) = stirlings2.(k, k:-1:1)
+expected_inclusion_counts(k::Integer) = stirlings2.(k, 1:k)
 function expected_inclusion_probabilities(k::Integer)
 	counts = expected_inclusion_counts(k)
 	return counts ./ sum(counts)
 end
-log_expected_inclusion_counts(k::Integer) = logstirlings2.(k, k:-1:1)
+log_expected_equality_counts(k::Integer) = logstirlings2.(k, 1:k)
 
 
 const UniformUrnDists = Union{UniformConditionalUrnDistribution, UniformMvUrnDistribution}
 expected_model_probabilities(d::UniformUrnDists) = expected_model_probabilities(length(d))
 expected_inclusion_counts(d::UniformUrnDists) = expected_inclusion_counts(length(d))
 expected_inclusion_probabilities(d::UniformUrnDists) = expected_inclusion_probabilities(length(d))
-log_expected_inclusion_counts(d::UniformUrnDists) = log_expected_inclusion_counts(length(d))
+log_expected_equality_counts(d::UniformUrnDists) = log_expected_equality_counts(length(d))
 function log_expected_inclusion_probabilities(d::UniformUrnDists)
-	vals = log_expected_inclusion_counts(length(d))
+	vals = log_expected_equality_counts(length(d))
 	z = logsumexp_batch(vals)
 	return vals .- z
 end

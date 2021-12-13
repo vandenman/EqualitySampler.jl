@@ -1,4 +1,8 @@
-#region combinatorial functions over the model space
+#=
+
+	combinatorial functions over the model space
+
+=#
 """
 	count_combinations(k::Int, islands::Int)
 	count_combinations(s::AbstractString)
@@ -39,11 +43,13 @@ returns the n-th bell number, which representats the total number of unique mode
 """
 count_distinct_models(k::Integer) = bellnumr(k, zero(k))
 
-count_distinct_models_with_incl(k, no_equalities) = stirlings2(k, k - no_equalities)
-count_models_with_incl(k, no_equalities) = count_distinct_models_with_incl(k, no_equalities) * count_combinations(k, k - no_equalities)
+count_distinct_models_with_no_equalities(k::T, no_equalities::T)     where T<:Integer = stirlings2(k, k - no_equalities)
+count_models_with_no_equalities(k::T, no_equalities::T)              where T<:Integer = count_distinct_models_with_no_equalities(k, no_equalities) * count_combinations(k, k - no_equalities)
+log_count_distinct_models_with_no_equalities(k::T, no_equalities::T) where T<:Integer = logstirlings2(k, k - no_equalities)
 
-log_count_distinct_models_with_incl(k, no_equalities) = logstirlings2(k, k - no_equalities)
-
+count_distinct_models_with_no_parameters(k::T, no_parameters::T)     where T<:Integer = stirlings2(k, no_parameters)
+count_models_with_no_parameters(k::T, no_parameters::T)              where T<:Integer = count_distinct_models_with_no_parameters(k, no_parameters) * count_combinations(k, no_parameters)
+log_count_distinct_models_with_no_parameters(k::T, no_parameters::T) where T<:Integer = logstirlings2(k, no_parameters)
 
 
 

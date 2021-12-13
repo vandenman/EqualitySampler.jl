@@ -1,5 +1,3 @@
-#region helperfunctions
-
 abstract type StirlingStrategy end
 struct RecursiveStrategy <: StirlingStrategy end
 struct ExplicitStrategy <: StirlingStrategy end

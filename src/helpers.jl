@@ -7,24 +7,24 @@ function counts2probs(counts::Dict{T, Int}) where T
 	return probs
 end
 
-function count_equalities(sampled_models::AbstractMatrix)
-
-	k, n = size(sampled_models)
-	result = Vector{Int}(undef, n)
-	for i in axes(sampled_models, 2)
-		result[i] = k - length(unique(view(sampled_models, :, i)))
-	end
-	return result
+function count_equalities(sampled_models::AbstractMatrix{<:Integer})
+	map(count_equalities, eachcol(sampled_models))
 end
 
 function empirical_model_probabilities(sampled_models::AbstractMatrix)
 	count_models = countmap(vec(mapslices(x->join(Int.(x)), sampled_models, dims = 1)))
 	probs_models = counts2probs(count_models)
-	return sort!(OrderedDict(probs_models), by=x->count_equalities(x))
+	return sort!(OrderedDict(probs_models), by=x->count_parameters(x))
 end
 
-function empirical_inclusion_probabilities(sampled_models::AbstractMatrix)
+function empirical_equality_probabilities(sampled_models::AbstractMatrix)
 	no_equalities = count_equalities(sampled_models)
 	counts_equalities = countmap(no_equalities)
-	return sort!(OrderedDict(counts2probs(counts_equalities)))
+	return sort!(OrderedDict(counts2probs(counts_equalities)), by=x->count_equalities(x))
+end
+
+function empirical_no_parameters_probabilities(sampled_models::AbstractMatrix)
+	no_parameters = map(count_parameters, eachcol(sampled_models))
+	counts_parameters = countmap(no_parameters)
+	return sort!(OrderedDict(counts2probs(counts_parameters)))
 end

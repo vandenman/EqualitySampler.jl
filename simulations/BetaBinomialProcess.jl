@@ -26,7 +26,7 @@ function get_empirical_model_probabilities(sampled_models)
 	return sort(probs_models, by = x->count_equalities(x))
 end
 
-function get_empirical_inclusion_probabilities(sampled_models)
+function get_empirical_equality_probabilities(sampled_models)
 	no_equalities = count_equalities(sampled_models)
 	counts_equalities = countmap(no_equalities)
 	return counts2probs(counts_equalities)
@@ -132,7 +132,7 @@ function randEqualityBB!(x::AbstractVector, D)
 	# y = similar(x)
 	incl_probs = pdf.(D, 0:k-1)
 	no_incl = 0
-	no_groups = 
+	no_groups =
 	# y = BitArray(undef, k)
 	# x[1] = rand(1:k)
 	for i in 1:k
@@ -168,7 +168,7 @@ function randEqualityBB!(x::AbstractVector, D)
 				# end
 				# probs[.!iszero.(probs)] .= 1.0 ./ probs[.!iszero.(probs)]
 				# probs = probs ./ sum(probs)
-				if i == 1 
+				if i == 1
 
 					x[2] = x[1]
 
@@ -213,7 +213,7 @@ D2 = BetaBinomialConditionalUrnDistribution(urns, 1, α, β)
 # sampled_models = simulate_from_distribution(nrand, D)
 
 empirical_model_probs     = get_empirical_model_probabilities(sampled_models)
-empirical_inclusion_probs = get_empirical_inclusion_probabilities(sampled_models)
+empirical_inclusion_probs = get_empirical_equality_probabilities(sampled_models)
 
 pjoint = visualize_eq_samples(D2, empirical_model_probs, empirical_inclusion_probs)
 
@@ -281,7 +281,7 @@ D2 = BetaBinomialConditionalUrnDistribution(urns, 1, α, β)
 # sampled_models = simulate_from_distribution(nrand, D)
 
 empirical_model_probs     = get_empirical_model_probabilities(sampled_models)
-empirical_inclusion_probs = get_empirical_inclusion_probabilities(sampled_models)
+empirical_inclusion_probs = get_empirical_equality_probabilities(sampled_models)
 
 pjoint = visualize_eq_samples(D2, empirical_model_probs, empirical_inclusion_probs)
 
@@ -294,7 +294,7 @@ function rstirling2(n::T, k::T, r::T) where T <: Integer
 	iszero(n) || iszero(k) && return zero(T)
 	n == r && return one(T)
 
-	return k * rstirling2(n - 1, k, r) + rstirling2(n - 1, k - 1, r) 
+	return k * rstirling2(n - 1, k, r) + rstirling2(n - 1, k - 1, r)
 
 end
 

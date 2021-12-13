@@ -44,17 +44,22 @@ export
 	count_models_with_no_equalities,
 	count_distinct_models_with_no_equalities,
 	log_count_distinct_models_with_no_equalities,
+	count_models_with_no_parameters,
+	count_distinct_models_with_no_parameters,
+	log_count_distinct_models_with_no_parameters,
 	count_equalities,
+	count_parameters,
 	reduce_model,
 	reduce_model_dpp,
 	# reduce_model!,
 	expected_model_probabilities,
 	expected_inclusion_counts,
 	expected_inclusion_probabilities,
-	log_expected_inclusion_counts,
+	log_expected_equality_counts,
 	log_expected_inclusion_probabilities,
 	empirical_model_probabilities,
-	empirical_inclusion_probabilities,
+	empirical_equality_probabilities,
+	empirical_no_parameters_probabilities,
 	generate_distinct_models,
 	generate_all_models,
 	count_set_partitions_given_partition_size,
@@ -94,6 +99,7 @@ export
 	# compute_incl_probs,
 	# get_posterior_means_mu_sigma
 
+include("specialfunctions.jl")
 include("stirling_helpers.jl")
 include("stirling1.jl")
 include("stirling2.jl")

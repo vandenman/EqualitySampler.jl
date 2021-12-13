@@ -19,7 +19,7 @@ updateDistribution(D::BetaBinomialConditionalUrnDistribution, urns, j) = BetaBin
 			end
 			D = updateDistribution(D, ones(Int, k), 1)
 			empirical_model_probs     = collect(values(empirical_model_probabilities(samples)))
-			empirical_inclusion_probs = collect(values(empirical_inclusion_probabilities(samples)))
+			empirical_inclusion_probs = collect(values(empirical_no_parameters_probabilities(samples)))
 			expected_model_probs      = expected_model_probabilities(D)
 			expected_inclusion_probs  = expected_inclusion_probabilities(D)
 			rtol = 0.15 + 0.02k # TODO: something better than this.
