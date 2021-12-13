@@ -176,7 +176,7 @@ end
 # 	lpdf
 # end
 
-function logpdf_incl(d::RandomProcessMvUrnDistribution, no_equalities::Integer)
+function logpdf_incl(d::RandomProcessMvUrnDistribution, ::Integer)
 
 	throw(DomainError(d, "only implemented for rpm<:Turing.RandomMeasures.DirichletProcess"))
 	# generate one instance of all different models with no_equalities

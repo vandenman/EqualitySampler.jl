@@ -94,6 +94,13 @@ export
 	# compute_incl_probs,
 	# get_posterior_means_mu_sigma
 
+include("stirling_helpers.jl")
+include("stirling1.jl")
+include("stirling2.jl")
+include("rstirling2.jl")
+include("bellnumr.jl")
+include("lookupTablesStirlingRBellnumbers.jl")
+include("generateModelSpace.jl")
 include("combinatorialFunctions.jl")
 include("multivariateUrnDistributions.jl")
 include("conditionalUrnDistributions.jl")
