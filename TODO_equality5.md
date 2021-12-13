@@ -179,5 +179,22 @@ examine whether DPP prior is not horribly slow!
   - [ ] top middle panel should be monotonically decreasing?
   - [ ] double check BetaBinomial with
   ```julia
-  log_model_probs_by_incl = Distributions.logpdf.(Distributions.BetaBinomial(k - 1, α, β), 0:k - 1) .- log_expected_inclusion_counts(k)
+  log_model_probs_by_incl = Distributions.logpdf.(Distributions.BetaBinomial(k - 1, α, β), 0:k - 1) .- log_expected_equality_counts(k)
   ```
+
+A:
+
+- [ ] BB(k, 1) is definitely not monotonically decreasing on the prior model inclusion space,
+  so sum(P(M_i) for i in 1:... if no_equalities(M_i) == j)
+
+- [ ] Somewhere I do logstirlings2(k, k:-1:1) should this not be logstirlings2(k, 1:k)?
+  - given k in 0:n-1, stirlings(n, n - k) counts the number of models given k equality constraints necessary. Meanwhile, stirlings(n, k) counts the number of free parameters in the model.
+
+
+- [ ] Flip stirling numbers + interpretation of betabinomial
+  -> x-axis becomes no. free parameters
+  -> Beta-binomial parametrization becomes (1, f(k)) rather than (f(k), 1)
+
+- [x] Recreate Figure 2
+- [ ] Recreate Figure 3
+- [ ] Recreate Figure 4

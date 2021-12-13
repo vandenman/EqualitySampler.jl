@@ -14,6 +14,7 @@
 
 using EqualitySampler, Distributions, Plots
 import		DataFrames					as DF,
+			OrderedCollections,
 			CSV
 import Turing.RandomMeasures: DirichletProcess
 
@@ -49,7 +50,7 @@ function get_data(dists)
 		models = models_int
 	)
 	df_wide_incl_probs = DF.DataFrame(
-		k = collect(0:k-1)
+		k = collect(1:k)
 	)
 
 	ndists = sum(max(1, length(elem[:args])) for elem in dists)
@@ -73,7 +74,7 @@ function get_data(dists)
 		for arg in args
 			D = updateDistribution(d, arg)
 			model_probs = vec(mapslices(m->logpdf_model_distinct(D, m), models, dims = 1))
-			incl_probs = logpdf_incl.(Ref(D), 0:k-1)
+			incl_probs = logpdf_incl.(Ref(D), 1:k)
 
 			nm = make_title_wide(D)
 			df_wide_model_probs[!, nm] = model_probs
@@ -123,7 +124,7 @@ function make_all_plots(dfg, dfg_incl;
 
 	ord = sortperm(ordering.(digits.(values(u))), lt=!isless)
 	x_models = collect(u)[ord]
-	x_idx = [findfirst(==(model), first(dfg)[1, :models]) for model in x_models]
+	x_idx = [findlast(==(model), first(dfg)[1, :models]) for model in x_models]
 
 	x_axis_plots = plot_model.(x_models)
 	for plt in x_axis_plots
@@ -212,7 +213,10 @@ function make_all_plots(dfg, dfg_incl;
 
 		subdf_incl = dfg_incl[i]
 
-		x = 0:4
+		k = ndigits(first(first(subdf.models)))
+		x = 0:k-1 # no. inequalities
+		# x = 1:k # no. free parameters
+
 		y = Matrix{Float64}(undef, length(x), size(subdf_incl, 1))
 		for j in axes(subdf, 1)
 			y[:, j] .= subdf_incl[j, :value]
@@ -230,8 +234,8 @@ function make_all_plots(dfg, dfg_incl;
 		# elseif subdf_incl[1, :distribution]<: RandomProcessMvUrnDistribution
 		# 	legendpos = :bottomleft
 		# end
-
-		plt = plot(reverse(x), y, markershape = :auto,# labels = labels,
+		@show x, y
+		plt = plot(x, y, markershape = :auto,# labels = labels,
 				legend = :none,#legendpos,
 				ylims = ylims, yticks = yticks,
 				markersize = graph_markersize
@@ -251,7 +255,7 @@ dists = (
 	),
 	(
 		dist = BetaBinomialMvUrnDistribution(k),
-		args = ((1, 1), (k, 1))
+		args = ((1, 1), (1, binomial(k, 2)))
 	),
 	(
 		dist = DirichletProcessMvUrnDistribution(k, 1),
@@ -267,8 +271,8 @@ df_wide_model_probs, df_long_model_probs, df_wide_incl_probs, df_long_incl_probs
 dfg = DF.groupby(df_long_model_probs, :distribution);
 dfg_incl = DF.groupby(df_long_incl_probs, :distribution);
 
-using PlotlyJS
-plotlyjs()
+# using PlotlyJS
+# plotlyjs()
 
 plts = make_all_plots(dfg, dfg_incl; graph_markersize = 5);
 plts = plts[:, [3, 2, 1]];
@@ -276,6 +280,7 @@ ylabel!(plts[1, 1], "Log prior probabilty");
 ylabel!(plts[2, 1], "Log prior probabilty");
 xlabel!(plts[1, 2], "Model type");
 xlabel!(plts[2, 2], "No. inequalities");
+# xlabel!(plts[2, 2], "No. free parameters");
 plot!(plts[1, 1]; foreground_color_legend = nothing, background_color_legend = nothing);
 plot!(plts[1, 2]; foreground_color_legend = nothing, background_color_legend = nothing);
 # plot!(plts[2, 2], bottom_margin = 10mm);
@@ -286,117 +291,6 @@ w = 600
 joint_plts = permutedims(plts)
 Plots.resetfontsizes()
 Plots.scalefontsizes(1.8) # only run this once!
-jointplot = plot(joint_plts..., legendfont = font(12), titlefont = font(24), layout = (2, 3), size = (3w, 2w));
-savefig(jointplot, joinpath("figures", "visualizePriors_2x3.png"))
+jointplot = plot(joint_plts..., legendfont = font(12), titlefont = font(24), layout = (2, 3), size = (3w, 2w),
+				bottom_margin = 10mm, left_margin = 15mm);
 savefig(jointplot, joinpath("figures", "visualizePriors_2x3.pdf"))
-
-topplots = plts[1, 1:3];
-joint_topplots = plot(topplots..., legend = false, guidefont = font(18), tickfont = font(12), titlefont = font(24), layout = (1, 3), size = (3w, 1w),
-						bottom_margin = 10mm, left_margin = 15mm);
-savefig(joint_topplots, joinpath("figures", "visualizePriors_1x3.png"))
-
-# jointplot = plot(
-# 	plts[1, :]...,
-# 	deepcopy(x_axis)...,
-# 	deepcopy(x_axis)...,
-# 	deepcopy(x_axis)...,
-# 	plts[2, :]...,
-# 	layout = @layout [
-# 		grid(1, 3,  heights = (0.7,  ))
-# 		grid(1, 21, heights = (0.15, ))
-# 		grid(1, 3,  heights = (0.7,  ))
-# 	]
-# )
-
-# this is basically https://github.com/JuliaPlots/Plots.jl/issues/3378
-# nr = 1
-# nc = 1
-
-# function show_plotmat(nr, nc)
-# 	plotmat = [plot(randn(10), legend = false) for i in 1:nr, j in 1:nc]
-# 	w = 600
-# 	l = @layout grid(nr, nc)
-# 	plot(plotmat..., layout = l, size = (nc * w, nr * w))
-# 	# plot(plotmat..., layout = grid(nr, nc), size = (nc * w, nr * w))
-# 	# plot(plotmat..., layout = (nr, nc), size = (nc * w, nr * w))
-# end
-
-# show_plotmat(1, 1) # good!
-# show_plotmat(3, 3) # distances between axis tick labels and axis increases!
-# show_plotmat(6, 2) # y-axis tick labels disappeared / fall outside of the plot area?
-# show_plotmat(2, 6) # x-axis tick labels disappeared / fall outside of the plot area?
-
-using Plots
-using StatsPlots, StatsPlots.PlotMeasures
-gr()
-plot(contourf(randn(10, 20)), boxplot(rand(1:4, 1000), randn(1000)))
-
-# Add a histogram inset on the heatmap.
-# We set the (optional) position relative to bottom-right of the 1st subplot.
-# The call is `bbox(x, y, width, height, origin...)`, where numbers are treated as
-# "percent of parent".
-histogram!(
-    randn(1000),
-    inset = (1, bbox(0.05, 0.05, 0.5, 0.25, :bottom, :right)),
-    ticks = nothing,
-    subplot = 3,
-    bg_inside = nothing
-)
-
-# Add sticks floating in the window (inset relative to the window, as opposed to being
-# relative to a subplot)
-sticks!(
-    randn(100),
-    inset = bbox(0, -0.2, 200px, 100px, :center),
-    ticks = nothing,
-    subplot = 4
-)
-
-p0 = plot(1:10, 1:10);
-plot!(p0, 0:1, 0:1,
-	inset_subplots = (1, bbox(x0, 0.05, inset_size, inset_size, :bottom, :left)),
-	subplot = 2
-)
-
-p0 = plot(1:10, 1:10);
-plot!(p0, 0:1, 0:1,
-	inset_subplots = (1, bbox(x0, 0.05, inset_size, inset_size, :bottom, :left)),
-	subplot = 2
-)
-plot!(p0[2], xlim = (-3, 3))
-
-p0 = plot(1:10, 1:10);
-plot!(p0, 0:1, 0:1,
-	inset_subplots = (1, bbox(x0, 0.05, inset_size, inset_size, :bottom, :left)),
-	subplot = 2,
-	xlim = (-3, 3) # works
-);
-p0
-
-p1 = plot(1:10, 1:10);
-plot!(p1, 0:1, 0:1,
-	inset_subplots = (1, bbox(x0, 0.05, inset_size, inset_size, :bottom, :left)),
-	subplot = 2
-)
-plot!(p1[2], xlim = (-3, 3));
-p1
-
-
-plot!(p0, 0:1, 0:1,
-	inset_subplots = (1, bbox(x0, 0.05, inset_size, inset_size, :bottom, :left)),
-	subplot = 2,
-	xlim = (-3, 3)
-)
-
-
-plot(plot(1:5, 1:5; xlab = "xtitle1"), plot(1:5, 1:5; xlab = "xtitle2"), layout = (2, 1))
-
-plt2 = plot(1:5, 1:5)
-
-function make_plot(N,M)
-    plotsize = (400,400)
-    plts = [plot(1:10, xlabel = "Some X Text", ylabel="Some Y Text", plotsize=plotsize) for i in 1:N*M]
-    plot(plts..., layout=grid(N,M), size=plotsize .* (M,N))
-end
-
-make_plot(2,2)
