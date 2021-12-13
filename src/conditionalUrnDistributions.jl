@@ -171,7 +171,7 @@ UniformConditionalUrnDistribution(k::T) where T <: Integer = UniformConditionalU
 _pdf(d::UniformConditionalUrnDistribution) = _pdf_helper(d, d.index, d.urns)
 
 # _pdf_uniform_helper exists so that it can also be reused by the multivariate distribution without explicitly creating a UniformConditionalUrnDistribution
-function _pdf_helper(d::Union{AbstractConditionalUrnDistribution, AbstractMvUrnDistribution}, index, complete_urns)
+function _pdf_helper(d::Union{AbstractConditionalUrnDistribution{T}, AbstractMvUrnDistribution{T}}, index::T, complete_urns::AbstractVector{T}) where T<:Integer
 
 	k = length(complete_urns)
 	result = zeros(Float64, length(complete_urns))
@@ -180,7 +180,7 @@ function _pdf_helper(d::Union{AbstractConditionalUrnDistribution, AbstractMvUrnD
 
 end
 
-function _pdf_helper!(result, ::Union{UniformConditionalUrnDistribution, UniformMvUrnDistribution}, index, complete_urns)
+function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, ::Union{UniformConditionalUrnDistribution{T}, UniformMvUrnDistribution{T}}, index::T, complete_urns::AbstractVector{T}) where T<:Integer
 
 	k = length(result)
 	if isone(index)
@@ -251,7 +251,8 @@ end
 _pdf(d::BetaBinomialConditionalUrnDistribution) = _pdf_helper(d, d.index, d.urns)
 
 log_model_probs_by_incl(d::BetaBinomialConditionalUrnDistribution) = d._log_model_probs_by_incl
-function _pdf_helper!(result, d::T, index, complete_urns) where T<:Union{BetaBinomialConditionalUrnDistribution, BetaBinomialMvUrnDistribution}
+function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, d::T, index::U, complete_urns::AbstractVector{U}) where
+	{U<:Integer, T<:Union{BetaBinomialConditionalUrnDistribution{U}, BetaBinomialMvUrnDistribution{U}}}
 
 	k = length(result)
 	if isone(index)

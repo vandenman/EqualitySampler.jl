@@ -266,7 +266,6 @@ D = BetaBinomialConditionalUrnDistribution(n_groups, 1.0, 1.0)
 complete_urns = D.urns
 index = D.index
 result = zeros(Float64, length(complete_urns))
-@code_warntype EqualitySampler._pdf_helper!(result, D, complete_urns, index)
 
 
 @code_warntype fit_model(df, iterations = iterations)
