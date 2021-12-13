@@ -193,18 +193,18 @@ function logpdf_model_distinct(d::RandomProcessMvUrnDistribution{W, T}, x::U) wh
 	logpdf_model_distinct(d::RandomProcessMvUrnDistribution{W, T}, convert(T, x))
 end
 
-function logpdf_model_distinct(d::RandomProcessMvUrnDistribution{W, T}, x::T) where {T<:Integer, W}
+function logpdf_model_distinct(d::RandomProcessMvUrnDistribution{W, T}, no_parameters::T) where {T<:Integer, W}
 
 	U = T === BigInt ? BigFloat : Float64
+	in_eqsupport(d, no_parameters) || return U(-Inf)
+
 	n = T(length(d))
 	M = U(d.rpm.α)
 
-	# idx = findall(==(n - x), length.(sizes))
-	target_size = n - x
-	f! = x->filter!(y->length(y) == target_size, x)
+	f! = x->filter!(y->length(y) == no_parameters, x)
 	counts, sizes = count_set_partitions_given_partition_size(f!, n)
 
-	res = U(0.0)
+	res = zero(U)
 	for i in eachindex(counts)#idx
 		v = length(sizes[i]) * log(M) +
 			SpecialFunctions.logabsgamma(M)[1] -
@@ -216,16 +216,19 @@ function logpdf_model_distinct(d::RandomProcessMvUrnDistribution{W, T}, x::T) wh
 	return res / sum(counts)
 end
 
-function logpdf_model_distinct(d::RandomProcessMvUrnDistribution{RPM, T}, x::AbstractVector{<:Integer})  where {RPM<:RandomMeasures.DirichletProcess, T<:Integer}
+function logpdf_model_distinct(d::RandomProcessMvUrnDistribution{RPM, T}, urns::AbstractVector{<:Integer})  where {RPM<:RandomMeasures.DirichletProcess, T<:Integer}
+
+	U = T === BigInt ? BigFloat : Float64
+	in_eqsupport(d, urns) || return U(-Inf)
 
 	n = length(d)
 	M = d.rpm.α
-	cc = countmap(x)
+	cc = countmap(urns)
 
 	return length(cc) * log(M) +
 		logabsgamma(M) -
 		logabsgamma(M + n) +
-		sum(x->logabsgamma(x), values(cc))
+		sum(logabsgamma, values(cc))
 
 end
 
