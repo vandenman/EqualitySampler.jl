@@ -138,10 +138,10 @@ import Distributions, Turing, StatsBase, Statistics
 
 			end
 
-			eqs = [count_equalities(x) for x in eachcol(m)]
-			ueqs = unique(eqs)
-			expected = [Statistics.mean(lpdfs[ueqs_i .== eqs]) for ueqs_i in ueqs]
-			computed = logpdf_model_distinct.(Ref(d), ueqs)
+			parameter_counts = [count_parameters(x) for x in eachcol(m)]
+			unique_parameter_counts = unique(parameter_counts)
+			expected = [Statistics.mean(lpdfs[unique_parameter_counts_i .== parameter_counts]) for unique_parameter_counts_i in unique_parameter_counts]
+			computed = logpdf_model_distinct.(Ref(d), unique_parameter_counts)
 			@test expected ≈ computed
 
 		end
