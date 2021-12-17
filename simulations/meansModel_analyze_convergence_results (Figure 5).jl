@@ -8,7 +8,7 @@ if !isinteractive()
 end
 
 
-using EqualitySampler, Plots, LaTeXStrings
+using EqualitySampler, Plots
 import Plots.PlotMeasures: mm
 import	StatsBase 			as SB,
 		LinearAlgebra 		as LA,
@@ -16,7 +16,7 @@ import	StatsBase 			as SB,
 		# StatsPlots			as SP
 
 
-import ProgressMeter, Statistics, Serialization, JLD, Logging, Suppressor
+import ProgressMeter, Statistics, Serialization, JLD, Logging
 import CategoricalArrays: categorical
 
 import Printf

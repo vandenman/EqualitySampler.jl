@@ -7,40 +7,35 @@ if !isinteractive()
 	Pkg.activate(".")
 end
 
-using EqualitySampler, Turing, DynamicPPL, FillArrays, Plots, Plots.PlotMeasures
+using EqualitySampler, Turing, Plots, Plots.PlotMeasures
 
-import	StatsBase 			as SB,
-		LinearAlgebra 		as LA,
-		StatsModels			as SM,
-		DataFrames			as DF,
-		GLM
+# import	StatsBase 			as SB,
+# 		LinearAlgebra 		as LA,
+# 		StatsModels			as SM,
+# 		DataFrames			as DF,
+# 		GLM
 
-import Logging
-import ProgressMeter
-import Serialization
-import DataFrames: DataFrame
-import StatsModels: @formula
-import Suppressor
-import Random
+import Logging, ProgressMeter, JLD2
+# import Serialization
+# import DataFrames: DataFrame
+# import StatsModels: @formula
+# import Random
 
-include("meansModel_Functions.jl")
-include("helpersTuring.jl")
-include("limitedLogger.jl")
-include("customHMCAdaptation.jl")
+include("anovaFunctions.jl")
 
 function get_priors()
 	return (
 		(n_groups)->UniformMvUrnDistribution(n_groups),
-		(n_groups)->BetaBinomialMvUrnDistribution(n_groups),
+		(n_groups)->BetaBinomialMvUrnDistribution(n_groups, 1.0, 1.0),
 		(n_groups)->BetaBinomialMvUrnDistribution(n_groups, n_groups, 1.0),
+		(n_groups)->BetaBinomialMvUrnDistribution(n_groups, 1.0, n_groups),
+		(n_groups)->BetaBinomialMvUrnDistribution(n_groups, 1.0, binomial(n_groups, 2)),
 		(n_groups)->DirichletProcessMvUrnDistribution(n_groups, 0.5),
-		(n_groups)->DirichletProcessMvUrnDistribution(n_groups, 1),
+		(n_groups)->DirichletProcessMvUrnDistribution(n_groups, 1.0),
+		(n_groups)->DirichletProcessMvUrnDistribution(n_groups, 2.0),
 		(n_groups)->DirichletProcessMvUrnDistribution(n_groups, :Gopalan_Berry)
 	)
 end
-
-
-compute_post_prob_eq_helper(x) = compute_post_prob_eq(x[3])
 
 function any_incorrect(x)
 
@@ -65,12 +60,12 @@ function prop_incorrect(x)
 end
 
 function get_resultsdir()
-	results_dir = joinpath("simulations", "results_multiplecomparisonsplot_200", "jls_files")
+	results_dir = joinpath("simulations", "results_multiplecomparisonsplot_200_2")
 	!ispath(results_dir) && mkpath(results_dir)
 	return results_dir
 end
 
-make_filename(results_dir, r, i) = joinpath(results_dir, "repeat_$(r)_groups_$(i).jls")
+make_filename(results_dir, r, i) = joinpath(results_dir, "repeat_$(r)_groups_$(i).jld2")
 
 function run_simulation()
 
@@ -106,9 +101,9 @@ function run_simulation()
 
 			n_groups = groups[i]
 			true_model = fill(1, n_groups)
-			true_θ = get_θ(0.2, true_model)
+			true_θ = normalize_θ(0.2, true_model)
 
-			_, df, _, _ = simulate_data_one_way_anova(n_groups, n_obs_per_group, true_θ, true_model);
+			dat, _, _ = simulate_data_one_way_anova(n_groups, n_obs_per_group, true_θ);
 
 			results = BitArray(undef, length(priors))
 			results_big = Array{Matrix{Float64}}(undef, length(priors))
@@ -117,8 +112,10 @@ function run_simulation()
 			for (j, fun) in enumerate(priors)
 
 				partition_prior = fun(n_groups)
-				res = fit_model(df; mcmc_iterations = mcmc_iterations, mcmc_burnin = mcmc_burnin, partition_prior = partition_prior, use_Gibbs = true, hmc_stepsize = 0.0);
-				post_probs =  compute_post_prob_eq_helper(res)
+				chn, model = fit_eq_model(dat, partition_prior, nothing; mcmc_iterations = mcmc_iterations, mcmc_burnin = mcmc_burnin);
+				partition_samples = Int.(Array(group(chn, :partition)))
+				post_probs = compute_post_prob_eq(partition_samples)
+				# post_probs =  compute_post_prob_eq_helper(res)
 
 				results[j] = any_incorrect(post_probs)
 				results_big[j] = post_probs
@@ -128,7 +125,8 @@ function run_simulation()
 
 			end
 
-			Serialization.serialize(filename, (results, results_big))
+			# Serialization.serialize(filename, (results, results_big))
+			JLD2.jldsave(filename; results=results, results_big=results_big)
 
 		end
 

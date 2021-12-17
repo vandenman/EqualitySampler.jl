@@ -196,5 +196,9 @@ A:
   -> Beta-binomial parametrization becomes (1, f(k)) rather than (f(k), 1)
 
 - [x] Recreate Figure 2
-- [ ] Recreate Figure 3
+- [x] Recreate Figure 3
 - [ ] Recreate Figure 4
+	priors:
+		- BB(1, 1), BB(1, k), BB(1, binomial(k, 2)),
+		- DPP(.5), DPP(1.0), DPP(Gopalan Berry),
+		- Uniform

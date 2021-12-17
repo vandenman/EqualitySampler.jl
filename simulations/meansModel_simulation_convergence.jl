@@ -24,7 +24,6 @@ import	StatsBase 			as SB,
 		DataFrames			as DF,
 		GLM
 
-# import Suppressor
 # import Serialization
 import JLD2
 import Random

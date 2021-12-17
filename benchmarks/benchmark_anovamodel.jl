@@ -1,144 +1,6 @@
-using EqualitySampler, Turing, DynamicPPL, FillArrays, Plots
+using EqualitySampler, Turing, Plots
 
-import	StatsBase 			as SB,
-		LinearAlgebra 		as LA,
-		StatsModels			as SM,
-		DataFrames			as DF,
-		GLM
-
-import Logging
-import ProgressMeter
-import Serialization
-import DataFrames: DataFrame
-import StatsModels: @formula
-import Suppressor
-import Random
-
-include("../simulations/meansModel_Functions.jl")
-include("../simulations/helpersTuring.jl")
-include("../simulations/limitedLogger.jl")
-include("../simulations/customHMCAdaptation.jl")
-
-function get_logπ(model)
-	vari = VarInfo(model)
-	mt = vari.metadata
-	return function logπ(partition, nt)
-		DynamicPPL.setval!(vari, partition, DynamicPPL.VarName(:partition))
-		for (key, val) in zip(keys(nt), nt)
-			if key !== :partition
-				indices = mt[key].vns
-				if !(val isa Vector)
-					DynamicPPL.setval!(vari, val, indices[1])
-				else
-					ranges = mt[key].ranges
-					for i in eachindex(indices)
-						DynamicPPL.setval!(vari, val[ranges[i]], indices[i])
-					end
-				end
-			end
-		end
-		DynamicPPL.logjoint(model, vari)
-	end
-end
-
-function get_θ_cs(model, chain)
-	gen = generated_quantities(model, Turing.MCMCChains.get_sections(chain, :parameters))
-	θ_cs = Matrix{Float64}(undef, length(gen), length(gen[1]))
-	for i in eachindex(gen)
-		for j in eachindex(gen[i])
-			θ_cs[i, j] = gen[i][j]
-		end
-	end
-	return θ_cs
-end
-
-function plot_retrieval(true_values, estimated_values)
-	p = Plots.plot(legend=false, xlab = "True value", ylab = "Posterior mean")
-	Plots.abline!(p, 1, 0)
-	scatter!(p, true_values, estimated_values)
-end
-
-function get_sampler(model; ϵ::Float64 = 0.0, n_leapfrog::Int = 20)
-	parameters = DynamicPPL.syms(DynamicPPL.VarInfo(model))
-	if :partition in parameters
-
-		continuous_parameters = filter(!=(:partition), parameters)
-		return Gibbs(
-			HMC(ϵ, n_leapfrog, continuous_parameters...),
-			GibbsConditional(:partition, EqualitySampler.PartitionSampler(length(mod_eq.args.partition_prior), get_logπ(model)))
-		)
-
-	else
-		return NUTS()
-	end
-end
-
-
-@model function one_way_anova_mv_ss_submodel(obs_mean, obs_var, obs_n, Q, partition = nothing, ::Type{T} = Float64) where {T}
-
-	n_groups = length(obs_mean)
-
-	# improper priors on grand mean and variance
-	μ_grand 		~ Flat()
-	σ² 				~ JeffreysPriorVariance()
-
-	# The setup for θ follows Rouder et al., 2012, p. 363
-	g   ~ InverseGamma(0.5, 0.5; check_args = false)
-
-	θ_r ~ MvNormal(LA.Diagonal(Fill(1.0, n_groups - 1)))
-
-	# ensure the sum to zero constraint
-	θ_s = Q * (sqrt(g) .* θ_r)
-
-	# constrain θ according to the sampled equalities
-	θ_cs = isnothing(partition) ? θ_s : average_equality_constraints(θ_s, partition)
-
-	# definition from Rouder et. al., (2012) eq 6.
-	for i in eachindex(obs_mean)
-		Turing.@addlogprob! EqualitySampler._univariate_normal_likelihood(obs_mean[i], obs_var[i], obs_n[i], μ_grand + sqrt(σ²) * θ_cs[i], σ²)
-	end
-	return θ_cs
-
-end
-
-@model function one_way_anova_mv_ss_eq_submodel(obs_mean, obs_var, obs_n, Q, partition_prior::D, ::Type{T} = Float64) where {T, D<:AbstractMvUrnDistribution}
-
-	partition ~ partition_prior
-	θ_cs = @submodel $(Symbol("one_way_anova_mv_ss_submodel")) one_way_anova_mv_ss_submodel(obs_mean, obs_var, obs_n, Q, partition, T)
-	return θ_cs
-
-end
-
-@model function one_way_anova_mv(obs_mean, obs_var, obs_n, Q, partition_prior, ::Type{T} = Float64) where {T}
-
-	n_groups = length(obs_mean)
-
-	# improper priors on grand mean and variance
-	μ_grand 		~ Flat()
-	σ² 				~ JeffreysPriorVariance()
-
-	# The setup for θ follows Rouder et al., 2012, p. 363
-	g   ~ InverseGamma(0.5, 0.5; check_args = false)
-
-	θ_r ~ MvNormal(LA.Diagonal(Fill(1.0, n_groups - 1)))
-
-	# ensure the sum to zero constraint
-	θ_s = Q * (sqrt(g) .* θ_r)
-
-	# sample a partition
-	partition ~ partition_prior
-
-	# constrain θ according to the partition
-	θ_cs = average_equality_constraints(θ_s, partition)
-
-	# definition from Rouder et. al., (2012) eq 6.
-	for i in eachindex(obs_mean)
-		Turing.@addlogprob! EqualitySampler._univariate_normal_likelihood(obs_mean[i], obs_var[i], obs_n[i], μ_grand + sqrt(σ²) * θ_cs[i], σ²)
-	end
-	return θ_cs
-
-end
-
+include("../simulations/anovaFunctions.jl")
 
 n_groups = 6
 n_obs_per_group = 100
@@ -147,27 +9,35 @@ n_obs_per_group = 100
 θ_raw .-= mean(θ_raw)
 true_model = [1, 1, 2, 2, 3, 3]
 θ_true = average_equality_constraints(θ_raw, true_model)
-y, df, D, true_values = simulate_data_one_way_anova(n_groups, n_obs_per_group, θ_true);
+data = simulate_data_one_way_anova(n_groups, n_obs_per_group, θ_true);
+
+priors = (
+	full			= nothing,
+	uniform 		= UniformMvUrnDistribution(n_groups),
+	betabinomial	= BetaBinomialMvUrnDistribution(n_groups),
+	Dirichlet		= DirichletProcessMvUrnDistribution(n_groups)
+)
+
+samples = map(prior->fit_eq_model(data.data, prior; mcmc_iterations = 10_000), priors)
+θ_post_means = map(samp->mean(eachrow(get_θ_cs(samp.model, samp.samples))), samples)
+
+plts = [plot!(plot_retrieval(data.true_values.θ, θ_post_mean), title = nm) for (nm, θ_post_mean) in pairs(θ_post_means)]
+plot(plts..., layout = (2, 2))
+
+eq_samples = NamedTuple{(:uniform, :betabinomial, :Dirichlet)}((samples[2], samples[3], samples[4]))
+partition_samps = map(samps->Int.(Array(group(samps.samples, :partition))), eq_samples)
+eq_tables = map(partition_samp->LA.UnitLowerTriangular(compute_post_prob_eq(partition_samp)), partition_samps)
+eq_tables.uniform
+eq_tables.betabinomial
+eq_tables.Dirichlet
+
+# TODO process results a little bit (only plots!)
+
+data.df
 obs_mean, obs_var, obs_n = get_suff_stats(df)
 Q = getQ_Rouder(n_groups)
 
 iterations = 20_000
-
-# function my_any(f, arr::AbstractArray{T}) where T
-# 	hasmethod(f, (T, )) || throw(error("called my_any(f, $(typeof(arr))) but there exists no method f(::$T)!"))
-# 	Base.return_types(f, (T, )) === Bool || throw(error("called my_any(f, $(typeof(arr))) but f(::$T) does not return Bool!"))
-# 	any(f, arr)
-# end
-# foo(x::Float64)=x>0
-# goo(x::Number)=x>0
-# hoo(x::Number)=x
-
-# my_any(foo, collect(1:3))
-# my_any(goo, collect(1:3))
-# my_any(hoo, collect(1:3))
-# any(foo, collect(1:3))
-# any(goo, collect(1:3))
-# any(hoo, collect(1:3))
 
 
 # full model
@@ -190,8 +60,13 @@ MCMCChains.wall_duration(samps_full2)
 
 # constrained model -- uniform prior
 mod_eq = one_way_anova_mv_ss_eq_submodel(obs_mean, obs_var, obs_n, Q, UniformMvUrnDistribution(n_groups))
-samps_eq0 = sample(mod_eq, get_sampler(mod_eq; ϵ = 0.005), 1000)
+
+starting_values = get_starting_values(df)
+init_params = get_init_params(starting_values...)
+
+samps_eq0 = sample(mod_eq, get_sampler(mod_eq), 10; init_params = init_params)
 θ_cs_eq0 = get_θ_cs(mod_eq, samps_eq0)
+
 plot_retrieval(θ_true, vec(mean(θ_cs_eq0; dims=1)))
 
 partition_samps_eq0 = Int.(Array(group(samps_eq0, :partition)))
@@ -219,7 +94,23 @@ spl0 = Gibbs(
 	HMC(0.0, 20, continuous_params...),
 	GibbsConditional(:partition, EqualitySampler.PartitionSampler(n_groups, get_logπ(mod_eq)))
 )
-samps0 = sample(mod_eq, spl0, 1000)
+
+θ_raw0 = vec(θ_true \ Q ./ sqrt(1.0))
+
+init_params = get_init_params(mod_eq, ones(Int, 6), θ_raw0)
+sample(mod_eq, spl0, 10; init_params = init_params)
+
+import Logging
+debuglogger = Logging.ConsoleLogger(stderr, Logging.Debug)
+Logging.with_logger(debuglogger) do
+	sample(mod_eq, spl0, 10; init_params = init_params)
+end
+
+sample(mod_eq, MH(), 4; init_params = init_params)
+
+
+NamedTuple{(:partition, Symbol("one_way_anova_mv_ss_submodel.μ_grand"))}([1, 1, 1, 1, 1, 1], 0.0)
+(partition = [1, 1, 1, 1, 1, 1], Symbol("one_way_anova_mv_ss_submodel.μ_grand") = 0.0, g = 1.0, σ² = 1.0, )
 
 DynamicPPL.VarInfo(mod_eq)
 
@@ -331,4 +222,5 @@ plot(θ_cs_eq') # trace plots
 hcat(ests, mean_θ_cs_eq) # compare frequentist estimates to posterior means
 scatter(true_values[:θ], mean_θ_cs_eq, legend = :none); Plots.abline!(1, 0)
 LA.UnitLowerTriangular(compute_post_prob_eq(chain_eq)) # inspect sampled equality constra
+
 

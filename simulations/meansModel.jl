@@ -8,7 +8,6 @@ import	StatsBase 			as SB,
 
 import DataFrames: DataFrame
 import StatsModels: @formula
-import Suppressor
 import Random
 
 # include("simulations/plotFunctions.jl") # <- unused?

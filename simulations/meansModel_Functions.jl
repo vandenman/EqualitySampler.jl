@@ -5,10 +5,8 @@ import	StatsBase 			as SB,
 		GLM
 
 import Statistics: mean, var
-# import Suppressor
 import CategoricalArrays
 using Turing
-import Memoize
 
 function simulate_data_one_way_anova(
 		n_groups::Integer,

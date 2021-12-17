@@ -1,62 +1,25 @@
-import	AdvancedHMC		as AHMC
+import	Random, Turing,
+		AdvancedHMC		as AHMC
 
-function custom_hmc_adaptation(model, spl0, init_theta; max_n_iters = 100, kwargs...)
+# Function Piracy to inject a more robust method for finding an initial value
+# tab indented lines are modified, space indented lines are not.
+# based on Turing v0.19.2
+# https://github.com/TuringLang/Turing.jl/blob/5c4b4d5e4715f82c6b53327c051c54e79b8d0079/src/inference/hmc.jl#L143-L221
+function AHMC.find_good_stepsize(
+	rng::Random.AbstractRNG,
+	h::AHMC.Hamiltonian,
+	θ::AbstractVector{T};
+	max_n_iters::Int=100,
+	DEBUG::Bool = false
+) where {T<:Real}
 
-	vi    = VarInfo(model)
-	spl   = Sampler(spl0, model)
-	DynamicPPL.initialize_parameters!(vi, init_theta, spl)
-
-	algs = spl.alg.algs
-	i = 0
-	samplers = map(algs) do alg
-		i += 1
-		if i == 1
-			prev_alg = algs[end]
-		else
-			prev_alg = algs[i-1]
-		end
-		rerun = Turing.Inference.gibbs_rerun(prev_alg, alg)
-		selector = DynamicPPL.Selector(Symbol(typeof(alg)), rerun)
-		Sampler(alg, model, selector)
-	end
-
-	# Add Gibbs to gids for all variables.
-	for sym in keys(vi.metadata)
-		vns = getfield(vi.metadata, sym).vns
-
-		for vn in vns
-			# update the gid for the Gibbs sampler
-			DynamicPPL.updategid!(vi, vn, spl)
-
-			# try to store each subsampler's gid in the VarInfo
-			for local_spl in samplers
-				DynamicPPL.updategid!(vi, vn, local_spl)
-			end
-		end
-	end
-
-	rng = Random.GLOBAL_RNG
-	spl_hmc = samplers[2]
-
-	link!(vi, spl_hmc)
-	model(rng, vi, spl_hmc)
-
-	# Extract parameters.
-	theta = vi[spl_hmc]
-
-	# Create a Hamiltonian.
-	metricT = Turing.Inference.getmetricT(spl_hmc.alg)
-	metric = metricT(length(theta))
-	∂logπ∂θ = Turing.Inference.gen_∂logπ∂θ(vi, spl_hmc, model)
-	logπ = Turing.Inference.gen_logπ(vi, spl_hmc, model)
-	hamiltonian = AHMC.Hamiltonian(metric, logπ, ∂logπ∂θ)
-
-	ϵ, _, i1 = find_good_stepsize2(rng, hamiltonian, theta; max_n_iters = max_n_iters, kwargs...)
+	# max_n_iters = 100
+	ϵ, _, i1 = find_good_stepsize2_inner(rng, h, θ; max_n_iters = max_n_iters, DEBUG = DEBUG)
 	safety = 1
 	maxsafety = 100
 	ϵ_min = ϵ
 	while i1 == max_n_iters && safety < maxsafety
-		ϵ, _, i1 = find_good_stepsize2(rng, hamiltonian, theta; max_n_iters = max_n_iters, kwargs...)
+		ϵ, _, i1 = find_good_stepsize2_inner(rng, h, θ; max_n_iters = max_n_iters, DEBUG = DEBUG)
 		safety += 1
 		if ϵ < ϵ_min
 			ϵ_min = ϵ
@@ -66,10 +29,10 @@ function custom_hmc_adaptation(model, spl0, init_theta; max_n_iters = 100, kwarg
 		ϵ = ϵ_min
 	end
 	@info "Found initial step size" ϵ safety i1
-	return ϵ / 2
+	return ϵ
 end
 
-function find_good_stepsize2(
+function find_good_stepsize2_inner(
 	rng::Random.AbstractRNG,
 	h::AHMC.Hamiltonian,
 	θ::AbstractVector{T};
@@ -142,3 +105,109 @@ function find_good_stepsize2(
 	end
 	return (ϵ, i0, i1)
 end
+
+
+# Function Piracy to inject a more robust method for finding an initial value
+# tab indented lines are modified, space indented lines are not.
+# based on Turing v0.19.2
+# https://github.com/TuringLang/Turing.jl/blob/5c4b4d5e4715f82c6b53327c051c54e79b8d0079/src/inference/hmc.jl#L143-L221
+# this approach is deprecated since it's safer to patch AHMC than DynamicPPL, but this functions is useful to verify that init_params are actually used
+# function DynamicPPL.initialstep(
+#     rng::Random.AbstractRNG,
+#     model::AbstractMCMC.AbstractModel,
+#     spl::DynamicPPL.Sampler{<:Turing.Inference.Hamiltonian},
+#     vi::DynamicPPL.AbstractVarInfo;
+#     init_params=nothing,
+#     nadapts=0,
+#     kwargs...
+# )
+
+# 	@debug "Pirated DynamicPPL.initialstep"
+# 	@debug "constrained θ" vi[spl]
+
+#     # Transform the samples to unconstrained space and compute the joint log probability.
+#     DynamicPPL.link!(vi, spl)
+#     vi = last(DynamicPPL.evaluate!!(model, rng, vi, spl))
+
+#     # Extract parameters.
+#     theta = vi[spl]
+# 	@debug "unconstrained θ" theta
+
+#     # Create a Hamiltonian.
+#     metricT = Turing.Inference.getmetricT(spl.alg)
+#     metric = metricT(length(theta))
+#     ∂logπ∂θ = Turing.Inference.gen_∂logπ∂θ(vi, spl, model)
+#     logπ = Turing.Inference.gen_logπ(vi, spl, model)
+#     hamiltonian = AHMC.Hamiltonian(metric, logπ, ∂logπ∂θ)
+
+#     # Compute phase point z.
+#     z = AHMC.phasepoint(rng, theta, hamiltonian)
+
+#     # If no initial parameters are provided, resample until the log probability
+#     # and its gradient are finite.
+#     if init_params === nothing
+#         while !isfinite(z)
+#             vi = last(DynamicPPL.evaluate!!(model, rng, vi, SampleFromUniform()))
+#             DynamicPPL.link!(vi, spl)
+#             theta = vi[spl]
+
+#             hamiltonian = AHMC.Hamiltonian(metric, logπ, ∂logπ∂θ)
+#             z = AHMC.phasepoint(rng, theta, hamiltonian)
+#         end
+#     end
+
+#     # Cache current log density.
+#     log_density_old = getlogp(vi)
+
+#     # Find good eps if not provided one
+#     if iszero(spl.alg.ϵ)
+# 		max_n_iters = 100 # no. steps taken by find_good_stepsize2_inner
+# 		maxsafety = 100  # no. times we repeat find_good_stepsize2_inner if it fails to converge
+# 		ϵ, _, i1 = find_good_stepsize2_inner(rng, hamiltonian, theta; max_n_iters = max_n_iters)
+# 		safety = 1
+# 		ϵ_min = ϵ
+# 		while i1 == max_n_iters && safety < maxsafety
+# 			ϵ, _, i1 = find_good_stepsize2_inner(rng, hamiltonian, theta; max_n_iters = max_n_iters)
+# 			safety += 1
+# 			if ϵ < ϵ_min
+# 				ϵ_min = ϵ
+# 			end
+# 		end
+# 		if safety == maxsafety
+# 			ϵ = ϵ_min
+# 		end
+# 		@info "Found initial step size" ϵ safety i1
+
+#     else
+#         ϵ = spl.alg.ϵ
+#     end
+
+#     # Generate a kernel.
+#     kernel = Turing.Inference.make_ahmc_kernel(spl.alg, ϵ)
+
+#     # Create initial transition and state.
+#     # Already perform one step since otherwise we don't get any statistics.
+#     t = AHMC.transition(rng, hamiltonian, kernel, z)
+
+#     # Adaptation
+#     adaptor = Turing.Inference.AHMCAdaptor(spl.alg, hamiltonian.metric; ϵ=ϵ)
+#     if spl.alg isa Turing.Inference.AdaptiveHamiltonian
+#         hamiltonian, kernel, _ =
+#             AHMC.adapt!(hamiltonian, kernel, adaptor,
+#                         1, nadapts, t.z.θ, t.stat.acceptance_rate)
+#     end
+
+#     # Update `vi` based on acceptance
+#     if t.stat.is_accept
+#         vi[spl] = t.z.θ
+#         DynamicPPL.setlogp!(vi, t.stat.log_density)
+#     else
+#         vi[spl] = theta
+#         DynamicPPL.setlogp!(vi, log_density_old)
+#     end
+
+#     transition = Turing.Inference.HMCTransition(vi, t)
+#     state = Turing.Inference.HMCState(vi, 1, kernel, hamiltonian, t.z, adaptor)
+
+#     return transition, state
+# end

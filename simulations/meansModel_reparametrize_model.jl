@@ -9,7 +9,6 @@ import	StatsBase 			as SB,
 
 import DataFrames: DataFrame
 import StatsModels: @formula
-import Suppressor
 import Random
 import ProgressMeter
 

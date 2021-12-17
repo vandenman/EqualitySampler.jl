@@ -6,7 +6,6 @@ using EqualitySampler, Turing, DynamicPPL, FillArrays, LinearAlgebra
 using Plots
 # using StatsPlots # has a bit too many dependencies
 import Colors # doesn't really need to be imported with using
-using Suppressor
 # include("src/loglikelihood.jl")
 include("simulations/helpersTuring.jl")
 # include("src/newApproach4.jl")
@@ -23,7 +22,7 @@ end
 
 function get_θ_cs(model, chain)
 
-	gen = Suppressor.@suppress generated_quantities(model, chain)
+	gen = generated_quantities(model, chain)
 	θ_cs_est = Matrix{Float64}(undef, length(gen), length(gen[1][1]))
 	for i in eachindex(gen)
 		θ_cs_est[i, :] .= gen[i][1]
@@ -385,7 +384,7 @@ chn_ss_post = sample(mod_ss, spl, 10_000)
 # spl_ml = MH(((:σ², :μ_grand, :θ, :equal_indices) .=> Ref(AdvancedMH.RandomWalkProposal(Normal(0, 0.25))))...)
 # chn_ss_post = sample(mod_ss, spl_mh, 10_000)
 
-gen = Suppressor.@suppress generated_quantities(mod_ss, chn_ss_post)
+gen = generated_quantities(mod_ss, chn_ss_post)
 θ_cs_est = Matrix{Float64}(undef, length(gen), length(gen[1][1]))
 for i in eachindex(gen)
 	θ_cs_est[i, :] .= gen[i][1]

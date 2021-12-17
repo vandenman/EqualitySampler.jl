@@ -9,7 +9,6 @@ import	StatsBase 			as SB,
 import Logging
 import DataFrames: DataFrame
 import StatsModels: @formula
-import Suppressor
 import Random
 import AdvancedMH
 
