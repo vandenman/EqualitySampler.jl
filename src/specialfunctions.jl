@@ -1,3 +1,3 @@
 # convenience wrappers around SpecialFunctions
-logbinomial(n::Integer, k::Integer) = SpecialFunctions.logabsbinomial(n, k)[1]
-logabsgamma(x::Real) = SpecialFunctions.logabsgamma(x)[1]
+logbinomial(n::Integer, k::Integer) = @inbounds SpecialFunctions.logabsbinomial(n, k)[1]
+logabsgamma(x::Real) = @inbounds SpecialFunctions.logabsgamma(x)[1]

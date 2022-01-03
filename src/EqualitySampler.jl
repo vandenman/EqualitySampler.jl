@@ -10,7 +10,7 @@ import Combinatorics
 import Statistics
 
 # for BayesFactor
-import QuadGK
+# import QuadGK
 
 export
 	NormalSuffStat,
@@ -112,7 +112,6 @@ include("multivariateUrnDistributions.jl")
 include("conditionalUrnDistributions.jl")
 include("normalLogLikelihood.jl")
 include("helpers.jl")
-include("PdfDirichletProcess.jl")
 include("bayesFactors.jl")
 include("PartitionSampler.jl")
 include("findDPPalpha.jl")

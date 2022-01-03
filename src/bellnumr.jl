@@ -59,7 +59,7 @@ function bellnumr_base_cases(n::T, r::T) where T <: Integer
 	# https://oeis.org/A005492 simplify equations for a(n)
 	n == 4	&&			return (true, 		T(15 + r * (20 + r * (12 + r * (4 + r)))))
 
-	if 0 <= r < size(_bellnumr_table_BigInt, 1) && 5 <= n < size(_bellnumr_table_BigInt, 2) &&
+	if 0 <= r < size(_bellnumr_table_BigInt, 1) && 5 <= n < size(_bellnumr_table_BigInt, 2)
 		return (true, T(_bellnumr_table_BigInt[r+1, n-4]))
 	end
 

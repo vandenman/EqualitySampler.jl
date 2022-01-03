@@ -15,6 +15,11 @@ function unsignedstirlings1_base_cases(n::T, k::T) where T <: Integer
 	k == n - 2							&& return (true, T(div((3 * n - 1) * binomial(n, 3), 4)))
 	k == n - 3							&& return (true, T(binomial(n, 2) * binomial(n, 4)))
 
+	if 7 <= n <= _stirling1_N_MAX && 3 <= k <= n - 3
+		index = _stirling1_index(n, k)
+		return (true, T(_stirlings1_table_BigInt[index]))
+	end
+
 	return(false, zero(T))
 end
 
@@ -35,6 +40,11 @@ function unsignedstirlings1(n::T, k::T, ::Type{ExplicitStrategy}) where T <: Int
 	succes, value = unsignedstirlings1_base_cases(n, k)
 	succes && return value
 
+	return _unsignedstirlings1_precompute(n, k)
+
+end
+
+function _unsignedstirlings1_precompute(n::T, k::T) where T <: Integer
 	sign = (-1)^(n - k)
 	result = zero(T)
 	for r in 0:n-k
@@ -43,6 +53,7 @@ function unsignedstirlings1(n::T, k::T, ::Type{ExplicitStrategy}) where T <: Int
 	end
 	return result
 end
+
 
 stirlings1ExplTerm(n::T, k::T, r::T)    where T <: Integer =    binomial(n + r - 1, k - 1) *    binomial(2n - k, n - k - r) *    stirlings2(n - k + r, r)
 stirlings1ExplLogTerm(n::T, k::T, r::T) where T <: Integer = logbinomial(n + r - 1, k - 1) + logbinomial(2n - k, n - k - r) + logstirlings2(n - k + r, r)

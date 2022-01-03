@@ -1,3 +1,4 @@
+# TODO: adapt the command line thingy to avoid isinteractive
 # from a terminal run julia -O3 -t auto simulations/multipleComparisonPlot.jl
 
 println("interactive = $(isinteractive())")
