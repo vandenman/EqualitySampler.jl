@@ -226,26 +226,19 @@ savefig(plot(p12, size = (1000, 500)), joinpath(figdir, "multipleComparisonPlot_
 
 using Gadfly, DataFrames
 import Cairo, Fontconfig
-# (n_groups)->UniformMvUrnDistribution(n_groups),
-# (n_groups)->BetaBinomialMvUrnDistribution(n_groups, 1.0, 1.0),
-# (n_groups)->BetaBinomialMvUrnDistribution(n_groups, n_groups, 1.0),
-# (n_groups)->BetaBinomialMvUrnDistribution(n_groups, 1.0, n_groups),
-# (n_groups)->BetaBinomialMvUrnDistribution(n_groups, 1.0, binomial(n_groups, 2)),
-# (n_groups)->DirichletProcessMvUrnDistribution(n_groups, 0.5),
-# (n_groups)->DirichletProcessMvUrnDistribution(n_groups, 1.0),
-# (n_groups)->DirichletProcessMvUrnDistribution(n_groups, 2.0),
-# (n_groups)->DirichletProcessMvUrnDistribution(n_groups, :Gopalan_Berry)
-priors_text = ["Uniform", "Beta-binomial α=1, β=1", "Beta-binomial α=K, β=1", "Beta-binomial α=1, β=K", "Beta-binomial α=1, β=binomial(K, 2)", "DPP α=0.5", "DPP α=1", "DPP α=2", "DPP α=Gopalan & Berry"]
+
+# note that "&" must be escaped to "&amp;" for pango, but SVG still fails...
+prior_names = ["Uniform", "Beta-binomial α=1, β=1", "Beta-binomial α=K, β=1", "Beta-binomial α=1, β=K", "Beta-binomial α=1, β=binomial(K, 2)", "DPP α=0.5", "DPP α=1", "DPP α=2", "DPP α=Gopalan and Berry"]
 any_incorrect_df = DataFrame(
-	prior	= repeat(priors_text, inner = length(groups)),
-	groups	= repeat(groups, length(priors_text)),
+	prior	= repeat(prior_names, inner = length(groups)),
+	groups	= repeat(groups, length(prior_names)),
 	value	= vec(mean(results, dims = 3))
 )
 
 results_big_prop_incorrect = prop_incorrect.(results_big)
 prop_incorrect_df = DataFrame(
-	prior	= repeat(priors_text, inner = length(groups)),
-	groups	= repeat(groups, length(priors_text)),
+	prior	= repeat(prior_names, inner = length(groups)),
+	groups	= repeat(groups, length(prior_names)),
 	value	= vec(mean(results_big_prop_incorrect, dims = 3))
 )
 
@@ -255,23 +248,45 @@ function base_plt(df)
 		Geom.line(),
 		Geom.point,
 		Scale.x_continuous(minvalue=0, maxvalue = 10),
-		Scale.y_continuous(minvalue=0, maxvalue = 1),
-		;
+		Scale.y_continuous(minvalue=0, maxvalue = 1);
 		x=:groups, y=:value, color=:prior, shape=:prior,
 		linestyle=[:dash]
 	)
 end
 
 plt_any_incorrect = base_plt(any_incorrect_df);
+push!(plt_any_incorrect, Theme(key_position = :none));
 plt_prop_incorrect = base_plt(prop_incorrect_df);
-hstack(plt_any_incorrect, plt_prop_incorrect) |> SVG("foo.svg", 7cm, 7cm)
+hstack(plt_any_incorrect, plt_prop_incorrect) |> SVG("foo.svg", 30cm, 15cm)
 
 Gadfly.plot(
+	DataFrame(prior = rand(["α", "1", "β"], 10), groups=rand(2:10, 10), value=rand(10)),
+	Geom.line(),
 	Geom.point,
-	Scale.x_continuous(minvalue=0, maxvalue = 1),
-	Scale.y_continuous(minvalue=0, maxvalue = 10);
-	x=rand(10), y=rand(0:10, 10)
+	Scale.x_continuous(minvalue=0, maxvalue = 10),
+	Scale.y_continuous(minvalue=0, maxvalue = 1);
+	x=:groups, y=:value, color=:prior, shape=:prior,
+	linestyle=[:dash]
 )
+Gadfly.plot(
+	any_incorrect_df,
+	Geom.line(),
+	Geom.point,
+	Scale.x_continuous(minvalue=0, maxvalue = 10),
+	Scale.y_continuous(minvalue=0, maxvalue = 1);
+	x=:groups, y=:value, color=:prior, shape=:prior,
+	linestyle=[:dash]
+)
+
+
+# pango does not like &
+using Gadfly
+prior = ["α", "&", "β"]; groups=[2, 3, 4]; value=[1.0, 2.0, 3.0]
+Gadfly.plot(Geom.point;	x=groups, y=value, color=prior)
+import Cairo, Fontconfig
+Gadfly.plot(Geom.point;	x=groups, y=value, color=prior)
+prior = ["α", "&amp;", "β"]
+Gadfly.plot(Geom.point;	x=groups, y=value, color=prior)
 
 # @model function gdemo(x, y)
 # 	s² ~ InverseGamma(2, 3)
