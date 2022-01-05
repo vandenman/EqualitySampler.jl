@@ -27,3 +27,4 @@ tutorials/*
 .Rproj.user
 
 simulations/simulation_results_*/*
+*.jld2

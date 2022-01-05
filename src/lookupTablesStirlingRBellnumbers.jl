@@ -54,3 +54,7 @@ const _stirlings1_table_BigInt = Vector{BigInt}(undef, _stirling1_index(_stirlin
 for n in BigInt(7):_stirling1_N_MAX, k in 3:n-4
 	_stirlings1_table_BigInt[_stirling1_index(n, k)] = _unsignedstirlings1_precompute(n, k)
 end
+
+# m1 = [ k < n ? unsignedstirlings1(n, k) : 0 for n in big(0):50, k in big(0):50]
+# m2 = [ k < n ? EqualitySampler._unsignedstirlings1_precompute(n, k) : 0 for n in big(0):50, k in big(0):50]
+# m1 == m2

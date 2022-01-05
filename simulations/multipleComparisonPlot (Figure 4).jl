@@ -1,28 +1,15 @@
-# TODO: adapt the command line thingy to avoid isinteractive
-# from a terminal run julia -O3 -t auto simulations/multipleComparisonPlot.jl
+#=
+	to run the simulation, run in a terminal
+		julia-1.6.5 --project=simulations -O3 -t auto simulations/multipleComparisonPlot\ \(Figure\ 4\).jl simulate_only
 
-println("interactive = $(isinteractive())")
+	TODO: split this file into 2 files?
 
-if !isinteractive()
-	import Pkg
-	Pkg.activate(".")
-end
+=#
 
 using EqualitySampler, Turing, Plots, Plots.PlotMeasures
-
-# import	StatsBase 			as SB,
-# 		LinearAlgebra 		as LA,
-# 		StatsModels			as SM,
-# 		DataFrames			as DF,
-# 		GLM
-
 import Logging, ProgressMeter, JLD2
-# import Serialization
-# import DataFrames: DataFrame
-# import StatsModels: @formula
-# import Random
-
 include("anovaFunctions.jl")
+
 
 function get_priors()
 	return (
@@ -84,13 +71,9 @@ function run_simulation()
 
 	priors = get_priors()
 
-	# results = BitArray(undef, length(priors), length(groups), repeats)
-	# results_big = Array{Matrix{Float64}}(undef, length(priors), length(groups), repeats)
 	p = ProgressMeter.Progress(nsim)
 	Turing.setprogress!(false)
-
 	Logging.disable_logging(Logging.Warn)
-	# Logging.global_logger(limited_warning_logger(3))
 
 	results_dir = get_resultsdir()
 
@@ -116,30 +99,34 @@ function run_simulation()
 				chn, model = fit_eq_model(dat, partition_prior, nothing; mcmc_iterations = mcmc_iterations, mcmc_burnin = mcmc_burnin);
 				partition_samples = Int.(Array(group(chn, :partition)))
 				post_probs = compute_post_prob_eq(partition_samples)
-				# post_probs =  compute_post_prob_eq_helper(res)
 
 				results[j] = any_incorrect(post_probs)
 				results_big[j] = post_probs
 
-				# results[j, i, r] = any_incorrect(post_probs)
-				# results_big[j, i, r] = post_probs
-
 			end
 
-			# Serialization.serialize(filename, (results, results_big))
 			JLD2.jldsave(filename; results=results, results_big=results_big)
 
 		end
 
-		ProgressMeter.next!(p)#; showvalues = [(:r, r), (:groups, n_groups)])
+		ProgressMeter.next!(p)
 
 	end
-	# return results, results_big
 end
 
-# path = joinpath("simulations", "results_multiplecomparisonsplot", "multipleComparisonPlot.jls")
-# if !isfile(path)
-if !isinteractive()
+# could also be a const global
+simulate_only() = length(ARGS) > 0 && first(ARGS) === "simulate_only"
+if (simulate_only())
+	println("""
+		simulate_only() = true
+		get_resultsdir() = $(get_resultsdir())
+		pwd() = $(pwd())
+	""")
+else
+	println("simulate_only() = false")
+end
+
+if simulate_only()
 	run_simulation()
 	exit()
 end
@@ -157,11 +144,13 @@ ProgressMeter.@showprogress for (r, i) in sim_opts
 	filename = make_filename(results_dir, r, i)
 	if isfile(filename)
 
-		temp, temp_big = Serialization.deserialize(filename)
-		results[:, i, r] .= temp
-		results_big[:, i, r] .= temp_big
+		temp = JLD2.jldopen(filename)
+		results[:, i, r] .= temp["results"]
+		results_big[:, i, r] .= temp["results_big"]
 
 	else
+		fill!(results[:, i, r], 0)
+		results_big[:, i, r] .= [zeros(Float64, groups[i], groups[i]) for _ in 1:len_priors]
 		@warn "This file does not exist: " filename
 	end
 end
@@ -234,3 +223,64 @@ figdir = "figures"
 savefig(plot(p12, size = (1000, 500)), joinpath(figdir, "multipleComparisonPlot_side_by_side.pdf"))
 # savefig(plot(p12, size = (1000, 500)), joinpath(figdir, "multipleComparisonPlot_side_by_side.png"))
 
+
+using Gadfly, DataFrames
+import Cairo, Fontconfig
+# (n_groups)->UniformMvUrnDistribution(n_groups),
+# (n_groups)->BetaBinomialMvUrnDistribution(n_groups, 1.0, 1.0),
+# (n_groups)->BetaBinomialMvUrnDistribution(n_groups, n_groups, 1.0),
+# (n_groups)->BetaBinomialMvUrnDistribution(n_groups, 1.0, n_groups),
+# (n_groups)->BetaBinomialMvUrnDistribution(n_groups, 1.0, binomial(n_groups, 2)),
+# (n_groups)->DirichletProcessMvUrnDistribution(n_groups, 0.5),
+# (n_groups)->DirichletProcessMvUrnDistribution(n_groups, 1.0),
+# (n_groups)->DirichletProcessMvUrnDistribution(n_groups, 2.0),
+# (n_groups)->DirichletProcessMvUrnDistribution(n_groups, :Gopalan_Berry)
+priors_text = ["Uniform", "Beta-binomial α=1, β=1", "Beta-binomial α=K, β=1", "Beta-binomial α=1, β=K", "Beta-binomial α=1, β=binomial(K, 2)", "DPP α=0.5", "DPP α=1", "DPP α=2", "DPP α=Gopalan & Berry"]
+any_incorrect_df = DataFrame(
+	prior	= repeat(priors_text, inner = length(groups)),
+	groups	= repeat(groups, length(priors_text)),
+	value	= vec(mean(results, dims = 3))
+)
+
+results_big_prop_incorrect = prop_incorrect.(results_big)
+prop_incorrect_df = DataFrame(
+	prior	= repeat(priors_text, inner = length(groups)),
+	groups	= repeat(groups, length(priors_text)),
+	value	= vec(mean(results_big_prop_incorrect, dims = 3))
+)
+
+function base_plt(df)
+	Gadfly.plot(
+		df,
+		Geom.line(),
+		Geom.point,
+		Scale.x_continuous(minvalue=0, maxvalue = 10),
+		Scale.y_continuous(minvalue=0, maxvalue = 1),
+		;
+		x=:groups, y=:value, color=:prior, shape=:prior,
+		linestyle=[:dash]
+	)
+end
+
+plt_any_incorrect = base_plt(any_incorrect_df);
+plt_prop_incorrect = base_plt(prop_incorrect_df);
+hstack(plt_any_incorrect, plt_prop_incorrect) |> SVG("foo.svg", 7cm, 7cm)
+
+Gadfly.plot(
+	Geom.point,
+	Scale.x_continuous(minvalue=0, maxvalue = 1),
+	Scale.y_continuous(minvalue=0, maxvalue = 10);
+	x=rand(10), y=rand(0:10, 10)
+)
+
+# @model function gdemo(x, y)
+# 	s² ~ InverseGamma(2, 3)
+# 	m ~ Normal(0, sqrt(s²))
+# 	x ~ Normal(m, sqrt(s²))
+# 	y ~ Normal(m, sqrt(s²))
+# end
+
+# #  Run sampler, collect results
+# e0 = gdemo(1.5, 2)
+# e1 = HMC(0.1, 5)
+# chn = sample(e0, MH(), 1000) # <- type unstable

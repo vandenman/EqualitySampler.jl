@@ -1,13 +1,19 @@
 module EqualitySampler
 
+# stdlib
 import Base: length
-import Distributions, Random, LinearAlgebra, SpecialFunctions, Optim
-import StatsBase: countmap
-import OrderedCollections: OrderedDict
-import Turing, Turing.RandomMeasures
-import Bijectors
-import Combinatorics
-import Statistics
+import LinearAlgebra, Random, Statistics
+
+import
+	Bijectors,
+	Combinatorics,
+	Distributions,
+	Optim,
+	OrderedCollections,
+	StatsBase,
+	SpecialFunctions,
+	Turing,
+	Turing.RandomMeasures
 
 # for BayesFactor
 # import QuadGK
@@ -86,7 +92,7 @@ export
 
 	dpp_find_α,
 
-	bayes_factor_one_way_anova,
+	# bayes_factor_one_way_anova,
 
 	# Jeffreys priors for variances and sds
 	JeffreysPriorStandardDeviation,

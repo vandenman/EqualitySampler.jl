@@ -223,7 +223,7 @@ function logpdf_model_distinct(d::RandomProcessMvUrnDistribution{RPM, T}, urns::
 
 	n = length(d)
 	M = d.rpm.α
-	cc = countmap(urns)
+	cc = StatsBase.countmap(urns)
 
 	return length(cc) * log(M) +
 		logabsgamma(M) -

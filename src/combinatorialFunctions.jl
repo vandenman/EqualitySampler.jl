@@ -82,10 +82,10 @@ function count_set_partitions_given_partition_size(f!::Function, n::T, sorted::B
 	end
 	return result, part
 end
-runs(x) = values(countmap(x))
+runs(x) = values(StatsBase.StatsBase.countmap(x))
 count_set_partitions_given_partition_size(n::T, sorted::Bool = true) where T = count_set_partitions_given_partition_size(identity, n, sorted)
 
-# runs(x) = sort!(collect(values(countmap(x))))
+# runs(x) = sort!(collect(values(StatsBase.StatsBase.countmap(x))))
 
 # """
 # count_set_partitions_given_partition_size(n::T, m::T) where T<:Integer
@@ -107,4 +107,4 @@ count_set_partitions_given_partition_size(n::T, sorted::Bool = true) where T = c
 # 	end
 # 	return result, part
 # end
-# runs1(x) = collect(values(StatsBase.countmap(x)))
+# runs1(x) = collect(values(StatsBase.StatsBase.countmap(x)))

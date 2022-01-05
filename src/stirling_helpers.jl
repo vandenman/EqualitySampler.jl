@@ -2,8 +2,6 @@ abstract type StirlingStrategy end
 struct RecursiveStrategy <: StirlingStrategy end
 struct ExplicitStrategy <: StirlingStrategy end
 
-logbinomial(n::Integer, k::Integer) = SpecialFunctions.logabsbinomial(n, k)[1]
-
 # for alternating sums
 alternatingIterator(x) = Iterators.cycle(isodd(length(x) - 1) ? (-1.0, 1.0) : (1.0, -1.0))
 

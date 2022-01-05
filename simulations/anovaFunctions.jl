@@ -176,7 +176,7 @@ function get_starting_values(df)
 
 	adj_mat = [
 		Int(cis[i, 1] <= cis[j, 2] && cis[j, 1] <= cis[i, 2])
-		for i in axes(cis, 2), j in axes(cis, 2)
+		for i in axes(cis, 1), j in axes(cis, 1)
 	]
 
 	Q = getQ_Rouder(size(cis, 1))
@@ -358,7 +358,7 @@ end
 function fit_full_model(df, spl = nothing; mcmc_iterations::Int = 10_000, mcmc_burnin::Int = 1_000)
 	obs_mean, obs_var, obs_n, Q = prep_model_arguments(df)
 	model = one_way_anova_mv_ss_submodel(obs_mean, obs_var, obs_n, Q)
-	samples = sample(model, isnothing(spl) ? get_sampler(model) : spl, mcmc_iterations; discard_initial = mcmc_burnin)
+	samples = sample(model, isnothing(spl) ? get_sampler(model) : spl, mcmc_iterations; discard_initial = mcmc_burnin)::MCMCChains.Chains
 	return (samples=samples, model=model)
 end
 
@@ -366,7 +366,7 @@ function fit_eq_model(df, partition_prior::Union{Nothing, EqualitySampler.Abstra
 						mcmc_iterations::Int = 10_000, mcmc_burnin::Int = 1_000)
 
 	if partition_prior === nothing
-		return fit_full_model(df, iter, spl)
+		return fit_full_model(df, spl; mcmc_iterations = mcmc_iterations, mcmc_burnin = mcmc_burnin)
 	end
 
 	obs_mean, obs_var, obs_n, Q = prep_model_arguments(df)
@@ -374,7 +374,8 @@ function fit_eq_model(df, partition_prior::Union{Nothing, EqualitySampler.Abstra
 	model = one_way_anova_mv_ss_eq_submodel(obs_mean, obs_var, obs_n, Q, partition_prior)
 	starting_values = get_starting_values(df)
 	init_params = get_init_params(starting_values...)
-	samples = sample(model, isnothing(spl) ? get_sampler(model) : spl, mcmc_iterations; discard_initial = mcmc_burnin, init_params = init_params)
+	mcmc_sampler = spl === nothing ? get_sampler(model) : spl
+	samples = sample(model, mcmc_sampler, mcmc_iterations; discard_initial = mcmc_burnin, init_params = init_params)::MCMCChains.Chains
 	return (samples=samples, model=model)
 end
 
