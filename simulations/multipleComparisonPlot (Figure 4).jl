@@ -83,6 +83,7 @@ function run_simulation()
 		filename = make_filename(results_dir, r, i)
 		if !isfile(filename)
 
+			@show i, r
 			n_groups = groups[i]
 			true_model = fill(1, n_groups)
 			true_θ = normalize_θ(0.2, true_model)
@@ -94,6 +95,7 @@ function run_simulation()
 
 			# (j, fun) = first(enumerate(priors))
 			for (j, fun) in enumerate(priors)
+				@show j
 
 				partition_prior = fun(n_groups)
 				chn, model = fit_eq_model(dat, partition_prior, nothing; mcmc_iterations = mcmc_iterations, mcmc_burnin = mcmc_burnin);
@@ -109,6 +111,7 @@ function run_simulation()
 
 		end
 
+		# TODO: update progress inside inner loop?
 		ProgressMeter.next!(p)
 
 	end
@@ -121,6 +124,7 @@ if (simulate_only())
 		simulate_only() = true
 		get_resultsdir() = $(get_resultsdir())
 		pwd() = $(pwd())
+		threads = $(Threads.nthreads())
 	""")
 else
 	println("simulate_only() = false")

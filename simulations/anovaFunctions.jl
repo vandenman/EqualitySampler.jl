@@ -179,14 +179,15 @@ function get_starting_values(df)
 		for i in axes(cis, 1), j in axes(cis, 1)
 	]
 
-	Q = getQ_Rouder(size(cis, 1))
+	n_groups = size(cis, 1)
+	Q = getQ_Rouder(n_groups)
 
 	y = df.y
 	partition_start	= map(x->findfirst(isone, x), eachcol(adj_mat))::Vector{Int}
 	n_partitions	= length(unique(partition_start))
 	σ_start			= var(GLM.residuals(fit))
 	μ_start			= mean(y)
-	θ_c_start		= isone(n_partitions) ? [0.0, 0.0] : average_equality_constraints(coefs, partition_start)
+	θ_c_start		= isone(n_partitions) ? zeros(n_groups) : average_equality_constraints(coefs, partition_start)
 	# this is faster than Q \ θ_c_start which uses a qr decomposition
 	θ_start_0		= LA.pinv(Q) * θ_c_start
 	g_start			= isone(n_partitions) ? 1.0 : var(θ_start_0)
