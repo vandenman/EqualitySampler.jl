@@ -12,8 +12,9 @@ import
 	StatsModels			as SM,
 	DataFrames			as DF
 
-include("customHMCAdaptation.jl")
+# include("customHMCAdaptation.jl")
 include("helpersTuring.jl")
+include("brute_force_epsilon.jl")
 
 struct TrueValues{T<:Real, U<:AbstractVector{T}, W<:AbstractVector{<:Integer}}
 	μ::T
@@ -238,7 +239,7 @@ function plot_retrieval(true_values, estimated_values)
 	scatter!(p, true_values, estimated_values)
 end
 
-function get_sampler(model; ϵ::Float64 = 0.0, n_leapfrog::Int = 20)
+function get_sampler(model, ϵ::Float64 = 0.0, n_leapfrog::Int = 20)
 	parameters = DynamicPPL.syms(DynamicPPL.VarInfo(model))
 	if :partition in parameters
 
@@ -375,7 +376,15 @@ function fit_eq_model(df, partition_prior::Union{Nothing, EqualitySampler.Abstra
 	model = one_way_anova_mv_ss_eq_submodel(obs_mean, obs_var, obs_n, Q, partition_prior)
 	starting_values = get_starting_values(df)
 	init_params = get_init_params(starting_values...)
-	mcmc_sampler = spl === nothing ? get_sampler(model) : spl
+
+	if spl === nothing
+		ϵ = brute_force_ϵ(model; init_params = init_params)
+		mcmc_sampler = get_sampler(model, ϵ)
+		@show mcmc_sampler
+	else
+		mcmc_sampler = spl
+	end
+
 	samples = sample(model, mcmc_sampler, mcmc_iterations; discard_initial = mcmc_burnin, init_params = init_params)::MCMCChains.Chains
 	return (samples=samples, model=model)
 end

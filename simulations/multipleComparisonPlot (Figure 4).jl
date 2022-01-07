@@ -3,13 +3,15 @@
 		julia-1.6.5 --project=simulations -O3 -t auto simulations/multipleComparisonPlot\ \(Figure\ 4\).jl simulate_only
 
 	TODO: split this file into 2 files?
+		- one for running the simulation
+			-	rerun simulations when any rhat is NaN or above 1.05?
+		- one for creating the figure
 
 =#
 
-using EqualitySampler, Turing, Plots, Plots.PlotMeasures
+using EqualitySampler, Turing
 import Logging, ProgressMeter, JLD2
 include("anovaFunctions.jl")
-
 
 function get_priors()
 	return (
@@ -48,18 +50,23 @@ function prop_incorrect(x)
 end
 
 function get_resultsdir()
-	results_dir = joinpath("simulations", "results_multiplecomparisonsplot_200_2")
+	results_dir = joinpath("simulations", "results_multiplecomparisonsplot_200_3")
 	!ispath(results_dir) && mkpath(results_dir)
 	return results_dir
 end
 
 make_filename(results_dir, r, i) = joinpath(results_dir, "repeat_$(r)_groups_$(i).jld2")
 
+function get_hyperparams()
+	n_obs_per_group = 100
+	repeats = 1:20
+	groups = 2:10
+	return n_obs_per_group, repeats, groups
+end
+
 function run_simulation()
 
-	n_obs_per_group = 100
-	repeats = 200
-	groups = 2:10
+	n_obs_per_group, repeats, groups = get_hyperparams()
 
 	sim_opts = Iterators.product(1:repeats, eachindex(groups))
 
@@ -135,14 +142,14 @@ if simulate_only()
 	exit()
 end
 
-repeats = 200
-groups = 2:10
+_, repeats, groups = get_hyperparams()
+no_repeats = length(repeats)
 len_priors = length(get_priors())
-sim_opts = Iterators.product(1:repeats, eachindex(groups))
+sim_opts = Iterators.product(repeats, eachindex(groups))
 results_dir = get_resultsdir()
 
-results = BitArray(undef, len_priors, length(groups), repeats)
-results_big = Array{Matrix{Float64}}(undef, len_priors, length(groups), repeats)
+results = BitArray(undef, len_priors, length(groups), no_repeats)
+results_big = Array{Matrix{Float64}}(undef, len_priors, length(groups), no_repeats)
 
 ProgressMeter.@showprogress for (r, i) in sim_opts
 	filename = make_filename(results_dir, r, i)
@@ -159,6 +166,8 @@ ProgressMeter.@showprogress for (r, i) in sim_opts
 	end
 end
 
+
+#=
 function make_figure(x, y, ylab, labels; shapes = :auto, kwargs...)
 	plot(
 		x,
@@ -181,7 +190,7 @@ function make_figure(x, y, ylab, labels; shapes = :auto, kwargs...)
 		kwargs...
 	)
 end
-
+using Plots, Plots.PlotMeasures
 # using PlotlyJS
 # plotlyjs()
 
@@ -226,10 +235,22 @@ figdir = "figures"
 
 savefig(plot(p12, size = (1000, 500)), joinpath(figdir, "multipleComparisonPlot_side_by_side.pdf"))
 # savefig(plot(p12, size = (1000, 500)), joinpath(figdir, "multipleComparisonPlot_side_by_side.png"))
-
+=#
 
 using Gadfly, DataFrames
 import Cairo, Fontconfig
+
+function base_plt(df)
+	Gadfly.plot(
+		df,
+		Geom.line(),
+		Geom.point,
+		Scale.x_continuous(minvalue=0, maxvalue = 10),
+		Scale.y_continuous(minvalue=0, maxvalue = 1);
+		x=:groups, y=:value, color=:prior, shape=:prior,
+		linestyle=[:dash]
+	)
+end
 
 # note that "&" must be escaped to "&amp;" for pango, but SVG still fails...
 prior_names = ["Uniform", "Beta-binomial α=1, β=1", "Beta-binomial α=K, β=1", "Beta-binomial α=1, β=K", "Beta-binomial α=1, β=binomial(K, 2)", "DPP α=0.5", "DPP α=1", "DPP α=2", "DPP α=Gopalan and Berry"]
@@ -245,18 +266,6 @@ prop_incorrect_df = DataFrame(
 	groups	= repeat(groups, length(prior_names)),
 	value	= vec(mean(results_big_prop_incorrect, dims = 3))
 )
-
-function base_plt(df)
-	Gadfly.plot(
-		df,
-		Geom.line(),
-		Geom.point,
-		Scale.x_continuous(minvalue=0, maxvalue = 10),
-		Scale.y_continuous(minvalue=0, maxvalue = 1);
-		x=:groups, y=:value, color=:prior, shape=:prior,
-		linestyle=[:dash]
-	)
-end
 
 plt_any_incorrect = base_plt(any_incorrect_df);
 push!(plt_any_incorrect, Theme(key_position = :none));
