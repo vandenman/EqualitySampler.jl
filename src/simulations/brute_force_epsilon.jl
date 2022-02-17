@@ -1,3 +1,4 @@
+import Logging, MCMCChains
 function get_rhats(chn::MCMCChains.Chains)
 	MCMCChains.summarystats(chn).nt.rhat
 end

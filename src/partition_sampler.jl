@@ -42,6 +42,7 @@ function sample_next_values(c, o)
 			nextValues[j] = i
 			if nextValues[j] != cache_idx
 				probvec[i] = o.logposterior(nextValues, c)
+				# @show i, nextValues, probvec
 			else
 				# println("use cache")
 				# @show i cache_idx cache_value nextValues
@@ -56,8 +57,15 @@ function sample_next_values(c, o)
 			@warn "probvec condition not satisfied! trying to normalize once more"
 			probvec_normalized ./= sum(probvec_normalized)
 		end
-		# TODO: consider disabling the isprobvec check with check_args = false?
-		nextValues[j] = rand(Distributions.Categorical(probvec_normalized))
+
+		if Distributions.isprobvec(probvec_normalized)
+			# TODO: consider disabling the isprobvec check with check_args = false?
+			nextValues[j] = rand(Distributions.Categorical(probvec_normalized))
+		elseif all(isinf, probvec)
+			return nextValues
+		else
+			nextValues[j] = c.partition[j]
+		end
 		if j != length(probvec)
 
 			cache_idx = nextValues[j+1]

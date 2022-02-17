@@ -11,6 +11,29 @@ true_model = [1, 1, 2, 2, 3, 3]
 θ_true = average_equality_constraints(θ_raw, true_model)
 data = simulate_data_one_way_anova(n_groups, n_obs_per_group, θ_true);
 
+df = data.data
+partition_prior = BetaBinomialMvUrnDistribution(n_groups)
+obs_mean, obs_var, obs_n, Q = prep_model_arguments(df)
+
+model = one_way_anova_mv_ss_eq_submodel(obs_mean, obs_var, obs_n, Q, partition_prior)
+starting_values = get_starting_values(df)
+init_params = get_init_params(starting_values...)
+
+parameters = DynamicPPL.syms(DynamicPPL.VarInfo(model))
+continuous_parameters = filter(!=(:partition), parameters)
+spl1 = Gibbs(
+	HMC(1/32, 20, continuous_parameters...),
+	GibbsConditional(:partition, EqualitySampler.PartitionSampler(length(model.args.partition_prior), get_logπ(model)))
+)
+spl2 = Gibbs(
+	HMC{Turing.Core.ForwardDiffAD{1}}(1/32, 20, continuous_parameters...),
+	GibbsConditional(:partition, EqualitySampler.PartitionSampler(length(model.args.partition_prior), get_logπ(model)))
+)
+chn1 = sample(model, spl1, 1000; init_params = init_params)
+chn2 = sample(model, spl2, 1000; init_params = init_params)
+
+fit_eq_model(data.data, prior, spl; mcmc_iterations = 10_000)
+
 priors = (
 	full			= nothing,
 	uniform 		= UniformMvUrnDistribution(n_groups),

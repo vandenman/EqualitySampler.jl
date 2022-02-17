@@ -27,6 +27,7 @@ export
 	get_normal_dense_suff_stats,
 	get_normal_dense_chol_suff_stats,
 	logpdf_mv_normal_chol_suffstat,
+	logpdf_mv_normal_precision_chol_suffstat,
 	AbstractConditionalUrnDistribution,
 	UniformConditionalUrnDistribution,
 	BetaBinomialConditionalUrnDistribution,
@@ -105,23 +106,30 @@ export
 	# compute_incl_probs,
 	# get_posterior_means_mu_sigma
 
-include("specialfunctions.jl")
+include("special_functions.jl")
 include("stirling_helpers.jl")
 include("stirling1.jl")
 include("stirling2.jl")
 include("rstirling2.jl")
 include("bellnumr.jl")
-include("lookupTablesStirlingRBellnumbers.jl")
-include("generateModelSpace.jl")
-include("combinatorialFunctions.jl")
-include("multivariateUrnDistributions.jl")
-include("conditionalUrnDistributions.jl")
-include("normalLogLikelihood.jl")
+include("lookup_tables_stirling_r_bellnumbers.jl")
+include("generate_model_space.jl")
+include("combinatorics.jl")
+include("multivariate_urn_distributions.jl")
+include("conditional_urn_distributions.jl")
+include("normal_loglikelihood.jl")
 include("helpers.jl")
-include("bayesFactors.jl")
-include("PartitionSampler.jl")
-include("findDPPalpha.jl")
-include("JeffreysPrior.jl")
+include("partition_sampler.jl")
+include("dpp_find_α.jl")
+include("jeffreys_prior.jl")
+
+include("simulations/Simulations.jl")
+import .Simulations: anova_test, proportion_test
+export
+	anova_test,
+	proportion_test
+
+
 
 
 end

@@ -49,6 +49,16 @@ function _univariate_normal_likelihood(obs_mean, obs_var, obs_n, pop_mean, pop_v
 	# return - n / 2 * result
 end
 
+# maybe this is faster for AD than explicitly looping over _univariate_normal_likelihood
+# function _multivariate_normal_diagonal_covariance_likelihood(obs_mean, obs_var, obs_n, pop_mean, pop_var)
+# 	# untested!
+# 	# pop_var should be a number, the others arrays of number
+# 	(-obs_n+length(obs_mean)) / 2.0 * (log(2pi) + log(pop_var)) +
+# 		- 1 / (2.0pop_var) * (
+# 			LA.dot((obs_n .- 1), obs_var) + LA.dot(obs_n, (obs_mean .- pop_mean)^2)
+# 		)
+# end
+
 # MvNormal Distribution parametrized with sufficient statistics for a diagonal covariance matrix
 struct MvNormalSuffStat{T<:AbstractVector{<:Real}, U<:AbstractVector{<:Real}} <: Distributions.AbstractMvNormal
 # struct MvNormalSuffStat{T<:AbstractVector{<:Real}, U<:AbstractVector{<:Real}} <: Distributions.Distribution{F, S}
@@ -110,9 +120,23 @@ function logpdf_mv_normal_chol_suffstat(x̄, S_chol::LinearAlgebra.UpperTriangul
 	return (
 		-n / 2 * (
 			d * log(2pi) +
-			2LinearAlgebra.logdet(Σ_chol) +
+			2 * sum(i->log(Σ_chol[i, i]), axes(Σ_chol, 1)) +
+			# 2LinearAlgebra.logdet(Σ_chol) +
 			sum(x->x^2, (x̄ .- μ)' / Σ_chol) +
 			sum(x->x^2, S_chol / Σ_chol)
+		)
+	)
+end
+
+
+function logpdf_mv_normal_precision_chol_suffstat(x̄, S_chol::LinearAlgebra.UpperTriangular, n, μ, Ω_chol::LinearAlgebra.UpperTriangular)
+	d = length(x̄)
+	return (
+		-n / 2 * (
+			d * log(2pi) +
+			-2 * sum(i->log(Ω_chol[i, i]), axes(Ω_chol, 1)) +
+			sum(x->x^2, (x̄ .- μ)' * Ω_chol) +
+			sum(x->x^2, S_chol * Ω_chol)
 		)
 	)
 end

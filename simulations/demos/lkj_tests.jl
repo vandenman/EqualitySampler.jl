@@ -1,5 +1,11 @@
-using Turing, MCMCChains, FillArrays, Plots, Distributions, LinearAlgebra, KernelDensity
+using Turing, MCMCChains, FillArrays, Distributions, LinearAlgebra
+using KernelDensity, Plots
 import DynamicPPL: @submodel
+import DistributionsAD
+import EqualitySampler
+
+
+include("lkj_prior.jl")
 
 """
 Marginal distributions of lkj samples
@@ -9,48 +15,6 @@ adpated from https://mjskay.github.io/ggdist/reference/lkjcorr_marginal.html
 function dlkjcorr_marginal(x, K, η, log = false)
 	D = Beta(η - 1 + K / 2, η - 1 + K / 2)
 	return log ? logpdf(D, (x + 1) / 2) - log(2) : pdf(D, (x + 1) / 2) / 2
-end
-
-@model function manual_lkj2(K, eta, ::Type{T} = Float64) where T
-
-	# based on https://github.com/rmcelreath/rethinking/blob/2acf2fd7b01718cf66a8352c52d001886c7d3c4c/R/distributions.r#L212-L248
-	alpha = eta + (K - 2) / 2
-	r_tmp ~ Beta(alpha, alpha)
-
-	r12 = 2 * r_tmp - 1
-	R = Matrix{T}(undef, K, K)
-	R[1, 1] = one(T)
-	R[1, 2] = r12
-	R[2, 2] = sqrt(one(T) - r12^2.0)
-
-	if K > 2
-
-		y = Vector{T}(undef, K-2)
-		# the original implementation overwrites a vector with one of a different size, but that won't work in Turing
-		# z = Vector{Vector{T}}(undef, K-2)
-		# but this should be more efficient
-
-		z ~ MvNormal(ones(K * (K - 1) ÷ 2 - 1))
-		z_idx = 0
-
-		for m in 2:K-1
-
-			z_i = view(z, z_idx + 1:z_idx + m)
-			z_idx += m
-
-			i = m - 1
-			alpha -= 0.5
-			y[i] ~ Beta(m / 2, alpha)
-
-			# R[1:m, m+1] .= sqrt(y[i]) .* z[i] ./ LA.norm(z[i])
-			R[1:m, m+1] .= sqrt(y[i]) .* z_i ./ norm(z_i)
-			# LA.normalize does not work because of https://github.com/JuliaDiff/ForwardDiff.jl/issues/175
-			# R[1:m, m+1] .= sqrt(y[i]) .* LA.normalize(z[i])
-			R[m+1, m+1] = sqrt(1 - y[i])
-
-		end
-	end
-	return UpperTriangular(R)
 end
 
 function sample_lkj(K, η, no_samples)
@@ -71,11 +35,19 @@ function sample_lkj(K, η, no_samples)
 	return ρs, chn
 end
 
+no_samples = 10_000
+chn1 = sample(manual_lkj(10, 1.0),  NUTS(), no_samples)
+chn2 = sample(manual_lkj2(10, 1.0), NUTS(), no_samples)
+[MCMCChains.wall_duration(chn1), MCMCChains.wall_duration(chn2)]
+[mean(MCMCChains.summarystats(chn1).nt.ess_per_sec), mean(MCMCChains.summarystats(chn2).nt.ess_per_sec)]
+
+
 Ks = (3, 4, 5)
 ηs = (1.0, 2.0, 5.0)
 no_samples = 10_000
 results = Vector{NamedTuple}()
 for (K, η) in Iterators.product(Ks, ηs)
+	@show K, η
 	ρs, _ = sample_lkj(K, η, no_samples)
 	push!(results, (K = K, η = η, ρs = ρs))
 end
@@ -86,20 +58,45 @@ for i in eachindex(plts)
 
 	K, η, ρs = results[i]
 	density_estimate = kde(view(ρs, :, 1); npoints = 2^12, boundary = (-1, 1))
-	plt = plot(density_estimate.x, density_estimate.density, title = "K = $K, η = $η", legend = false,
-	           label = "sampled")
-	plot!(plt, xcoords, dlkjcorr_marginal.(xcoords, K, η), label = "theoretical")
+	plt = Plots.plot(density_estimate.x, density_estimate.density, title = "K = $K, η = $η", legend = false, label = "sampled")
+	Plots.plot!(plt, xcoords, dlkjcorr_marginal.(xcoords, K, η), label = "theoretical")
 	plts[i] = plt
 
 end
 
-legend = plot([0 0], showaxis = false, grid = false, label = ["sampled" "theoretical"], axis = nothing);
-plot(plts..., legend, layout = @layout [grid(3,3) a{0.2w}])
+legend = Plots.plot([0 0], showaxis = false, grid = false, label = ["sampled" "theoretical"], axis = nothing);
+Plots.plot(plts..., legend, layout = @layout [grid(3,3) a{0.2w}])
 # plot(plts..., layout = (length(Ks), length(ηs)))
 
 # use the LKJ to fit a normal
 
-n, p = 100, 4
+function perf_plot(model, chn, true_μ, true_σ, true_ρs)
+
+	est_μ = MCMCChains.summarystats(group(chn, :μ)).nt.mean
+	est_σ = MCMCChains.summarystats(group(chn, :sds)).nt.mean
+
+	gen = generated_quantities(model, MCMCChains.get_sections(chn, :parameters))
+	Rs = map(x -> x'x, gen)
+	ρs = Matrix{Float64}(undef, length(Rs), p * (p - 1) ÷ 2)
+	for i in axes(ρs, 1)
+		ρs[i, :] .= [Rs[i][m, n] for m in 2:size(Rs[i], 1) for n in 1:m-1]
+	end
+	est_ρs = mean(eachrow(ρs))
+
+	plt_μ = scatter(true_μ, est_μ, title = "μ")
+	Plots.abline!(plt_μ, 1, 0, legend=false)
+
+	plt_σ = scatter(true_σ, est_σ, title = "σ")
+	Plots.abline!(plt_σ, 1, 0, legend=false)
+
+	plt_ρs = scatter(true_ρs, est_ρs, title = "ρ")
+	Plots.abline!(plt_ρs, 1, 0, legend=false)
+
+	plot(plt_μ, plt_σ, plt_ρs, layout = grid(1, 3))
+
+end
+
+n, p = 10_000, 4
 
 true_means  = collect(1.0:p)
 true_R_chol = rand(LKJCholesky(p, 1.0, 'U'))
@@ -108,37 +105,73 @@ true_sd     = collect(1.0:p)
 true_S_chol = true_R_chol.U * Diagonal(true_sd)
 true_S      = true_S_chol'true_S_chol
 
-using PDMats
+true_ρs = [true_R[m, n] for m in 2:size(true_R, 1) for n in 1:m-1]
 
-PDMat(Cholesky(true_S_chol, :U, 0))
+true_S_chol2 = Cholesky(true_S_chol, :U, 0)
+true_d = MvNormal(true_means, true_S)
 
+x = rand(true_d, n)
 
-x = rand(MvNormal(true_means, PDMat(true_S_chol)), n)
-
+# This works but is really slow
 @model function mvnormal_turing(x, η, ::Type{T} = Float64) where T
 
 	p, n = size(x)
-	means ~ MvNormal(ones(Float64, p))
-	sds   ~ filldist(InverseGamma(1.0, 1.0), p)
+	μ ~ MvNormal(Zeros(p), Ones(p))
+	sds ~ filldist(InverseGamma(5.0, 4.0), p)
+	DynamicPPL.@submodel prefix="manual_lkj" R_chol = manual_lkj2(p, η, T)
 
-	R_chol = @submodel $(Symbol("manual_lkj")) manual_lkj2(p, η, T)
-	Sigma_chol = UpperTriangular(R_chol * Diagonal(sds))
-
-	if det(Sigma_chol) < sqrt(eps(T))
+	# @show means sds R_chol
+	if LinearAlgebra.det(R_chol) < sqrt(eps(T))
 		Turing.@addlogprob! -Inf
-		return (R_chol, )
-	end
-	Sigma = Sigma_chol'Sigma_chol
-
-
-	for i in 1:n
-		x[:, i] ~ MvNormal(means, Sigma)
+	else
+		# prec_chol = Diagonal(1 ./ sds) * inv(R_chol)
+		# Sigma_chol = Cholesky(UpperTriangular(R_chol * Diagonal(sds)), :U, 0)
+		Sigma_chol = Cholesky(R_chol * Diagonal(sds), :U, 0)
+		# Sigma = Sigma_chol.U'Sigma_chol.U
+		for i in 1:n
+			x[:, i] ~ DistributionsAD.TuringDenseMvNormal(μ, Sigma_chol)
+			# x[:, i] ~ MvNormal(means, Sigma)
+		end
 	end
 
 	return (R_chol, )
 end
 
-mod_mvnormal = mvnormal_turing(x, 1.0)
-samps = sample(mod_mvnormal, NUTS(), 100)
+mod_mvnormal0 = mvnormal_turing(x, 1.0)
+samps0 = sample(mod_mvnormal0, NUTS(), 1000)
+perf_plot(mod_mvnormal0, samps0, true_means, true_sd, true_ρs)
 
-Sigma_chol = [1.6996185109323887 4.861521935132051 -0.6498621746830178 0.21264491910724162; 0.0 7.27536669578297 0.6005138605151561 0.5164578717483551; 0.0 0.0 0.8337881313363649 -0.3674260700803254; 0.0 0.0 0.0 0.35013387861256073]
+@model function mvnormal_suffstats(obs_mean, obs_cov_chol, n, η = 1.0, ::Type{T} = Float64) where T
+
+	p = length(obs_mean)
+	μ ~ MvNormal(Zeros(p), Ones(p))
+	sds ~ filldist(InverseGamma(5.0, 4.0), p)
+
+	DynamicPPL.@submodel prefix="manual_lkj" R_chol = manual_lkj2(p, η, T)
+
+	if LinearAlgebra.det(R_chol) < sqrt(eps(T))
+		Turing.@addlogprob! -Inf
+	else
+		# Diagonal(1 ./ sds) / inv(R_chol) throws an error
+		prec_chol = Diagonal(1 ./ sds) * inv(R_chol)
+		Turing.@addlogprob! EqualitySampler.logpdf_mv_normal_precision_chol_suffstat(obs_mean, obs_cov_chol, n, μ, prec_chol)
+	end
+
+	return R_chol
+end
+
+obs_mean, obs_cov_chol, n = get_normal_dense_chol_suff_stats(x)
+prec_chol = inv(true_S_chol)
+# inv(Diagonal(true_sd)) * inv(true_R_chol.U)
+# Diagonal(1 ./ true_sd) * inv(true_R_chol.U)
+# Diagonal(1 ./ true_sd) / true_R_chol.U
+# Diagonal(1 ./ true_sd) \ true_R_chol.U
+# Diagonal(1 ./ true_sd) * inv(true_R_chol.U)
+
+
+loglikelihood(MvNormal(true_means, true_S), x) ≈ logpdf_mv_normal_chol_suffstat(obs_mean, obs_cov_chol, n, true_means, true_S_chol) ≈ logpdf_mv_normal_precision_chol_suffstat(obs_mean, obs_cov_chol, n, true_means, prec_chol)
+
+mod_mvnormal = mvnormal_suffstats(obs_mean, obs_cov_chol, n)
+samps = sample(mod_mvnormal, NUTS(), 5_000)
+
+perf_plot(mod_mvnormal, samps, true_means, true_sd, true_ρs)

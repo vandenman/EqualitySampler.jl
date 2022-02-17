@@ -55,7 +55,7 @@ function simulate_data_one_way_anova(
 	length(θ) != n_groups && throw(error("length(θ) != n_groups"))
 
 	n_obs = n_groups * n_obs_per_group
-	θc = θ .- mean(θ)
+	θc = θ .- SB.mean(θ)
 
 	g = Vector{UnitRange{Int}}(undef, n_groups)
 	for i in eachindex(g)
@@ -73,7 +73,6 @@ function simulate_data_one_way_anova(
 	D = MvNormal(μ .+ σ .* view(θc, g_big), σ)
 	y = rand(D)
 
-	# dat = DF.DataFrame(:y => y, :g => CategoricalArrays.categorical(g))
 	dat = SimpleDataSet(y, g)
 
 	true_values = TrueValues(μ, σ, θc, partition)
@@ -116,7 +115,7 @@ function get_suff_stats(df::SimpleDataSet)
 	return obs_mean, obs_var, obs_n
 end
 
-function get_suff_stats(df::DF.DataFrame)
+function get_suff_stats(df::DataFrames.DataFrame)
 
 	_, obs_mean, obs_var, obs_n = eachcol(
 		DataFrames.combine(DataFrames.groupby(df, :g), :y => mean, :y => var, :y => length)
@@ -182,7 +181,6 @@ function get_starting_values(df)
 
 end
 
-
 function get_θ_cs(model, chain)
 	gen = generated_quantities(model, MCMCChains.get_sections(chain, :parameters))
 	θ_cs = Matrix{Float64}(undef, length(gen), length(gen[1]))
@@ -194,7 +192,6 @@ function get_θ_cs(model, chain)
 	return θ_cs
 end
 
-# TODO: move this to the analysis file!
 # function plot_retrieval(true_values, estimated_values)
 # 	p = Plots.plot(legend=false, xlab = "True value", ylab = "Posterior mean")
 # 	Plots.abline!(p, 1, 0)
@@ -228,7 +225,7 @@ function get_init_params(partition::Vector{Int}, θ_r::Vector{Float64}, μ = 0.0
 	)
 end
 
-@model function one_way_anova_mv_ss_submodel(obs_mean, obs_var, obs_n, Q, partition = nothing, ::Type{T} = Float64) where {T}
+DynamicPPL.@model function one_way_anova_mv_ss_submodel(obs_mean, obs_var, obs_n, Q, partition = nothing, ::Type{T} = Float64) where {T}
 
 	n_groups = length(obs_mean)
 
@@ -257,43 +254,10 @@ end
 
 end
 
-@model function one_way_anova_mv_ss_eq_submodel(obs_mean, obs_var, obs_n, Q, partition_prior::D, ::Type{T} = Float64) where {T, D<:AbstractMvUrnDistribution}
+DynamicPPL.@model function one_way_anova_mv_ss_eq_submodel(obs_mean, obs_var, obs_n, Q, partition_prior::D, ::Type{T} = Float64) where {T, D<:AbstractMvUrnDistribution}
 
 	partition ~ partition_prior
 	DynamicPPL.@submodel prefix="one_way_anova_mv_ss_submodel" θ_cs = one_way_anova_mv_ss_submodel(obs_mean, obs_var, obs_n, Q, partition, T)
-	# θ_cs = DynamicPPL.@submodel $(Symbol("one_way_anova_mv_ss_submodel")) one_way_anova_mv_ss_submodel(obs_mean, obs_var, obs_n, Q, partition, T)
-	return θ_cs
-
-end
-
-@model function one_way_anova_mv(obs_mean, obs_var, obs_n, Q, partition_prior, ::Type{T} = Float64) where {T}
-	# this version could use condition syntax to switch between the full model or the partition sampler
-
-
-	n_groups = length(obs_mean)
-
-	# improper priors on grand mean and variance
-	μ_grand 		~ Flat()
-	σ² 				~ JeffreysPriorVariance()
-
-	# The setup for θ follows Rouder et al., 2012, p. 363
-	g   ~ InverseGamma(0.5, 0.5; check_args = false)
-
-	θ_r ~ MvNormal(LA.Diagonal(Fill(1.0, n_groups - 1)))
-
-	# ensure the sum to zero constraint
-	θ_s = Q * (sqrt(g) .* θ_r)
-
-	# sample a partition
-	partition ~ partition_prior
-
-	# constrain θ according to the partition
-	θ_cs = average_equality_constraints(θ_s, partition)
-
-	# definition from Rouder et. al., (2012) eq 6.
-	for i in eachindex(obs_mean)
-		Turing.@addlogprob! EqualitySampler._univariate_normal_likelihood(obs_mean[i], obs_var[i], obs_n[i], μ_grand + sqrt(σ²) * θ_cs[i], σ²)
-	end
 	return θ_cs
 
 end
@@ -334,7 +298,8 @@ function fit_eq_model(df, partition_prior::Union{Nothing, EqualitySampler.Abstra
 	end
 
 	samples = sample(model, mcmc_sampler, mcmc_iterations; discard_initial = mcmc_burnin, init_params = init_params)::MCMCChains.Chains
-	#TODO: unify the output with that of proportion_model!
+
+	# TODO: should be the same output structure as proportion_test!
 	return (samples=samples, model=model)
 end
 

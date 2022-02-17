@@ -197,8 +197,43 @@ A:
 
 - [x] Recreate Figure 2
 - [x] Recreate Figure 3
-- [ ] Recreate Figure 4
+- [x] Recreate Figure 4
 	priors:
 		- BB(1, 1), BB(1, k), BB(1, binomial(k, 2)),
 		- DPP(.5), DPP(1.0), DPP(Gopalan Berry),
 		- Uniform
+
+- use DocStringUtils
+
+- [ ] Update figure 4 with Plots.jl
+
+- [ ] Proportion example -- more figures (check only after uploading to overleaf!)
+	- [ ] Two panel plot
+		- [ ] Left: for estimation
+			- [ ] Show posterior density of proportions for each journal
+			- [ ] Ridgeline plot, possibly on one line with different colors
+		- [ ] Right: for testing
+			- [ ] Create posterior model probabilities table, see if some models dominate
+			- [ ] Try out some stuff
+			- [ ] Heatmap with posterior propabilties of equality (8x8 table) with values in there up to two digits
+
+- [ ] Variances example -- more figures (check only after uploading to overleaf!)
+	- [ ] Two panel plot
+		- [ ] Left: for estimation
+			- [ ] Show posterior density of proportions for each journal
+			- [ ] Ridgeline plot, possibly on one line with different colors
+		- [ ] Right: for testing
+			- [ ] Create posterior model probabilities table, see if some models dominate
+			- [ ] Try out some stuff
+			- [ ] Heatmap with posterior propabilties of equality (10x10 table) with values in there up to two digits
+			- [ ] Check if we can use the upper triangle for something interesting (e.g., the prior)
+
+- [ ] Package changes
+	- [ ] move all the functionality inside anovaFunctions.jl into the package.
+		- [ ] remove `include("anovaFunctions.jl")` in the demos/ simulations.
+	- [ ] Add generic functions for user friendliness
+		- [ ] anova_test		(formula, data, prior, ...)
+		- [ ] proportion_test	(formula, data, prior, ...)
+		- [ ] variance_test		(formula, data, prior, ...)
+	- [ ] look at https://cran.r-project.org/package=JuliaCall
+	- [ ] stick to one naming convention for filenames!
