@@ -15,9 +15,6 @@ import
 	Turing,
 	Turing.RandomMeasures
 
-# for BayesFactor
-# import QuadGK
-
 export
 	NormalSuffStat,
 	MvNormalSuffStat,

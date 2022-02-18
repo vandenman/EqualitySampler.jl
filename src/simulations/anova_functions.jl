@@ -304,5 +304,53 @@ function fit_eq_model(df, partition_prior::Union{Nothing, EqualitySampler.Abstra
 end
 
 # TODO!
-function anova_test()
+function anova_test(
+		f::StatsModels.FormulaTerm,
+		df::DataFrames.DataFrame;
+		kwargs...
+	)
+
+	ts = StatsModels.apply_schema(f, StatsModels.schema(df))
+	!isone(length(ts.rhs))
+	y, g = map(vec, StatsModels.modelcols(ts, df))
+
 end
+
+function anova_test(
+	y::AbstractVector{<:AbstractFloat},
+	g::AbstractVector{<:Integer};
+	kwargs...
+)
+
+end
+
+
+function anova_test(
+		y::AbstractVector{<:AbstractFloat},
+		g::AbstractVector{<:UnitRange{<:Integer}};
+		kwargs...
+	)
+
+end
+
+function anova_test(
+
+	;
+		no_samples::Integer = 1_000, no_burnin::Integer = 500, no_chains::Integer = 3,
+		spl = nothing,
+		kwargs...
+)
+end
+
+# df = DataFrames.DataFrame(
+# 	x = 2 .+ randn(10),
+# 	y = rand(10),
+# 	g = reduce(vcat, fill.(1:3, (3, 3, 4)))
+# )
+		
+# f = StatsModels.@formula(y~g+x)
+
+# ts = StatsModels.apply_schema(f, StatsModels.schema(df))
+# typeof(ts.rhs)
+# !isone(length(ts.rhs))
+		
