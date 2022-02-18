@@ -120,7 +120,7 @@ include("conditional_urn_distributions.jl")
 include("normal_loglikelihood.jl")
 include("helpers.jl")
 include("partition_sampler.jl")
-include("dpp_find_α.jl")
+include("dpp_find_alpha.jl")
 include("jeffreys_prior.jl")
 
 include("simulations/Simulations.jl")
