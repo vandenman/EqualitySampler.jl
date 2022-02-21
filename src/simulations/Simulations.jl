@@ -14,6 +14,7 @@ import
 
 # other dependencies
 import
+	AbstractMCMC,
 	CategoricalArrays,
 	DataFrames,
 	Distributions,

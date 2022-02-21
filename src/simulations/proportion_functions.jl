@@ -50,7 +50,7 @@ function proportion_test(
 	all_samples = sample(model, spl, no_samples, no_chains; discard_initial = no_burnin, kwargs...);
 	posterior_means, posterior_samples = get_p_constrained(model, all_samples)
 
-	# TODO: maybe don't return the model?
+	# TODO: maybe don't return the model? also should this be a struct rather than a named tuple?
 	return (posterior_means = posterior_means, posterior_samples = posterior_samples, all_samples = all_samples, model = model)
 
 end

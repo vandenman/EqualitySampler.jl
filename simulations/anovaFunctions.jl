@@ -109,6 +109,11 @@ function fit_lm(df, formula = StatsModels.@formula(y ~ 1 + g))
 	return ests, cis, fit
 end
 
+function get_suff_stats(X::AbstractVector, y::AbstractVector)
+	throw(error("TODO: implement me!"))
+	# return obs_mean, obs_var, obs_n
+end
+
 function get_suff_stats(df::SimpleDataSet)
 	obs_mean = [mean(df.y[idx]) for idx in df.g]
 	obs_var  = [var(df.y[idx]) for idx in df.g]

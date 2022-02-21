@@ -81,13 +81,22 @@ function simulate_data_one_way_anova(
 
 end
 
+function fit_lm(X::AbstractVector, y::AbstractVector)
+	# TODO: implement me! X to design_matrix and then call fit_lm!
+	throw(error("not implemented!"))
+end
+
+function fit_lm(X::AbstractMatrix, y::AbstractVector)
+	fit = GLM.lm(X, y)::GLM.LinearModel{GLM.LmResp{Vector{Float64}}, GLM.DensePredChol{Float64, LinearAlgebra.CholeskyPivoted{Float64, Matrix{Float64}}}}
+	return GLM.coef(fit), GLM.confint(fit), fit
+end
+
 function fit_lm(df::SimpleDataSet)
 	design_matrix = zeros(Int, length(df.y), length(df.g))
 	for (i, idx) in enumerate(df.g)
 		design_matrix[idx, i] .= 1
 	end
-	fit = GLM.lm(design_matrix, df.y)::GLM.LinearModel{GLM.LmResp{Vector{Float64}}, GLM.DensePredChol{Float64, LinearAlgebra.CholeskyPivoted{Float64, Matrix{Float64}}}}
-	GLM.coef(fit), GLM.confint(fit), fit
+	return fit_lm(design_matrix, y)
 end
 
 function fit_lm(df, formula = StatsModels.@formula(y ~ 1 + g))
@@ -106,6 +115,11 @@ function fit_lm(df, formula = StatsModels.@formula(y ~ 1 + g))
 	cis[1, :] .-= GLM.coef(fit)[1] # subtract reference level value
 
 	return ests, cis, fit
+end
+
+function get_suff_stats(X::AbstractVector, y::AbstractVector)
+	throw(error("TODO: implement me!"))
+	# return obs_mean, obs_var, obs_n
 end
 
 function get_suff_stats(df::SimpleDataSet)
@@ -269,35 +283,48 @@ function prep_model_arguments(df)
 	return obs_mean, obs_var, obs_n, Q
 end
 
-function fit_full_model(df, spl = nothing; mcmc_iterations::Int = 10_000, mcmc_burnin::Int = 1_000)
+function fit_full_model(
+		df
+		;
+		spl = nothing,
+		mcmc_iterations::Int = 10_000, mcmc_burnin::Int = 1_000
+		mcmc_chains::Integer = 3,
+		parallel::AbstractMCMC.AbstractMCMCEnsemble = Turing.MCMCSerial
+	)
+
 	obs_mean, obs_var, obs_n, Q = prep_model_arguments(df)
 	model = one_way_anova_mv_ss_submodel(obs_mean, obs_var, obs_n, Q)
-	samples = sample(model, isnothing(spl) ? get_sampler(model) : spl, mcmc_iterations; discard_initial = mcmc_burnin)::MCMCChains.Chains
+	mcmc_sampler = isnothing(spl) ? get_sampler(model) : spl
+
+	samples = sample(model, mcmc_sampler, mcmc_iterations, parallel, mcmc_chains; discard_initial = mcmc_burnin, init_params = init_params)::MCMCChains.Chains
+
+	# TODO: should be the same output structure as proportion_test!
 	return (samples=samples, model=model)
 end
 
-function fit_eq_model(df, partition_prior::Union{Nothing, EqualitySampler.AbstractMvUrnDistribution}, spl = nothing;
-						mcmc_iterations::Int = 10_000, mcmc_burnin::Int = 1_000)
-
-	if partition_prior === nothing
-		return fit_full_model(df, spl; mcmc_iterations = mcmc_iterations, mcmc_burnin = mcmc_burnin)
-	end
+function fit_eq_model(
+		df,
+		partition_prior::EqualitySampler.AbstractMvUrnDistribution
+		;
+		spl = nothing,
+		mcmc_iterations::Int = 10_000, mcmc_burnin::Int = 1_000
+		mcmc_chains::Integer = 3,
+		parallel::AbstractMCMC.AbstractMCMCEnsemble = Turing.MCMCSerial
+	)
 
 	obs_mean, obs_var, obs_n, Q = prep_model_arguments(df)
-
 	model = one_way_anova_mv_ss_eq_submodel(obs_mean, obs_var, obs_n, Q, partition_prior)
 	starting_values = get_starting_values(df)
 	init_params = get_init_params(starting_values...)
 
-	if spl === nothing
+	if isnothing(spl)
 		ϵ = brute_force_ϵ(model; init_params = init_params)
 		mcmc_sampler = get_sampler(model, ϵ)
-		# @show mcmc_sampler
 	else
 		mcmc_sampler = spl
 	end
 
-	samples = sample(model, mcmc_sampler, mcmc_iterations; discard_initial = mcmc_burnin, init_params = init_params)::MCMCChains.Chains
+	samples = sample(model, mcmc_sampler, mcmc_iterations, parallel, mcmc_chains; discard_initial = mcmc_burnin, init_params = init_params)::MCMCChains.Chains
 
 	# TODO: should be the same output structure as proportion_test!
 	return (samples=samples, model=model)
@@ -305,14 +332,19 @@ end
 
 # TODO!
 function anova_test(
-		f::StatsModels.FormulaTerm,
-		df::DataFrames.DataFrame;
-		kwargs...
-	)
+	f::StatsModels.FormulaTerm,
+	df::DataFrames.DataFrame
+	;
+	kwargs...
+)
 
 	ts = StatsModels.apply_schema(f, StatsModels.schema(df))
-	!isone(length(ts.rhs))
+	ts = StatsModels.drop_term(ts, StatsModels.term(1))
+
+	!isone(length(ts.rhs.terms)) && throw(DomainError(f, "Expected `$f` to only specify one predictor, for example `y ~ g`"))
 	y, g = map(vec, StatsModels.modelcols(ts, df))
+
+	return anova_test(y, g; kwargs...)
 
 end
 
@@ -321,25 +353,32 @@ function anova_test(
 	g::AbstractVector{<:Integer};
 	kwargs...
 )
-
+	# TODO: consider something like a nonsimpledataset and skip the type instability of dataframes in the remainder of the methods
+	return anova_test(DataFrames.DataFrame(y = y, g = g); kwargs...)
 end
 
 
 function anova_test(
-		y::AbstractVector{<:AbstractFloat},
-		g::AbstractVector{<:UnitRange{<:Integer}};
-		kwargs...
-	)
-
-end
-
-function anova_test(
-
-	;
-		no_samples::Integer = 1_000, no_burnin::Integer = 500, no_chains::Integer = 3,
-		spl = nothing,
-		kwargs...
+	y::AbstractVector{<:AbstractFloat},
+	g::AbstractVector{<:UnitRange{<:Integer}};
+	kwargs...
 )
+	return anova_test(SimpleDataSet(y, g); kwargs...)
+end
+
+function anova_test(
+	df::Union{SimpleDataSet, DataFrames.DataFrame} # TODO: what else is allowed?
+	;
+	partition_prior::Union{Nothing, AbstractMvUrnDistribution}
+	kwargs...
+)
+	# TODO: dispatch based on Nothing vs AbstractMvUrnDistribution?
+	if isnothing(partition_prior)
+		return fit_full_model(df; kwargs...)
+	else
+		return fit_eq_model(df, partition_prior; kwargs...)
+	end
+
 end
 
 # df = DataFrames.DataFrame(
@@ -347,10 +386,9 @@ end
 # 	y = rand(10),
 # 	g = reduce(vcat, fill.(1:3, (3, 3, 4)))
 # )
-		
+
 # f = StatsModels.@formula(y~g+x)
 
 # ts = StatsModels.apply_schema(f, StatsModels.schema(df))
 # typeof(ts.rhs)
 # !isone(length(ts.rhs))
-		
