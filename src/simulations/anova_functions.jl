@@ -8,7 +8,7 @@ end
 struct SimpleDataSet
 	y::Vector{Float64}
 	g::Vector{UnitRange{Int}}
-	function SimpleDataSet(y, g)
+	function SimpleDataSet(y::Vector{Float64}, g::Vector{UnitRange{Int}})
 		@assert length(y) == sum(length, g)
 		for i in 1:length(g)-1
 			for j in i+1:length(g)
@@ -17,6 +17,32 @@ struct SimpleDataSet
 		end
 		return new(y, g)
 	end
+end
+
+function SimpleDataSet(y::Vector{Float64}, g::Vector{<:Integer})
+
+	@assert length(y) == length(g)
+	o = sortperm(g)
+	g_sorted = g[o]
+	u = unique(g_sorted)
+	
+	g_unitrange = Vector{UnitRange{Int}}(undef, length(u))
+	g_from = 1
+	g_to = 1
+	idx = 1
+	for i in eachindex(g)
+		if g_sorted[i] == u[idx]
+			g_to += 1
+		else
+			g_unitrange[idx] = g_from:g_to
+			idx += 1
+			g_from = g_to + 1
+		end
+	end
+	g_unitrange[idx] = g_from:length(g)
+
+	SimpleDataSet(y[o], g_unitrange)
+
 end
 
 function normalize_θ(offset::AbstractFloat, true_model::Vector{T}) where T<:Integer
@@ -287,7 +313,7 @@ function fit_full_model(
 		df
 		;
 		spl = nothing,
-		mcmc_iterations::Int = 10_000, mcmc_burnin::Int = 1_000
+		mcmc_iterations::Int = 10_000, mcmc_burnin::Int = 1_000,
 		mcmc_chains::Integer = 3,
 		parallel::AbstractMCMC.AbstractMCMCEnsemble = Turing.MCMCSerial
 	)
@@ -307,7 +333,7 @@ function fit_eq_model(
 		partition_prior::EqualitySampler.AbstractMvUrnDistribution
 		;
 		spl = nothing,
-		mcmc_iterations::Int = 10_000, mcmc_burnin::Int = 1_000
+		mcmc_iterations::Int = 10_000, mcmc_burnin::Int = 1_000,
 		mcmc_chains::Integer = 3,
 		parallel::AbstractMCMC.AbstractMCMCEnsemble = Turing.MCMCSerial
 	)
@@ -344,7 +370,7 @@ function anova_test(
 	!isone(length(ts.rhs.terms)) && throw(DomainError(f, "Expected `$f` to only specify one predictor, for example `y ~ g`"))
 	y, g = map(vec, StatsModels.modelcols(ts, df))
 
-	return anova_test(y, g; kwargs...)
+	return anova_test(SimpleDataSet(y, g); kwargs...)
 
 end
 
@@ -353,8 +379,7 @@ function anova_test(
 	g::AbstractVector{<:Integer};
 	kwargs...
 )
-	# TODO: consider something like a nonsimpledataset and skip the type instability of dataframes in the remainder of the methods
-	return anova_test(DataFrames.DataFrame(y = y, g = g); kwargs...)
+	return anova_test(SimpleDataSet(y, g); kwargs...)
 end
 
 
@@ -369,7 +394,7 @@ end
 function anova_test(
 	df::Union{SimpleDataSet, DataFrames.DataFrame} # TODO: what else is allowed?
 	;
-	partition_prior::Union{Nothing, AbstractMvUrnDistribution}
+	partition_prior::Union{Nothing, AbstractMvUrnDistribution},
 	kwargs...
 )
 	# TODO: dispatch based on Nothing vs AbstractMvUrnDistribution?
@@ -392,3 +417,25 @@ end
 # ts = StatsModels.apply_schema(f, StatsModels.schema(df))
 # typeof(ts.rhs)
 # !isone(length(ts.rhs))
+
+# y = randn(100)
+# g = rand(1:6, 100)
+
+# o = sortperm(g)
+# g_sorted = g[o]
+# u = unique(g_sorted)
+
+# g_unitrange = Vector{UnitRange{Int}}(undef, length(u))
+# g_from = 1
+# g_to = 1
+# idx = 1
+# for i in eachindex(g)
+# 	if g_sorted[i] == u[idx]
+# 		g_to += 1
+# 	else
+# 		g_unitrange[idx] = g_from:g_to
+# 		idx += 1
+# 		g_from = g_to + 1
+# 	end
+# end
+# g_unitrange[idx] = g_from:length(g)
