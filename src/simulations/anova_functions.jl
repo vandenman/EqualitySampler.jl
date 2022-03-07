@@ -5,46 +5,6 @@ struct TrueValues{T<:Real, U<:AbstractVector{T}, W<:AbstractVector{<:Integer}}
 	partition::W
 end
 
-struct SimpleDataSet
-	y::Vector{Float64}
-	g::Vector{UnitRange{Int}}
-	function SimpleDataSet(y::Vector{Float64}, g::Vector{UnitRange{Int}})
-		@assert length(y) == sum(length, g)
-		for i in 1:length(g)-1
-			for j in i+1:length(g)
-				@assert isempty(intersect(g[i], g[j]))
-			end
-		end
-		return new(y, g)
-	end
-end
-
-function SimpleDataSet(y::Vector{Float64}, g::Vector{<:Integer})
-
-	@assert length(y) == length(g)
-	o = sortperm(g)
-	g_sorted = g[o]
-	u = unique(g_sorted)
-	
-	g_unitrange = Vector{UnitRange{Int}}(undef, length(u))
-	g_from = 1
-	g_to = 1
-	idx = 1
-	for i in eachindex(g)
-		if g_sorted[i] == u[idx]
-			g_to += 1
-		else
-			g_unitrange[idx] = g_from:g_to
-			idx += 1
-			g_from = g_to + 1
-		end
-	end
-	g_unitrange[idx] = g_from:length(g)
-
-	SimpleDataSet(y[o], g_unitrange)
-
-end
-
 function normalize_θ(offset::AbstractFloat, true_model::Vector{T}) where T<:Integer
 
 	copy_model = copy(true_model)
@@ -81,7 +41,7 @@ function simulate_data_one_way_anova(
 	length(θ) != n_groups && throw(error("length(θ) != n_groups"))
 
 	n_obs = n_groups * n_obs_per_group
-	θc = θ .- SB.mean(θ)
+	θc = θ .- mean(θ)
 
 	g = Vector{UnitRange{Int}}(undef, n_groups)
 	for i in eachindex(g)
@@ -96,7 +56,7 @@ function simulate_data_one_way_anova(
 	for (i, idx) in enumerate(g)
 		g_big[idx] .= i
 	end
-	D = MvNormal(μ .+ σ .* view(θc, g_big), σ)
+	D = Distributions.MvNormal(μ .+ σ .* view(θc, g_big), σ)
 	y = rand(D)
 
 	dat = SimpleDataSet(y, g)
@@ -105,11 +65,6 @@ function simulate_data_one_way_anova(
 
 	return (data=dat, distribution=D, true_values=true_values)
 
-end
-
-function fit_lm(X::AbstractVector, y::AbstractVector)
-	# TODO: implement me! X to design_matrix and then call fit_lm!
-	throw(error("not implemented!"))
 end
 
 function fit_lm(X::AbstractMatrix, y::AbstractVector)
@@ -122,7 +77,7 @@ function fit_lm(df::SimpleDataSet)
 	for (i, idx) in enumerate(df.g)
 		design_matrix[idx, i] .= 1
 	end
-	return fit_lm(design_matrix, y)
+	return fit_lm(design_matrix, df.y)
 end
 
 function fit_lm(df, formula = StatsModels.@formula(y ~ 1 + g))
@@ -141,11 +96,6 @@ function fit_lm(df, formula = StatsModels.@formula(y ~ 1 + g))
 	cis[1, :] .-= GLM.coef(fit)[1] # subtract reference level value
 
 	return ests, cis, fit
-end
-
-function get_suff_stats(X::AbstractVector, y::AbstractVector)
-	throw(error("TODO: implement me!"))
-	# return obs_mean, obs_var, obs_n
 end
 
 function get_suff_stats(df::SimpleDataSet)
@@ -222,14 +172,14 @@ function get_starting_values(df)
 end
 
 function get_θ_cs(model, chain)
-	gen = generated_quantities(model, MCMCChains.get_sections(chain, :parameters))
+	gen = DynamicPPL.generated_quantities(model, MCMCChains.get_sections(chain, :parameters))
 	θ_cs = Matrix{Float64}(undef, length(gen), length(gen[1]))
 	for i in eachindex(gen)
 		for j in eachindex(gen[i])
 			θ_cs[i, j] = gen[i][j]
 		end
 	end
-	return θ_cs
+	return vec(mean(θ_cs, dims = 2)), θ_cs
 end
 
 # function plot_retrieval(true_values, estimated_values)
@@ -313,19 +263,16 @@ function fit_full_model(
 		df
 		;
 		spl = nothing,
-		mcmc_iterations::Int = 10_000, mcmc_burnin::Int = 1_000,
-		mcmc_chains::Integer = 3,
-		parallel::AbstractMCMC.AbstractMCMCEnsemble = Turing.MCMCSerial
+		mcmc_settings::MCMCSettings = MCMCSettings()
 	)
 
 	obs_mean, obs_var, obs_n, Q = prep_model_arguments(df)
 	model = one_way_anova_mv_ss_submodel(obs_mean, obs_var, obs_n, Q)
 	mcmc_sampler = isnothing(spl) ? get_sampler(model) : spl
 
-	samples = sample(model, mcmc_sampler, mcmc_iterations, parallel, mcmc_chains; discard_initial = mcmc_burnin, init_params = init_params)::MCMCChains.Chains
+	chain = sample_model(model, mcmc_sampler, mcmc_settings)::MCMCChains.Chains
+	return combine_chain_with_generated_quantities(model, chain, "θ_cs")
 
-	# TODO: should be the same output structure as proportion_test!
-	return (samples=samples, model=model)
 end
 
 function fit_eq_model(
@@ -333,9 +280,7 @@ function fit_eq_model(
 		partition_prior::EqualitySampler.AbstractMvUrnDistribution
 		;
 		spl = nothing,
-		mcmc_iterations::Int = 10_000, mcmc_burnin::Int = 1_000,
-		mcmc_chains::Integer = 3,
-		parallel::AbstractMCMC.AbstractMCMCEnsemble = Turing.MCMCSerial
+		mcmc_settings::MCMCSettings = MCMCSettings()
 	)
 
 	obs_mean, obs_var, obs_n, Q = prep_model_arguments(df)
@@ -350,92 +295,97 @@ function fit_eq_model(
 		mcmc_sampler = spl
 	end
 
-	samples = sample(model, mcmc_sampler, mcmc_iterations, parallel, mcmc_chains; discard_initial = mcmc_burnin, init_params = init_params)::MCMCChains.Chains
+	chain = sample_model(model, mcmc_sampler, mcmc_settings)::MCMCChains.Chains
 
-	# TODO: should be the same output structure as proportion_test!
-	return (samples=samples, model=model)
+	return combine_chain_with_generated_quantities(model, chain, "θ_cs")
 end
 
-# TODO!
-function anova_test(
-	f::StatsModels.FormulaTerm,
-	df::DataFrames.DataFrame
-	;
-	kwargs...
-)
+function get_generated_quantities(model, chain)
 
-	ts = StatsModels.apply_schema(f, StatsModels.schema(df))
-	ts = StatsModels.drop_term(ts, StatsModels.term(1))
-
-	!isone(length(ts.rhs.terms)) && throw(DomainError(f, "Expected `$f` to only specify one predictor, for example `y ~ g`"))
-	y, g = map(vec, StatsModels.modelcols(ts, df))
-
-	return anova_test(SimpleDataSet(y, g); kwargs...)
-
+	gen = DynamicPPL.generated_quantities(model, MCMCChains.get_sections(chain, :parameters))
+	gen_mat = Matrix{Float64}(undef, length(gen), length(gen[1]))
+	for i in eachindex(gen)
+		for j in eachindex(gen[i])
+			gen_mat[i, j] = gen[i][j]
+		end
+	end
+	return gen_mat
 end
 
-function anova_test(
-	y::AbstractVector{<:AbstractFloat},
-	g::AbstractVector{<:Integer};
-	kwargs...
-)
-	return anova_test(SimpleDataSet(y, g); kwargs...)
+function combine_chain_with_generated_quantities(model, chain, parameter_name::AbstractString)
+
+	constrained_samples = get_generated_quantities(model, chain)
+
+	constrained_chain = MCMCChains.setrange(
+		MCMCChains.Chains(constrained_samples, collect(Symbol(parameter_name, "["* string(i) * "]") for i in axes(constrained_samples, 2))),
+		range(chain)
+	)
+
+	combined_chain = hcat(chain, constrained_chain)
+
+	return combined_chain
 end
 
+"""
+	$(TYPEDSIGNATURES)
 
-function anova_test(
-	y::AbstractVector{<:AbstractFloat},
-	g::AbstractVector{<:UnitRange{<:Integer}};
-	kwargs...
-)
-	return anova_test(SimpleDataSet(y, g); kwargs...)
-end
+Using the formula `f` and data frame `df` fit a one-way ANOVA.
+If `partition_prior` is specified as a keyword argument then equalities among the levels of the grouping variable are sampled.
+"""
+anova_test(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame, args...; kwargs...) = anova_test(SimpleDataSet(f, df), args...; kwargs...)
 
+"""
+	$(TYPEDSIGNATURES)
+
+Using the vector `y` and grouping variable `g` fit a one-way ANOVA.
+If `partition_prior` is specified as a keyword argument then equalities among the levels of the grouping variable are sampled.
+"""
+anova_test(y::AbstractVector{<:AbstractFloat}, g::AbstractVector{<:Integer}, args...; kwargs...) = anova_test(SimpleDataSet(y, g), args...; kwargs...)
+
+"""
+	$(TYPEDSIGNATURES)
+
+Using the vector `y` and grouping variable `g` fit a one-way ANOVA.
+Here `g` is a vector of UnitRanges where each element indicates the group membership of `y`.
+
+If `partition_prior` is specified as a keyword argument then equalities among the levels of the grouping variable are sampled.
+"""
+anova_test(y::AbstractVector{<:AbstractFloat}, g::AbstractVector{<:UnitRange{<:Integer}}, args...; kwargs...) = anova_test(SimpleDataSet(y, g), args...; kwargs...)
+
+"""
+	$(TYPEDSIGNATURES)
+
+positional arguments:
+- `partition_prior::Union{Nothing, AbstractMvUrnDistribution}`, either nothing (i.e., fit the full model) or a subtype of `AbstractMvUrnDistribution`.
+
+keyword arguments:
+
+- `spl = nothing`, a custom Turing sampler. `nothing` implies a default sampler is used which for the the full model defaults to `NUTS()` and for the equality selector to a Gibbs sampler with HMC for continuous parameters and Metropolis for discrete parameters.
+- `mcmc_iterations::Integer = 10_000`, the number of post warmup MCMC samples.
+- `mcmc_burnin::Integer = 1_000`, the number of initial MCMC samples to discard.
+- `mcmc_chains::Integer = 3`, the number of MCMC chains to sample.
+- `parallel::AbstractMCMC.AbstractMCMCEnsemble = Turing.MCMCSerial`, should the chains be sampled in parallel? Possible values are, No parallization (`Turing.MCMCSerial``), paralellization through multiple julia processes (`Turing.MCMCDistributed`), and paralellization through multithreading (`Turing.MCMCThreads`).
+"""
 function anova_test(
-	df::Union{SimpleDataSet, DataFrames.DataFrame} # TODO: what else is allowed?
-	;
+	df::Union{SimpleDataSet, DataFrames.DataFrame},
 	partition_prior::Union{Nothing, AbstractMvUrnDistribution},
-	kwargs...
+	;
+	spl = nothing,
+	mcmc_settings::MCMCSettings = MCMCSettings()
 )
 	# TODO: dispatch based on Nothing vs AbstractMvUrnDistribution?
 	if isnothing(partition_prior)
-		return fit_full_model(df; kwargs...)
+		return fit_full_model(df;                spl = spl, mcmc_settings = mcmc_settings)
 	else
-		return fit_eq_model(df, partition_prior; kwargs...)
+		return fit_eq_model(df, partition_prior; spl = spl, mcmc_settings = mcmc_settings)
 	end
-
 end
 
-# df = DataFrames.DataFrame(
-# 	x = 2 .+ randn(10),
-# 	y = rand(10),
-# 	g = reduce(vcat, fill.(1:3, (3, 3, 4)))
-# )
-
-# f = StatsModels.@formula(y~g+x)
-
-# ts = StatsModels.apply_schema(f, StatsModels.schema(df))
-# typeof(ts.rhs)
-# !isone(length(ts.rhs))
-
+# using EqualitySampler
 # y = randn(100)
-# g = rand(1:6, 100)
+# g = rand(1:5, 100)
+# df = EqualitySampler.Simulations.SimpleDataSet(y, g)
+# fit0 = anova_test(y, g; partition_prior=nothing)
+# fit1 = anova_test(df; partition_prior=nothing)
 
-# o = sortperm(g)
-# g_sorted = g[o]
-# u = unique(g_sorted)
-
-# g_unitrange = Vector{UnitRange{Int}}(undef, length(u))
-# g_from = 1
-# g_to = 1
-# idx = 1
-# for i in eachindex(g)
-# 	if g_sorted[i] == u[idx]
-# 		g_to += 1
-# 	else
-# 		g_unitrange[idx] = g_from:g_to
-# 		idx += 1
-# 		g_from = g_to + 1
-# 	end
-# end
-# g_unitrange[idx] = g_from:length(g)
+# @edit anova_test(df; partition_prior=nothing)

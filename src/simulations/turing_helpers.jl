@@ -26,13 +26,13 @@ function get_sampler(model, ϵ::Float64 = 0.0, n_leapfrog::Int = 20)
 	if :partition in parameters
 
 		continuous_parameters = filter(!=(:partition), parameters)
-		return Gibbs(
-			HMC(ϵ, n_leapfrog, continuous_parameters...),
-			GibbsConditional(:partition, PartitionSampler(length(model.args.partition_prior), get_logπ(model)))
+		return Turing.Gibbs(
+			Turing.HMC(ϵ, n_leapfrog, continuous_parameters...),
+			Turing.GibbsConditional(:partition, PartitionSampler(length(model.args.partition_prior), get_logπ(model)))
 		)
 
 	else
-		return NUTS()
+		return Turing.NUTS()
 	end
 end
 #endregion

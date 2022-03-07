@@ -208,14 +208,14 @@ A:
 - [ ] Update figure 4 with Plots.jl
 
 - [ ] Proportion example -- more figures (check only after uploading to overleaf!)
-	- [ ] Two panel plot
-		- [ ] Left: for estimation
-			- [ ] Show posterior density of proportions for each journal
-			- [ ] Ridgeline plot, possibly on one line with different colors
-		- [ ] Right: for testing
-			- [ ] Create posterior model probabilities table, see if some models dominate
-			- [ ] Try out some stuff
-			- [ ] Heatmap with posterior propabilties of equality (8x8 table) with values in there up to two digits
+	- [x] Two panel plot
+		- [x] Left: for estimation
+			- [x] Show posterior density of proportions for each journal
+			- [x] Ridgeline plot, possibly on one line with different colors
+		- [x] Right: for testing
+			- [x] Create posterior model probabilities table, see if some models dominate
+			- [x] Try out some stuff
+			- [x] Heatmap with posterior propabilties of equality (8x8 table) with values in there up to two digits
 
 - [ ] Variances example -- more figures (check only after uploading to overleaf!)
 	- [ ] Two panel plot
@@ -229,7 +229,7 @@ A:
 			- [ ] Check if we can use the upper triangle for something interesting (e.g., the prior)
 
 - [ ] Package changes
-	- [ ] move all the functionality inside anovaFunctions.jl into the package.
+	- [x] move all the functionality inside anovaFunctions.jl into the package.
 		- [ ] remove `include("anovaFunctions.jl")` in the demos/ simulations.
 	- [ ] Add generic functions for user friendliness
 		- [ ] anova_test		(formula, data, prior, ...)
@@ -237,3 +237,23 @@ A:
 		- [ ] variance_test		(formula, data, prior, ...)
 	- [ ] look at https://cran.r-project.org/package=JuliaCall
 	- [ ] stick to one naming convention for filenames!
+	- [x] Create MCMCsettings.jl to hold all mcmc hyperparameters.
+
+
+- [ ] Implement Westfall test.
+	- [x] Implement independent samples t-test like BayesFactor
+	- [ ] write unit tests!
+- [x] Implement MCMCSettings!
+- [ ] Repeat figure 4 but for the full model
+	1. [x] run with 20 repeats
+	2. [ ] inspect plot with Plots.jl
+	3. [ ] run with 50 repeats
+	4. [ ] inspect plot
+	5. [ ] add Wilson option as prior
+	6. [ ] rerun 50 repeats
+	7. [ ] inspect plot
+	8. [ ] run all 200 repeats + inspect plot
+
+- [ ] Create figure 5 for false positive and false negatives
+	false positives: prop. saying they are equal when they are unequal.
+	false negatives: prop. saying they are unequal when they are equal.

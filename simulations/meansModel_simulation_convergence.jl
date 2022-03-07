@@ -47,21 +47,25 @@ const dir_for_results = joinpath("simulations", "simulation_results_test")
 
 function get_simulation_params(no_repeats::Int = 1)
 
-	sample_sizes		= [100, 250, 500, 750, 1_000, 10_000]
+	# sample_sizes		= [100, 250, 500, 750, 1_000, 10_000]
+	sample_sizes		= [250, 500, 750, 1_000]
 	no_params			= [5, 10]#, 15, 20]
 	no_inequalities		= [20, 40, 60, 80] # percentage
 	offset 				= 0.2
 
+	# TODO: avoid anonoymous functions to not upset JLD2?
 	priors = (
 		("uniform",		k->UniformMvUrnDistribution(k)),
 
-		("betabinom11",	k->BetaBinomialMvUrnDistribution(k, 1, 1)),
-		("betabinomk1",	k->BetaBinomialMvUrnDistribution(k, k, 1)),
-		# ("betabinom1k",	k->BetaBinomialMvUrnDistribution(k, 1, k)),
+		# ("betabinom11",	k->BetaBinomialMvUrnDistribution(k, 1, 1)),
+		# ("betabinomk1",	k->BetaBinomialMvUrnDistribution(k, k, 1)),
+		("betabinom1k",	k->BetaBinomialMvUrnDistribution(k, 1, k)),
+		("betabinom1k",	k->BetaBinomialMvUrnDistribution(k, 1, binomial(k, 2))),
 
-		("dppalpha0.5",	k->RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(0.5))),
+		# ("dppalpha0.5",	k->RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(0.5))),
 		("dppalpha1",	k->RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(1.0))),
-		("dppalphak",	k->RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(dpp_find_α(k))))
+		("dppalpha1",	k->RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(2.0))),
+		# ("dppalphak",	k->RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(dpp_find_α(k))))
 	)
 
 	repeats = 1:no_repeats

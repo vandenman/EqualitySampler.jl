@@ -197,6 +197,9 @@ function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, ::Union{UniformCo
 	other = setdiff(1:k, urns)
 	result[other] .= count[length(urns) + 1] ./ length(other)
 	result ./= sum(result)
+
+	@show count, result[view(urns, idx_nonzero)], result[other]
+
 	return
 end
 
@@ -284,11 +287,14 @@ function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, d::T, index::U, c
 	known = reduce_model(v_known_urns)
 	counts = get_conditional_counts(k, known, false)
 	idx_nonzero = findall(!iszero, counts)
+	#TODO: just divide by the number of distinct known values
 	result[v_known_urns[idx_nonzero]] .= probEquality .* (counts[idx_nonzero] ./ sum(counts[idx_nonzero]))
 
 	# probability of an inequality
 	inequality_options = setdiff(1:n0, v_known_urns)
 	result[inequality_options] .= (1 - probEquality) ./ length(inequality_options)
+
+	@show counts, result[v_known_urns[idx_nonzero]], result[inequality_options], probEquality
 
 	return
 

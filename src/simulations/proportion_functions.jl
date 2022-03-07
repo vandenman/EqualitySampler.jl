@@ -13,6 +13,7 @@ DynamicPPL.@model function proportion_model_equality_selector(no_errors, total_c
 end
 
 function get_p_constrained(model, samps)
+	# TODO: delete this function?
 
 	default_result = DynamicPPL.generated_quantities(model, MCMCChains.get_sections(samps, :parameters))
 	clean_result = Matrix{Float64}(undef, length(default_result[1][1]), size(default_result, 1))
@@ -47,10 +48,12 @@ function proportion_test(
 	end
 
 	# TODO: what package should be prefixed here?
-	all_samples = sample(model, spl, no_samples, no_chains; discard_initial = no_burnin, kwargs...);
-	posterior_means, posterior_samples = get_p_constrained(model, all_samples)
+	chain = sample(model, spl, no_samples, no_chains; discard_initial = no_burnin, kwargs...);
+	return combine_chain_with_generated_quantities(model, chain, "p_constrained")
+
 
 	# TODO: maybe don't return the model? also should this be a struct rather than a named tuple?
-	return (posterior_means = posterior_means, posterior_samples = posterior_samples, all_samples = all_samples, model = model)
+	# posterior_means, posterior_samples = get_p_constrained(model, all_samples)
+	# return (posterior_means = posterior_means, posterior_samples = posterior_samples, all_samples = all_samples, model = model)
 
 end

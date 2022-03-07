@@ -15,7 +15,7 @@ import
 	Turing,
 	Turing.RandomMeasures
 
-import DocStringExtensions: TYPEDEF, TYPEDFIELDS, TYPEDSIGNATURES
+using DocStringExtensions: TYPEDEF, TYPEDFIELDS, TYPEDSIGNATURES
 
 export
 	NormalSuffStat,

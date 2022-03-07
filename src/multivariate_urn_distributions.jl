@@ -1,3 +1,10 @@
+#= NOTES
+
+	*_distinct	does NOT account for duplicate configurations. For example, [1, 1, 1] is     the only null model and [2, 2, 2] does NOT exist
+	*			does     account for duplicate configurations. For example, [1, 1, 1] is NOT the only null model and [2, 2, 2] does     exist (and so does [3, 3, 3])
+
+=#
+
 
 
 #region AbstractMvUrnDistribution
@@ -41,13 +48,14 @@ function Distributions._rand!(rng::Random.AbstractRNG, d::AbstractMvUrnDistribut
 	x
 end
 
+# TODO: rename no_parameters
 function logpdf_incl(d::AbstractMvUrnDistribution, no_parameters::T) where T<:Integer
 	in_eqsupport(d, no_parameters) || return T === BigInt ? BigFloat(-Inf) : Float64(-Inf)
 	k = length(d)
 	logpdf_model_distinct(d, no_parameters) + log_count_distinct_models_with_no_parameters(k, no_parameters)
 end
 pdf_incl(d::AbstractMvUrnDistribution,  no_parameters) = exp(logpdf_incl(d,  no_parameters))
-# pdf_model(d::AbstractMvUrnDistribution, no_parameters) = exp(logpdf_model(d, no_parameters))
+
 
 
 function logpdf_model(d::AbstractMvUrnDistribution, x::T) where T <: Integer
@@ -66,8 +74,6 @@ Distributions.logpdf(d::AbstractMvUrnDistribution, x::AbstractVector{T}) where T
 struct UniformMvUrnDistribution{T <: Integer} <: AbstractMvUrnDistribution{T}
 	k::T
 end
-
-Distributions.logpdf(d::UniformMvUrnDistribution, x::AbstractVector{T}) where T<:Integer = logpdf_model(d, x)
 
 logpdf_model_distinct(d::UniformMvUrnDistribution, ::AbstractVector{T}) where T <: Integer = -logbellnumr(convert(T, length(d)), zero(T))
 logpdf_model_distinct(d::UniformMvUrnDistribution, ::T) where T <: Integer = -logbellnumr(convert(T, length(d)), zero(T))
@@ -107,7 +113,7 @@ end
 
 function logpdf_incl(d::BetaBinomialMvUrnDistribution, no_parameters::Integer)
 	in_eqsupport(d, no_parameters) || return -Inf
-	Distributions.logpdf.(Distributions.BetaBinomial(length(d) - 1, d.α, d.β), no_parameters - 1)
+	Distributions.logpdf(Distributions.BetaBinomial(length(d) - 1, d.α, d.β), no_parameters - 1)
 end
 
 #endregion

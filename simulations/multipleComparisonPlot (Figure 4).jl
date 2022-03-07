@@ -1,6 +1,6 @@
 #=
 	to run the simulation, run in a terminal
-		julia-1.6.5 --project=simulations -O3 --threads 8 --math-mode=fast --check-bounds=no simulations/multipleComparisonPlot\ \(Figure\ 4\).jl simulate_only
+		julia-1.7.2 --project=simulations -O3 --threads 8 --check-bounds=no simulations/multipleComparisonPlot\ \(Figure\ 4\).jl simulate_only
 
 	TODO: split this file into 2 files?
 		- one for running the simulation
@@ -9,74 +9,103 @@
 
 =#
 
-using EqualitySampler, Turing
-import Logging, ProgressMeter, JLD2
-include("anovaFunctions.jl")
+using EqualitySampler, EqualitySampler.Simulations, MCMCChains
+import ProgressMeter, JLD2, Turing, Logging
+
+#region simulation functions
+function instantiate_prior(symbol::Symbol, k::Integer)
+
+	symbol == :uniform				&&	return UniformMvUrnDistribution(k)
+	symbol == :BetaBinomial11		&&	return BetaBinomialMvUrnDistribution(k, 1.0, 1.0)
+	symbol == :BetaBinomialk1		&&	return BetaBinomialMvUrnDistribution(k, k, 1.0)
+	symbol == :BetaBinomial1k		&&	return BetaBinomialMvUrnDistribution(k, 1.0, k)
+	symbol == :BetaBinomial1binomk2	&&	return BetaBinomialMvUrnDistribution(k, 1.0, binomial(k, 2))
+	symbol == :DirichletProcess0_5	&&	return DirichletProcessMvUrnDistribution(k, 0.5)
+	symbol == :DirichletProcess1_0	&&	return DirichletProcessMvUrnDistribution(k, 1.0)
+	symbol == :DirichletProcess2_0	&&	return DirichletProcessMvUrnDistribution(k, 2.0)
+	symbol == :DirichletProcessGP	&&	return DirichletProcessMvUrnDistribution(k, :Gopalan_Berry)
+
+end
 
 function get_priors()
 	return (
-		(n_groups)->UniformMvUrnDistribution(n_groups),
-		(n_groups)->BetaBinomialMvUrnDistribution(n_groups, 1.0, 1.0),
-		(n_groups)->BetaBinomialMvUrnDistribution(n_groups, n_groups, 1.0),
-		(n_groups)->BetaBinomialMvUrnDistribution(n_groups, 1.0, n_groups),
-		(n_groups)->BetaBinomialMvUrnDistribution(n_groups, 1.0, binomial(n_groups, 2)),
-		(n_groups)->DirichletProcessMvUrnDistribution(n_groups, 0.5),
-		(n_groups)->DirichletProcessMvUrnDistribution(n_groups, 1.0),
-		(n_groups)->DirichletProcessMvUrnDistribution(n_groups, 2.0),
-		(n_groups)->DirichletProcessMvUrnDistribution(n_groups, :Gopalan_Berry)
+		:uniform,
+		:BetaBinomial11,
+		:BetaBinomialk1,
+		:BetaBinomial1k,
+		:BetaBinomial1binomk2,
+		:DirichletProcess0_5,
+		:DirichletProcess1_0,
+		:DirichletProcess2_0,
+		:DirichletProcessGP,
+		:Westfall
 	)
 end
 
-function any_incorrect(x)
+function get_reference_and_comparison(hypothesis::Symbol, values_are_log_odds::Bool = false)
+	if values_are_log_odds
+		reference =  0.0
+		comparison = hypothesis === :null ? !isless : isless
+	else
+		reference =  0.5
+		comparison = hypothesis === :null ? isless : !isless
+	end
+	return reference, comparison
+end
 
+function any_incorrect(x, hypothesis::Symbol, values_are_log_odds::Bool = false)
+
+	reference, comparison = get_reference_and_comparison(hypothesis, values_are_log_odds)
 	for j in 1:size(x, 1)-1, i in j+1:size(x, 1)
-		if x[i, j] < 0.5
+		if comparison(x[i, j], reference)
 			return true
 		end
 	end
 	return false
 end
 
-function prop_incorrect(x)
+function prop_incorrect(x, hypothesis::Symbol, values_are_log_odds::Bool = false)
 
+	reference, comparison = get_reference_and_comparison(hypothesis, values_are_log_odds)
 	count = 0
 	n = size(x, 1)
 	for j in 1:n-1, i in j+1:n
-		if x[i, j] < 0.5
+		if comparison(x[i, j], reference)
 			count += 1
 		end
 	end
-	return count / (n * (n - 1) / 2)
+	return count / (n * (n - 1) ÷ 2)
 end
 
 function get_resultsdir()
-	results_dir = joinpath("simulations", "results_multiplecomparisonsplot_200_3")
+	results_dir = joinpath("simulations", "results_multiplecomparisonsplot_200_5")
 	!ispath(results_dir) && mkpath(results_dir)
 	return results_dir
 end
 
-make_filename(results_dir, r, i) = joinpath(results_dir, "repeat_$(r)_groups_$(i).jld2")
+make_filename(results_dir, r, i, hypothesis) = joinpath(results_dir, "repeat_$(r)_groups_$(i)_H_$(hypothesis).jld2")
 
 function get_hyperparams()
 	n_obs_per_group = 100
-	repeats = 1:200
+	repeats = 1:30
 	groups = 2:10
-	return n_obs_per_group, repeats, groups
+	hypothesis=(:null, :full)
+	return n_obs_per_group, repeats, groups, hypothesis
 end
 
 function run_simulation()
 
-	n_obs_per_group, repeats, groups = get_hyperparams()
+	n_obs_per_group, repeats, groups, hypotheses = get_hyperparams()
 
-	sim_opts = Iterators.product(repeats, eachindex(groups))
-
-	mcmc_iterations = 10_000
-	mcmc_burnin = 2_000
-
-	nsim = length(sim_opts)
-	println("starting simulation of $(nsim) runs with $(Threads.nthreads()) threads")
+	sim_opts = Iterators.product(repeats, eachindex(groups), hypotheses)
 
 	priors = get_priors()
+
+	nsim = length(sim_opts)
+	println("starting simulation of $(nsim) runs with $(length(priors)) priors and $(Threads.nthreads()) threads")
+
+	mcmc_settings = MCMCSettings(;iterations = 10_000, burnin = 2_000, chains = 1)
+	# mcmc_settings = MCMCSettings(;iterations = 200, burnin = 100, chains = 1)
 
 	p = ProgressMeter.Progress(nsim)
 	Turing.setprogress!(false)
@@ -84,15 +113,20 @@ function run_simulation()
 
 	results_dir = get_resultsdir()
 
-	# (r, i) = first(sim_opts)
-	Threads.@threads for (r, i) in collect(sim_opts)
+	# (r, i, hypothesis) = first(sim_opts)
+	# Threads.@threads for (r, i, hypothesis) in collect(sim_opts)
+	for (r, i, hypothesis) in collect(sim_opts)
 
-		filename = make_filename(results_dir, r, i)
+		filename = make_filename(results_dir, r, i, hypothesis)
 		if !isfile(filename)
 
-			@show i, r
+			# @show i, r, hypothesis
 			n_groups = groups[i]
-			true_model = fill(1, n_groups)
+			if hypothesis == :null
+				true_model = fill(1, n_groups)
+			else
+				true_model = collect(1:n_groups)
+			end
 			true_θ = normalize_θ(0.2, true_model)
 
 			dat, _, _ = simulate_data_one_way_anova(n_groups, n_obs_per_group, true_θ);
@@ -100,21 +134,32 @@ function run_simulation()
 			results = BitArray(undef, length(priors))
 			results_big = Array{Matrix{Float64}}(undef, length(priors))
 
-			# (j, fun) = first(enumerate(priors))
-			for (j, fun) in enumerate(priors)
-				@show j
+			# (j, prior) = first(enumerate(priors))
+			for (j, prior) in enumerate(priors)
 
-				partition_prior = fun(n_groups)
-				chn, model = fit_eq_model(dat, partition_prior, nothing; mcmc_iterations = mcmc_iterations, mcmc_burnin = mcmc_burnin);
-				partition_samples = Int.(Array(group(chn, :partition)))
-				post_probs = compute_post_prob_eq(partition_samples)
+				@show j, prior
 
-				results[j] = any_incorrect(post_probs)
-				results_big[j] = post_probs
+				if prior === :Westfall
 
+					result = westfall_test(dat)
+					log_posterior_odds_mat = result.log_posterior_odds_mat
+					results[j] = any_incorrect(log_posterior_odds_mat, hypothesis, true)
+					results_big[j] = Matrix(log_posterior_odds_mat)
+
+				else
+
+					partition_prior = instantiate_prior(prior, n_groups)
+					chain = anova_test(dat, partition_prior; mcmc_settings = mcmc_settings)
+					partition_samples = Int.(Array(group(chain, :partition)))
+					post_probs = compute_post_prob_eq(partition_samples)
+
+					results[j] = any_incorrect(post_probs, hypothesis)
+					results_big[j] = post_probs
+
+				end
 			end
 
-			JLD2.jldsave(filename; results=results, results_big=results_big)
+			JLD2.jldsave(filename; results=results, results_big=results_big, run = (;r, i, hypothesis))
 
 		end
 
@@ -122,6 +167,47 @@ function run_simulation()
 
 	end
 end
+#endregion
+
+#region analysis functions
+function load_results()
+
+	_, repeats, groups, hypotheses = get_hyperparams()
+	repeats = 1:maximum(repeats)
+	no_repeats = length(repeats)
+	no_hypotheses = length(hypotheses)
+	len_priors = length(get_priors())
+	sim_opts = Iterators.product(repeats, eachindex(groups), hypotheses)
+	results_dir = get_resultsdir()
+
+	results = BitArray(undef, len_priors, length(groups), no_repeats, no_hypotheses)
+	results_big = Array{Matrix{Float64}}(undef, len_priors, length(groups), no_repeats, no_hypotheses)
+
+	ProgressMeter.@showprogress for (r, i, hypothesis) in sim_opts
+		filename = make_filename(results_dir, r, i, hypothesis)
+
+		hypothesis_idx = hypothesis === :null ? 1 : 2
+		if isfile(filename)
+			@show filename
+
+			temp = JLD2.jldopen(filename)
+			results[:, i, r, hypothesis_idx] .= temp["results"]
+			results_big[:, i, r, hypothesis_idx] .= temp["results_big"]
+
+		else
+			fill!(results[:, i, r, hypothesis_idx], 0)
+			results_big[:, i, r, hypothesis_idx] .= [zeros(Float64, groups[i], groups[i]) for _ in 1:len_priors]
+			@warn "This file does not exist: " filename
+		end
+	end
+
+	return results, results_big
+
+end
+
+
+
+#endregion
 
 # could also be a const global
 simulate_only() = length(ARGS) > 0 && first(ARGS) === "simulate_only"
@@ -141,33 +227,9 @@ if simulate_only()
 	exit()
 end
 
-_, repeats, groups = get_hyperparams()
-repeats = 1:maximum(repeats)
-no_repeats = length(repeats)
-len_priors = length(get_priors())
-sim_opts = Iterators.product(repeats, eachindex(groups))
-results_dir = get_resultsdir()
-
-results = BitArray(undef, len_priors, length(groups), no_repeats)
-results_big = Array{Matrix{Float64}}(undef, len_priors, length(groups), no_repeats)
-
-ProgressMeter.@showprogress for (r, i) in sim_opts
-	filename = make_filename(results_dir, r, i)
-	if isfile(filename)
-
-		temp = JLD2.jldopen(filename)
-		results[:, i, r] .= temp["results"]
-		results_big[:, i, r] .= temp["results_big"]
-
-	else
-		fill!(results[:, i, r], 0)
-		results_big[:, i, r] .= [zeros(Float64, groups[i], groups[i]) for _ in 1:len_priors]
-		@warn "This file does not exist: " filename
-	end
-end
+results, results_big = load_results()
 
 
-#=
 function make_figure(x, y, ylab, labels; shapes = :auto, kwargs...)
 	Plots.plot(
 		x,
@@ -190,26 +252,35 @@ function make_figure(x, y, ylab, labels; shapes = :auto, kwargs...)
 		kwargs...
 	)
 end
+
 using Plots, Plots.PlotMeasures
 # using PlotlyJS
 # plotlyjs()
 
 # gr()
-size(results)
 
-labels = ["Uniform", "Beta-binomial α=1, β=1", "Beta-binomial α=K, β=1", "Beta-binomial α=1, β=K", "Beta-binomial α=1, β=binomial(K, 2)", "DPP α=0.5", "DPP α=1", "DPP α=2", "DPP α=Gopalan & Berry"]
+labels = string.(collect(get_priors()))
+# labels = ["Uniform", "Beta-binomial α=1, β=1", "Beta-binomial α=K, β=1", "Beta-binomial α=1, β=K", "Beta-binomial α=1, β=binomial(K, 2)", "DPP α=0.5", "DPP α=1", "DPP α=2", "DPP α=Gopalan & Berry"]
 keep = eachindex(labels)#[1, 2, 3, 5]
-labels = reshape(labels[1, keep], 1, length(keep))
+labels = reshape(labels[keep], 1, length(keep))
 
-shapes = [:circle :rect :star5 :diamond :hexagon :utriangle]
+shapes = :auto#[:circle :rect :star5 :diamond :hexagon :utriangle]
 
-mu = dropdims(mean(results, dims = 3), dims = 3)[keep, :]
+mu = dropdims(mean(view(results, :, :, :, 1), dims = 3), dims = 3)[keep, :]
 # [mean(results[i, g, :]) for i in axes(results, 1), g in axes(results, 2)] == mu
 p1 = make_figure(groups, permutedims(mu), "P(one or more errors)", labels; shapes = shapes)
 # plot!(p1, xlabel = "Number of groups", xticks = 2:10, xlim = (2, 10), ylim = (0, 1), widen = true)
 Plots.plot!(p1, xlabel = "Number of groups", xticks = 2:10, xlim = (2, 10), ylim = (0, 1), widen = true, legend = (0.085, .95))
 
+mu_full = dropdims(mean(view(results, :, :, :, 2), dims = 3), dims = 3)[keep, :]
+p1_full = make_figure(groups, permutedims(mu_full), "P(one or more errors)", labels; shapes = shapes)
+Plots.plot!(p1_full, xlabel = "Number of groups", xticks = 2:10, xlim = (2, 10), ylim = (0, 1), widen = true, legend = (0.085, .95))
 
+# TODO: why does results_big have #undef values?
+try2 = Array{Float64}(undef, size(results_big))
+for it in CartesianIndices(results_big)
+	try2[it] = prop_incorrect(view(results_big, it)[1], isone(it[4]) ? :null : :full, labels[it[1]] === :Westfall)
+end
 try2 = prop_incorrect.(results_big)
 mu2 = dropdims(mean(try2, dims = 3), dims = 3)[keep, :]
 p2 = make_figure(groups, permutedims(mu2), "Proportion of errors", labels; shapes = shapes)
@@ -235,7 +306,7 @@ figdir = "figures"
 
 savefig(plot(p12, size = (1000, 500)), joinpath(figdir, "multipleComparisonPlot_side_by_side.pdf"))
 # savefig(plot(p12, size = (1000, 500)), joinpath(figdir, "multipleComparisonPlot_side_by_side.png"))
-=#
+
 
 using Gadfly, DataFrames, Compose
 import Cairo, Fontconfig

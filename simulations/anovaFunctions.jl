@@ -342,7 +342,3 @@ function fit_eq_model(df, partition_prior::Union{Nothing, EqualitySampler.Abstra
 	#TODO: unify the output with that of proportion_model!
 	return (samples=samples, model=model)
 end
-
-# TODO!
-function anova_test()
-end
