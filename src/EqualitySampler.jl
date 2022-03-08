@@ -8,7 +8,6 @@ import
 	Bijectors,
 	Combinatorics,
 	Distributions,
-	Optim,
 	OrderedCollections,
 	StatsBase,
 	SpecialFunctions,

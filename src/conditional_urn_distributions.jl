@@ -198,7 +198,7 @@ function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, ::Union{UniformCo
 	result[other] .= count[length(urns) + 1] ./ length(other)
 	result ./= sum(result)
 
-	@show count, result[view(urns, idx_nonzero)], result[other]
+	# @show count, result[view(urns, idx_nonzero)], result[other]
 
 	return
 end
@@ -268,7 +268,8 @@ function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, d::T, index::U, c
 
 	# no_duplicated = count_equalities(view(urns, index_already_sampled))
 	v_known_urns = view(complete_urns, index_already_sampled)
-	r = length(Set(v_known_urns))
+	v_known_set = Set(v_known_urns)
+	r = length(v_known_set)
 	n = n0 - (index - r - 1)
 
 	model_probs_by_incl = exp.(log_model_probs_by_incl(d))
@@ -283,21 +284,30 @@ function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, d::T, index::U, c
 	# den =     sum(model_probs_by_incl[k] * stirlings2r(n    , n0 - k + 1, r + 1) for k in 1:n0)
 	# probEquality = num / (num + den)
 
+	for i in eachindex(result)
+		if i in v_known_set
+			result[i] = probEquality / r
+		else
+			result[i] = (1 - probEquality) / (k - r)
+		end
+	end
+	return
+
+	#= old approach
+
 	# probability of an equality
 	known = reduce_model(v_known_urns)
 	counts = get_conditional_counts(k, known, false)
 	idx_nonzero = findall(!iszero, counts)
-	#TODO: just divide by the number of distinct known values
 	result[v_known_urns[idx_nonzero]] .= probEquality .* (counts[idx_nonzero] ./ sum(counts[idx_nonzero]))
 
 	# probability of an inequality
 	inequality_options = setdiff(1:n0, v_known_urns)
 	result[inequality_options] .= (1 - probEquality) ./ length(inequality_options)
 
-	@show counts, result[v_known_urns[idx_nonzero]], result[inequality_options], probEquality
-
 	return
 
+	=#
 end
 #endregion
 

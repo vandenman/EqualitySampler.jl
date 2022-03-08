@@ -7,19 +7,22 @@ This does not consider duplicte models, i.e., it minimizes (EqualitySampler.logp
 """
 function dpp_find_α(k::Integer)
 
-	null_model = fill(1, k)
-	full_model = collect(1:k)
+	return exp(-(1 / (1 - k)) * logabsgamma(k))
 
-	function target(α)
-		dpp = RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(exp(first(α))))
-		(
-			EqualitySampler.logpdf_model_distinct(dpp, full_model) -
-			EqualitySampler.logpdf_model_distinct(dpp, null_model)
-		)^2
-	end
+	# brute force version
+	# null_model = fill(1, k)
+	# full_model = collect(1:k)
 
-	result = Optim.optimize(target, [log(1.817)], Optim.BFGS())
+	# function target(α)
+	# 	dpp = RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(exp(first(α))))
+	# 	(
+	# 		EqualitySampler.logpdf_model_distinct(dpp, full_model) -
+	# 		EqualitySampler.logpdf_model_distinct(dpp, null_model)
+	# 	)^2
+	# end
 
-	return exp(first(result.minimizer))#, result
+	# result = Optim.optimize(target, [log(1.817)], Optim.BFGS())
+
+	# return exp(first(result.minimizer))#, result
 
 end
