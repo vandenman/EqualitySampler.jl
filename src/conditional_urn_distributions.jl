@@ -190,17 +190,31 @@ function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, ::Union{UniformCo
 
 	urns = view(complete_urns, 1:index - 1)
 
-	count = get_conditional_counts(k, urns)
+	urns_set = Set(urns)
+	r = length(urns_set)
+	num = bellnumr(k - index , r + 1)
+	den = r * bellnumr(k - index, r)
+	prob_new_label = num / (num + den)
 
+	for i in eachindex(result)
+		if i in urns_set
+			result[i] = (1 - prob_new_label) / r
+		else
+			result[i] = prob_new_label / (k - r)
+		end
+	end
+	return
+
+	#= old approach
+
+	count = get_conditional_counts(k, urns)
 	idx_nonzero = findall(!iszero, view(count, 1:length(urns)))
 	result[view(urns, idx_nonzero)] .= count[idx_nonzero]
 	other = setdiff(1:k, urns)
 	result[other] .= count[length(urns) + 1] ./ length(other)
 	result ./= sum(result)
+	=#
 
-	# @show count, result[view(urns, idx_nonzero)], result[other]
-
-	return
 end
 
 # function _pdf_helper!(result, d::Union{BetaBinomialConditionalUrnDistribution, BetaBinomialMvUrnDistribution}, index, complete_urns)
@@ -264,31 +278,32 @@ function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, d::T, index::U, c
 	end
 
 	index_already_sampled = 1:index - 1
-	n0 = k
 
 	# no_duplicated = count_equalities(view(urns, index_already_sampled))
 	v_known_urns = view(complete_urns, index_already_sampled)
 	v_known_set = Set(v_known_urns)
 	r = length(v_known_set)
-	n = n0 - (index - r - 1)
+	n = k - (index - r - 1)
 
 	model_probs_by_incl = exp.(log_model_probs_by_incl(d))
 
-	# no. parameters
-	num = r * sum(model_probs_by_incl[k] * stirlings2r(n - 1, k, r    ) for k in 1:n0)
-	den =     sum(model_probs_by_incl[k] * stirlings2r(n    , k, r + 1) for k in 1:n0)
-	probEquality = num / (num + den)
+	# no. parameters k j m
+	num = r * sum(model_probs_by_incl[k] * stirlings2r(n - 1, i, r    ) for i in 1:k)
+	den =     sum(model_probs_by_incl[k] * stirlings2r(n    , i, r + 1) for i in 1:k)
+	# prob_equality = num / (num + den)
 
-	# no. equalities
-	# num = r * sum(model_probs_by_incl[k] * stirlings2r(n - 1, n0 - k + 1, r    ) for k in 1:n0)
-	# den =     sum(model_probs_by_incl[k] * stirlings2r(n    , n0 - k + 1, r + 1) for k in 1:n0)
-	# probEquality = num / (num + den)
+	prob_new_label = den / (den + num)
 
 	for i in eachindex(result)
+		# if i in v_known_set
+		# 	result[i] = prob_equality / r
+		# else
+		# 	result[i] = (1 - prob_equality) / (k - r)
+		# end
 		if i in v_known_set
-			result[i] = probEquality / r
+			result[i] = (1 - prob_new_label) / r
 		else
-			result[i] = (1 - probEquality) / (k - r)
+			result[i] = prob_new_label / (k - r)
 		end
 	end
 	return
@@ -302,7 +317,7 @@ function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, d::T, index::U, c
 	result[v_known_urns[idx_nonzero]] .= probEquality .* (counts[idx_nonzero] ./ sum(counts[idx_nonzero]))
 
 	# probability of an inequality
-	inequality_options = setdiff(1:n0, v_known_urns)
+	inequality_options = setdiff(1:k, v_known_urns)
 	result[inequality_options] .= (1 - probEquality) ./ length(inequality_options)
 
 	return
