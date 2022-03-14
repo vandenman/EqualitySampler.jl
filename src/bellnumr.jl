@@ -24,12 +24,6 @@ function bellnumr_inner(n::T, r::T) where T <: Integer
 	for k in 0:n
 		res += stirlings2r(n+r, k+r, r)
 	end
-	# for k in 0:n, i in 0:n
-	# 	res +=
-			# binomial(n, i) *
-			# stirlings2(i, k) *
-			# r^(n - i)
-	# end
 	return res
 
 end
@@ -57,7 +51,7 @@ function bellnumr_base_cases(n::T, r::T) where T <: Integer
 	# https://oeis.org/A005491 offset by 1
 	n == 3		&&		return (true, 		T((r + 1)^3 + 3(r + 1) + 1))
 	# https://oeis.org/A005492 simplify equations for a(n)
-	n == 4	&&			return (true, 		T(15 + r * (20 + r * (12 + r * (4 + r)))))
+	n == 4		&&		return (true, 		T(15 + r * (20 + r * (12 + r * (4 + r)))))
 
 	if 0 <= r < size(_bellnumr_table_BigInt, 1) && 5 <= n < size(_bellnumr_table_BigInt, 2)
 		return (true, T(_bellnumr_table_BigInt[r+1, n-4]))

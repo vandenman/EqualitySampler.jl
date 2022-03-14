@@ -78,7 +78,7 @@ function prop_incorrect(x, hypothesis::Symbol, values_are_log_odds::Bool = false
 end
 
 function get_resultsdir()
-	results_dir = joinpath("simulations", "results_multiplecomparisonsplot_200_5")
+	results_dir = joinpath("simulations", "results_multiplecomparisonsplot_200_7")
 	!ispath(results_dir) && mkpath(results_dir)
 	return results_dir
 end
@@ -87,10 +87,17 @@ make_filename(results_dir, r, i, hypothesis) = joinpath(results_dir, "repeat_$(r
 
 function get_hyperparams()
 	n_obs_per_group = 100
-	repeats = 1:30
+	repeats = 1:2# 30
 	groups = 2:10
 	hypothesis=(:null, :full)
 	return n_obs_per_group, repeats, groups, hypothesis
+end
+
+function validate_r_hat(chn, tolerance = 1.05)
+	rhats = MCMCChains.summarystats(chn).nt.rhat
+	any(isnan, rhats) && return true, NaN
+	any(>(tolerance), rhats) && return true, mean(rhats)
+	return false, 0.0
 end
 
 function run_simulation()
@@ -114,30 +121,28 @@ function run_simulation()
 	results_dir = get_resultsdir()
 
 	# (r, i, hypothesis) = first(sim_opts)
-	# Threads.@threads for (r, i, hypothesis) in collect(sim_opts)
-	for (r, i, hypothesis) in collect(sim_opts)
+	Threads.@threads for (r, i, hypothesis) in collect(sim_opts)
+	# for (r, i, hypothesis) in collect(sim_opts)
 
 		filename = make_filename(results_dir, r, i, hypothesis)
 		if !isfile(filename)
 
 			# @show i, r, hypothesis
 			n_groups = groups[i]
-			if hypothesis == :null
-				true_model = fill(1, n_groups)
-			else
-				true_model = collect(1:n_groups)
-			end
+			true_model = hypothesis === :null ? fill(1, n_groups) : collect(1:n_groups)
 			true_θ = normalize_θ(0.2, true_model)
 
-			dat, _, _ = simulate_data_one_way_anova(n_groups, n_obs_per_group, true_θ);
+			data_obj = simulate_data_one_way_anova(n_groups, n_obs_per_group, true_θ);
+			dat = data_obj.data
 
 			results = BitArray(undef, length(priors))
 			results_big = Array{Matrix{Float64}}(undef, length(priors))
+			results_rhat = BitArray(undef, length(priors))
 
 			# (j, prior) = first(enumerate(priors))
 			for (j, prior) in enumerate(priors)
 
-				@show j, prior
+				@show r, i, hypothesis, j, prior
 
 				if prior === :Westfall
 
@@ -149,17 +154,28 @@ function run_simulation()
 				else
 
 					partition_prior = instantiate_prior(prior, n_groups)
-					chain = anova_test(dat, partition_prior; mcmc_settings = mcmc_settings)
-					partition_samples = Int.(Array(group(chain, :partition)))
-					post_probs = compute_post_prob_eq(partition_samples)
+					for bad_rhat_count in 1:5
+					# while any_bad_rhats && bad_rhat_count <= 5
+					# chain = anova_test(dat, partition_prior; mcmc_settings = mcmc_settings, spl = :PG)
+					# chain = anova_test(dat, partition_prior; mcmc_settings = mcmc_settings, spl = Turing.SMC())
+						chain = anova_test(dat, partition_prior; mcmc_settings = mcmc_settings)
+						any_bad_rhats, mean_rhat_value = validate_r_hat(chain)
+						if any_bad_rhats
+							@error "This run had an bad r-hat:" r, i, hypothesis, j, prior bad_rhat_count, mean_rhat_value
+						else
 
-					results[j] = any_incorrect(post_probs, hypothesis)
-					results_big[j] = post_probs
+							partition_samples = Int.(Array(group(chain, :partition)))
+							post_probs = compute_post_prob_eq(partition_samples)
 
+							results[j] = any_incorrect(post_probs, hypothesis)
+							results_big[j] = post_probs
+							results_rhat[j] = any_bad_rhats
+						end
+					end
 				end
 			end
 
-			JLD2.jldsave(filename; results=results, results_big=results_big, run = (;r, i, hypothesis))
+			JLD2.jldsave(filename; results=results, results_big=results_big, results_rhat = results_rhat, run = (;r, i, hypothesis))
 
 		end
 
@@ -259,6 +275,7 @@ using Plots, Plots.PlotMeasures
 
 # gr()
 
+groups = 2:10
 labels = string.(collect(get_priors()))
 # labels = ["Uniform", "Beta-binomial α=1, β=1", "Beta-binomial α=K, β=1", "Beta-binomial α=1, β=K", "Beta-binomial α=1, β=binomial(K, 2)", "DPP α=0.5", "DPP α=1", "DPP α=2", "DPP α=Gopalan & Berry"]
 keep = eachindex(labels)#[1, 2, 3, 5]
@@ -275,6 +292,8 @@ Plots.plot!(p1, xlabel = "Number of groups", xticks = 2:10, xlim = (2, 10), ylim
 mu_full = dropdims(mean(view(results, :, :, :, 2), dims = 3), dims = 3)[keep, :]
 p1_full = make_figure(groups, permutedims(mu_full), "P(one or more errors)", labels; shapes = shapes)
 Plots.plot!(p1_full, xlabel = "Number of groups", xticks = 2:10, xlim = (2, 10), ylim = (0, 1), widen = true, legend = (0.085, .95))
+
+
 
 # TODO: why does results_big have #undef values?
 try2 = Array{Float64}(undef, size(results_big))

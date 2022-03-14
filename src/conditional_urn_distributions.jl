@@ -205,15 +205,14 @@ function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, ::Union{UniformCo
 	end
 	return
 
-	#= old approach
-
-	count = get_conditional_counts(k, urns)
-	idx_nonzero = findall(!iszero, view(count, 1:length(urns)))
-	result[view(urns, idx_nonzero)] .= count[idx_nonzero]
-	other = setdiff(1:k, urns)
-	result[other] .= count[length(urns) + 1] ./ length(other)
-	result ./= sum(result)
-	=#
+	#old approach
+	# count = get_conditional_counts(k, urns)
+	# idx_nonzero = findall(!iszero, view(count, 1:length(urns)))
+	# result[view(urns, idx_nonzero)] .= count[idx_nonzero]
+	# other = setdiff(1:k, urns)
+	# result[other] .= count[length(urns) + 1] ./ length(other)
+	# result ./= sum(result)
+	# return
 
 end
 
@@ -288,41 +287,33 @@ function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, d::T, index::U, c
 	model_probs_by_incl = exp.(log_model_probs_by_incl(d))
 
 	# no. parameters k j m
-	num = r * sum(model_probs_by_incl[k] * stirlings2r(n - 1, i, r    ) for i in 1:k)
-	den =     sum(model_probs_by_incl[k] * stirlings2r(n    , i, r + 1) for i in 1:k)
-	# prob_equality = num / (num + den)
+	num = r * sum(model_probs_by_incl[i] * stirlings2r(n - 1, i, r    ) for i in 1:k)
+	den =     sum(model_probs_by_incl[i] * stirlings2r(n    , i, r + 1) for i in 1:k)
 
 	prob_new_label = den / (den + num)
-
 	for i in eachindex(result)
-		# if i in v_known_set
-		# 	result[i] = prob_equality / r
-		# else
-		# 	result[i] = (1 - prob_equality) / (k - r)
-		# end
 		if i in v_known_set
 			result[i] = (1 - prob_new_label) / r
 		else
 			result[i] = prob_new_label / (k - r)
 		end
 	end
-	return
+	# return
 
-	#= old approach
+	# #old approach
+	# prob_equality = num / (num + den)
 
-	# probability of an equality
-	known = reduce_model(v_known_urns)
-	counts = get_conditional_counts(k, known, false)
-	idx_nonzero = findall(!iszero, counts)
-	result[v_known_urns[idx_nonzero]] .= probEquality .* (counts[idx_nonzero] ./ sum(counts[idx_nonzero]))
+	# # probability of an equality
+	# known = reduce_model(v_known_urns)
+	# counts = get_conditional_counts(k, known, false)
+	# idx_nonzero = findall(!iszero, counts)
+	# result[v_known_urns[idx_nonzero]] .= prob_equality .* (counts[idx_nonzero] ./ sum(counts[idx_nonzero]))
 
-	# probability of an inequality
-	inequality_options = setdiff(1:k, v_known_urns)
-	result[inequality_options] .= (1 - probEquality) ./ length(inequality_options)
+	# # probability of an inequality
+	# inequality_options = setdiff(1:k, v_known_urns)
+	# result[inequality_options] .= (1 - prob_equality) ./ length(inequality_options)
+	# return
 
-	return
-
-	=#
 end
 #endregion
 

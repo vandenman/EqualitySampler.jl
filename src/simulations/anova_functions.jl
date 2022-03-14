@@ -23,6 +23,12 @@ function normalize_θ(offset::AbstractFloat, true_model::Vector{T}) where T<:Int
 	return θ .- mean(θ)
 end
 
+struct AnovaSimulatedData
+	data::SimpleDataSet
+	distribution::Distributions.MvNormal
+	true_values::TrueValues
+end
+
 
 function simulate_data_one_way_anova(
 	n_groups::Integer,
@@ -63,7 +69,7 @@ function simulate_data_one_way_anova(
 
 	true_values = TrueValues(μ, σ, θc, partition)
 
-	return (data=dat, distribution=D, true_values=true_values)
+	return AnovaSimulatedData(dat, D, true_values)
 
 end
 
@@ -259,16 +265,28 @@ function prep_model_arguments(df)
 	return obs_mean, obs_var, obs_n, Q
 end
 
+# for full model
+get_mcmc_sampler_anova(spl::Turing.Inference.InferenceAlgorithm, args...) = spl
+get_mcmc_sampler_anova(::Symbol, model) = get_sampler(model)
+
+# for equalities
+get_mcmc_sampler_anova(spl::Real, model, _) = get_sampler(model, spl, :custom)
+function get_mcmc_sampler_anova(spl::Symbol, model, init_params)
+	ϵ = brute_force_ϵ(model, spl; init_params = init_params)
+	return get_sampler(model, spl, ϵ)
+end
+
 function fit_full_model(
 		df
 		;
-		spl = nothing,
+		spl = :custom,
 		mcmc_settings::MCMCSettings = MCMCSettings()
 	)
 
 	obs_mean, obs_var, obs_n, Q = prep_model_arguments(df)
 	model = one_way_anova_mv_ss_submodel(obs_mean, obs_var, obs_n, Q)
-	mcmc_sampler = isnothing(spl) ? get_sampler(model) : spl
+	# mcmc_sampler = isnothing(spl) ? get_sampler(model, spl) : spl
+	mcmc_sampler = get_mcmc_sampler_anova(spl, model)
 
 	chain = sample_model(model, mcmc_sampler, mcmc_settings)::MCMCChains.Chains
 	return combine_chain_with_generated_quantities(model, chain, "θ_cs")
@@ -279,7 +297,7 @@ function fit_eq_model(
 		df,
 		partition_prior::EqualitySampler.AbstractMvUrnDistribution
 		;
-		spl = nothing,
+		spl = :custom,
 		mcmc_settings::MCMCSettings = MCMCSettings()
 	)
 
@@ -288,12 +306,17 @@ function fit_eq_model(
 	starting_values = get_starting_values(df)
 	init_params = get_init_params(starting_values...)
 
-	if isnothing(spl)
-		ϵ = brute_force_ϵ(model; init_params = init_params)
-		mcmc_sampler = get_sampler(model, ϵ)
-	else
-		mcmc_sampler = spl
-	end
+	# maybe this should be a separate function to ease the compilers work
+	mcmc_sampler = get_mcmc_sampler_anova(spl, model, init_params)
+
+	# if spl isa Symbol
+	# 	ϵ = brute_force_ϵ(model, spl; init_params = init_params)
+	# 	mcmc_sampler = get_sampler(model, ϵ, spl)
+	# elseif spl isa Real
+	# 	mcmc_sampler = get_sampler(model, spl, :custom)
+	# else
+	# 	mcmc_sampler = spl
+	# end
 
 	chain = sample_model(model, mcmc_sampler, mcmc_settings)::MCMCChains.Chains
 
@@ -370,7 +393,7 @@ function anova_test(
 	df::Union{SimpleDataSet, DataFrames.DataFrame},
 	partition_prior::Union{Nothing, AbstractMvUrnDistribution},
 	;
-	spl = nothing,
+	spl = :custom,
 	mcmc_settings::MCMCSettings = MCMCSettings()
 )
 	# TODO: dispatch based on Nothing vs AbstractMvUrnDistribution?
@@ -380,12 +403,3 @@ function anova_test(
 		return fit_eq_model(df, partition_prior; spl = spl, mcmc_settings = mcmc_settings)
 	end
 end
-
-# using EqualitySampler
-# y = randn(100)
-# g = rand(1:5, 100)
-# df = EqualitySampler.Simulations.SimpleDataSet(y, g)
-# fit0 = anova_test(y, g; partition_prior=nothing)
-# fit1 = anova_test(df; partition_prior=nothing)
-
-# @edit anova_test(df; partition_prior=nothing)

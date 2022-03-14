@@ -1,36 +1,62 @@
-using EqualitySampler, Turing, Plots
+using EqualitySampler, EqualitySampler.Simulations, Turing, Plots
+import EqualitySampler.Simulations as EQS
+import AbstractMCMC
+# include("../simulations/anovaFunctions.jl")
 
-include("../simulations/anovaFunctions.jl")
-
-n_groups = 6
+n_groups = 15
 n_obs_per_group = 100
 
 θ_raw = randn(n_groups) .* 3
 θ_raw .-= mean(θ_raw)
-true_model = [1, 1, 2, 2, 3, 3]
-θ_true = average_equality_constraints(θ_raw, true_model)
+# true_model = [1, 1, 2, 2, 3, 3]
+true_model = [1, 1, 2, 2, 3, 3, 4, 4, 4, 5]
+θ_true = EQS.average_equality_constraints(θ_raw, true_model)
 data = simulate_data_one_way_anova(n_groups, n_obs_per_group, θ_true);
 
 df = data.data
 partition_prior = BetaBinomialMvUrnDistribution(n_groups)
-obs_mean, obs_var, obs_n, Q = prep_model_arguments(df)
+obs_mean, obs_var, obs_n, Q = EQS.prep_model_arguments(df)
 
-model = one_way_anova_mv_ss_eq_submodel(obs_mean, obs_var, obs_n, Q, partition_prior)
-starting_values = get_starting_values(df)
-init_params = get_init_params(starting_values...)
+model = EQS.one_way_anova_mv_ss_eq_submodel(obs_mean, obs_var, obs_n, Q, partition_prior)
+starting_values = EQS.get_starting_values(df)
+init_params = EQS.get_init_params(starting_values...)
 
 parameters = DynamicPPL.syms(DynamicPPL.VarInfo(model))
 continuous_parameters = filter(!=(:partition), parameters)
+
+ϵ = 1 / 50
+spl0 = Gibbs(
+	HMC(ϵ, 20, continuous_parameters...),
+	MH(:partition)
+)
+
 spl1 = Gibbs(
-	HMC(1/32, 20, continuous_parameters...),
-	GibbsConditional(:partition, EqualitySampler.PartitionSampler(length(model.args.partition_prior), get_logπ(model)))
+	HMC(ϵ, 20, continuous_parameters...),
+	GibbsConditional(:partition, EqualitySampler.PartitionSampler(length(model.args.partition_prior), EQS.get_logπ(model)))
 )
+
 spl2 = Gibbs(
-	HMC{Turing.Core.ForwardDiffAD{1}}(1/32, 20, continuous_parameters...),
-	GibbsConditional(:partition, EqualitySampler.PartitionSampler(length(model.args.partition_prior), get_logπ(model)))
+	HMC(ϵ, 20, continuous_parameters...),
+	PG(n_groups, :partition)
 )
+chn0 = sample(model, spl0, 1000; init_params = init_params)
 chn1 = sample(model, spl1, 1000; init_params = init_params)
-chn2 = sample(model, spl2, 1000; init_params = init_params)
+chn2 = sample(model, spl1, 1000; init_params = init_params)
+
+chn3 = anova_test(df, UniformMvUrnDistribution(n_groups); spl = :PG,			mcmc_settings = MCMCSettings(1000, 1, 1, 1, AbstractMCMC.MCMCSerial()))
+chn4 = anova_test(df, UniformMvUrnDistribution(n_groups); spl = SMC(),			mcmc_settings = MCMCSettings(1000, 1, 1, 1, AbstractMCMC.MCMCSerial()))
+chn5 = anova_test(df, UniformMvUrnDistribution(n_groups); spl = PG(n_groups), 	mcmc_settings = MCMCSettings(1000, 1, 1, 1, AbstractMCMC.MCMCSerial()))
+
+chns_list = [chn0, chn1, chn2, chn3, chn4, chn5]
+
+rhat(chn) = summarystats(chn).nt.rhat
+mean_positive_ess_per_sec(chn) = mean(filter(>(0), summarystats(chn).nt.ess_per_sec))
+mean_rhat(chn) = mean(rhat(chn))
+mean_positive_ess_per_sec.(chns_list)
+mean_rhat.(chns_list)
+MCMCChains.wall_duration.(chns_list)
+
+hcat(rhat.(chns_list)...)
 
 fit_eq_model(data.data, prior, spl; mcmc_iterations = 10_000)
 

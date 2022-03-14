@@ -21,15 +21,23 @@ function get_logπ(model)
 	end
 end
 
-function get_sampler(model, ϵ::Float64 = 0.0, n_leapfrog::Int = 20)
+function get_sampler(model, discrete_sampler::Symbol = :custom, ϵ::Float64 = 0.0, n_leapfrog::Int = 20)
 	parameters = DynamicPPL.syms(DynamicPPL.VarInfo(model))
 	if :partition in parameters
 
 		continuous_parameters = filter(!=(:partition), parameters)
-		return Turing.Gibbs(
-			Turing.HMC(ϵ, n_leapfrog, continuous_parameters...),
-			Turing.GibbsConditional(:partition, PartitionSampler(length(model.args.partition_prior), get_logπ(model)))
-		)
+		if discrete_sampler == :custom
+			return Turing.Gibbs(
+				Turing.HMC(ϵ, n_leapfrog, continuous_parameters...),
+				Turing.GibbsConditional(:partition, PartitionSampler(length(model.args.partition_prior), get_logπ(model)))
+			)
+		else
+			no_groups = length(model.args.obs_mean)::Int
+			return Turing.Gibbs(
+				Turing.HMC(ϵ, n_leapfrog, continuous_parameters...),
+				Turing.PG(no_groups, :partition)
+			)
+		end
 
 	else
 		return Turing.NUTS()
