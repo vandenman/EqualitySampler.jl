@@ -46,6 +46,6 @@ function MCMCSettings(;iterations::Integer=10_000, burnin::Integer=1_000, chains
 	return MCMCSettings(iterations, burnin, chains, thinning, parallel)
 end
 
-function sample_model(model, spl, settings::MCMCSettings{T, U}; kwargs...) where {T, U<:AbstractMCMC.AbstractMCMCEnsemble}
-	AbstractMCMC.sample(model, spl, U(), settings.iterations, settings.chains; discard_initial = settings.burnin, thinning = settings.thinning)
+function sample_model(model, spl, settings::MCMCSettings{T, U}, rng = Random.GLOBAL_RNG; kwargs...) where {T, U<:AbstractMCMC.AbstractMCMCEnsemble}
+	AbstractMCMC.sample(rng, model, spl, U(), settings.iterations, settings.chains; discard_initial = settings.burnin, thinning = settings.thinning)
 end

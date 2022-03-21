@@ -33,20 +33,34 @@ function sample_next_values(c, o)
 		which should save a bunch of likelihood evaluations whenever the current partition is far a model that implies everything is distinct
 	=#
 
+	new_label_log_posterior = 0.0
+	new_label_log_posterior_computed = false
+	present_labels = fast_countmap_partition_incl_zero(nextValues)
+
+	# ~O(k^2) (double look over k) with at worst k * (k-1) likelihood evaluations if all labels are distinct and at best k * 2 likelihood evaluations
 	for j in eachindex(probvec)
 
-		# originalValue = nextValues[j]
 		for i in eachindex(probvec)
 
-			# Maybe cache the one value that can be reused?
 			nextValues[j] = i
-			if nextValues[j] != cache_idx
-				probvec[i] = o.logposterior(nextValues, c)
-				# @show i, nextValues, probvec
-			else
-				# println("use cache")
-				# @show i cache_idx cache_value nextValues
+			if nextValues[j] == cache_idx
+
 				probvec[i] = cache_value
+
+			elseif !iszero(present_labels[i])
+
+				probvec[i] = o.logposterior(nextValues, c)
+
+			elseif new_label_log_posterior_computed
+
+				probvec[i] = new_label_log_posterior
+
+			else
+
+				new_label_log_posterior = o.logposterior(nextValues, c)
+				probvec[i] = new_label_log_posterior
+				new_label_log_posterior_computed = true
+
 			end
 
 		end
@@ -60,20 +74,66 @@ function sample_next_values(c, o)
 
 		if Distributions.isprobvec(probvec_normalized)
 			# TODO: consider disabling the isprobvec check with check_args = false?
+			present_labels[nextValues[j]] -= 1
 			nextValues[j] = rand(Distributions.Categorical(probvec_normalized))
-		elseif all(isinf, probvec)
+			present_labels[nextValues[j]] += 1
+
+		elseif all(isinf, probvec) # not possible to recover from this
 			return nextValues
 		else
 			nextValues[j] = c.partition[j]
 		end
-		if j != length(probvec)
 
+		if j != length(probvec)
 			cache_idx = nextValues[j+1]
 			cache_value = probvec[nextValues[j]]
-
-			# println("updated cache")
-			# @show cache_idx cache_value nextValues probvec
 		end
+		new_label_log_posterior_computed = false
 	end
 	return nextValues
+
+	# ~O(k^2) (double look over k) with k * (k-1) likelihood evaluations
+	# for j in eachindex(probvec)
+
+	# 	# originalValue = nextValues[j]
+	# 	for i in eachindex(probvec)
+
+	# 		# Maybe cache the one value that can be reused?
+	# 		nextValues[j] = i
+	# 		if nextValues[j] != cache_idx
+	# 			probvec[i] = o.logposterior(nextValues, c)
+	# 			# @show i, nextValues, probvec
+	# 		else
+	# 			# println("use cache")
+	# 			# @show i cache_idx cache_value nextValues
+	# 			probvec[i] = cache_value
+	# 		end
+
+	# 	end
+
+	# 	probvec_normalized = exp.(probvec .- logsumexp_batch(probvec))
+	# 	if !Distributions.isprobvec(probvec_normalized)
+	# 		@show probvec, probvec_normalized
+	# 		@warn "probvec condition not satisfied! trying to normalize once more"
+	# 		probvec_normalized ./= sum(probvec_normalized)
+	# 	end
+
+	# 	if Distributions.isprobvec(probvec_normalized)
+	# 		# TODO: consider disabling the isprobvec check with check_args = false?
+	# 		nextValues[j] = rand(Distributions.Categorical(probvec_normalized))
+	# 	elseif all(isinf, probvec)
+	# 		return nextValues
+	# 	else
+	# 		nextValues[j] = c.partition[j]
+	# 	end
+	# 	if j != length(probvec)
+
+	# 		cache_idx = nextValues[j+1]
+	# 		cache_value = probvec[nextValues[j]]
+
+	# 		# println("updated cache")
+	# 		# @show cache_idx cache_value nextValues probvec
+	# 	end
+	# end
+	# return nextValues
 end

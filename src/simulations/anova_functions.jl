@@ -29,8 +29,17 @@ struct AnovaSimulatedData
 	true_values::TrueValues
 end
 
+simulate_data_one_way_anova(
+	n_groups::Integer,
+	n_obs_per_group::Integer,
+	θ::AbstractVector{<:AbstractFloat} = Float64[],
+	partition::AbstractVector{<:Integer} = 1:n_groups,
+	μ::AbstractFloat = 0.0,
+	σ::AbstractFloat = 1.0
+) = simulate_data_one_way_anova(Random.GLOBAL_RNG, n_groups, n_obs_per_group, θ, partition, μ, σ)
 
 function simulate_data_one_way_anova(
+	rng::Random.AbstractRNG,
 	n_groups::Integer,
 	n_obs_per_group::Integer,
 	θ::AbstractVector{<:AbstractFloat} = Float64[],
@@ -63,7 +72,7 @@ function simulate_data_one_way_anova(
 		g_big[idx] .= i
 	end
 	D = Distributions.MvNormal(μ .+ σ .* view(θc, g_big), σ)
-	y = rand(D)
+	y = rand(rng, D)
 
 	dat = SimpleDataSet(y, g)
 
@@ -148,6 +157,30 @@ end
 
 average_equality_constraints(ρ::AbstractVector{<:Real}, partition::AbstractVector{<:Integer}) = average_equality_constraints!(similar(ρ), ρ, partition)
 
+function get_equalizer_matrix_from_partition(partition::AbstractVector{<:Integer})
+	k = length(partition)
+	mmm = Matrix{Float64}(undef, k, k)
+	@inbounds for i in axes(mmm, 2)
+		v = count(==(partition[i]), partition)
+		mmm[:, i] .= (1.0 / v) .* (partition .== partition[i])
+	end
+	mmm
+end
+
+function build_get_equalizer_matrix_from_partition_with_cache()
+	local _cache = Dict{Vector{Int}, Matrix{Float64}}()
+	function _inner(partition::Vector{Int})
+		reduced_partition = reduce_model(partition)
+		if haskey(_cache, reduced_partition)
+			return _cache[reduced_partition]
+		else
+			res = get_equalizer_matrix_from_partition(partition)
+			_cache[reduced_partition] = res
+			return res
+		end
+	end
+end
+
 function get_starting_values(df)
 
 	coefs, cis, fit = fit_lm(df)
@@ -162,7 +195,7 @@ function get_starting_values(df)
 
 	y = df.y
 	partition_start	= map(x->findfirst(isone, x), eachcol(adj_mat))::Vector{Int}
-	n_partitions	= length(unique(partition_start))
+	n_partitions	= EqualitySampler.no_distinct_groups_in_partition(partition_start)
 	σ_start			= var(GLM.residuals(fit))
 	μ_start			= mean(y)
 	θ_c_start		= isone(n_partitions) ? zeros(n_groups) : average_equality_constraints(coefs, partition_start)
@@ -242,7 +275,70 @@ DynamicPPL.@model function one_way_anova_mv_ss_submodel(obs_mean, obs_var, obs_n
 
 	# definition from Rouder et. al., (2012) eq 6.
 	for i in eachindex(obs_mean)
-		# TODO: how to access this function?
+		Turing.@addlogprob! EqualitySampler._univariate_normal_likelihood(obs_mean[i], obs_var[i], obs_n[i], μ_grand + sqrt(σ²) * θ_cs[i], σ²)
+	end
+
+	return θ_cs
+
+end
+
+DynamicPPL.@model function one_way_anova_mv_ss_submodel_matrix(obs_mean, obs_var, obs_n, Q, partition = nothing, ::Type{T} = Float64) where {T}
+
+	n_groups = length(obs_mean)
+
+	# improper priors on grand mean and variance
+	μ_grand 		~ Turing.Flat()
+	σ² 				~ JeffreysPriorVariance()
+
+	# The setup for θ follows Rouder et al., 2012, p. 363
+	g   ~ Distributions.InverseGamma(0.5, 0.5; check_args = false)
+
+	θ_r ~ Distributions.MvNormal(LinearAlgebra.Diagonal(FillArrays.Fill(1.0, n_groups - 1)))
+
+	# get matrix that constrains θ according to the sampled equalities
+	if isnothing(partition)
+		# ensure the sum to zero constraint
+		θ_cs = Q * (sqrt(g) .* θ_r)
+	else
+		# ensure the sum to zero constraint + apply average accordin to partition
+		θ_cs = get_equalizer_matrix_from_partition(partition) * Q * (sqrt(g) .* θ_r)
+	end
+
+
+	# definition from Rouder et. al., (2012) eq 6.
+	for i in eachindex(obs_mean)
+		Turing.@addlogprob! EqualitySampler._univariate_normal_likelihood(obs_mean[i], obs_var[i], obs_n[i], μ_grand + sqrt(σ²) * θ_cs[i], σ²)
+	end
+
+	return θ_cs
+
+end
+
+DynamicPPL.@model function one_way_anova_mv_ss_submodel_matrix_memoization(obs_mean, obs_var, obs_n, Q, memoized_get_equalizer_matrix, partition = nothing, ::Type{T} = Float64) where {T}
+
+	n_groups = length(obs_mean)
+
+	# improper priors on grand mean and variance
+	μ_grand 		~ Turing.Flat()
+	σ² 				~ JeffreysPriorVariance()
+
+	# The setup for θ follows Rouder et al., 2012, p. 363
+	g   ~ Distributions.InverseGamma(0.5, 0.5; check_args = false)
+
+	θ_r ~ Distributions.MvNormal(LinearAlgebra.Diagonal(FillArrays.Fill(1.0, n_groups - 1)))
+
+	# get matrix that constrains θ according to the sampled equalities
+	if isnothing(partition)
+		# ensure the sum to zero constraint
+		θ_cs = Q * (sqrt(g) .* θ_r)
+	else
+		# ensure the sum to zero constraint + apply average accordin to partition
+		θ_cs = memoized_get_equalizer_matrix(partition) * Q * (sqrt(g) .* θ_r)
+	end
+
+
+	# definition from Rouder et. al., (2012) eq 6.
+	for i in eachindex(obs_mean)
 		Turing.@addlogprob! EqualitySampler._univariate_normal_likelihood(obs_mean[i], obs_var[i], obs_n[i], μ_grand + sqrt(σ²) * θ_cs[i], σ²)
 	end
 
@@ -254,6 +350,22 @@ DynamicPPL.@model function one_way_anova_mv_ss_eq_submodel(obs_mean, obs_var, ob
 
 	partition ~ partition_prior
 	DynamicPPL.@submodel prefix="one_way_anova_mv_ss_submodel" θ_cs = one_way_anova_mv_ss_submodel(obs_mean, obs_var, obs_n, Q, partition, T)
+	return θ_cs
+
+end
+
+DynamicPPL.@model function one_way_anova_mv_ss_eq_submodel_matrix(obs_mean, obs_var, obs_n, Q, partition_prior::D, ::Type{T} = Float64) where {T, D<:AbstractMvUrnDistribution}
+
+	partition ~ partition_prior
+	DynamicPPL.@submodel prefix="one_way_anova_mv_ss_submodel" θ_cs = one_way_anova_mv_ss_submodel_matrix(obs_mean, obs_var, obs_n, Q, partition, T)
+	return θ_cs
+
+end
+
+DynamicPPL.@model function one_way_anova_mv_ss_eq_submodel_matrix_memoized(obs_mean, obs_var, obs_n, Q, memoized_get_equalizer_matrix, partition_prior::D, ::Type{T} = Float64) where {T, D<:AbstractMvUrnDistribution}
+
+	partition ~ partition_prior
+	DynamicPPL.@submodel prefix="one_way_anova_mv_ss_submodel" θ_cs = one_way_anova_mv_ss_submodel_matrix_memoization(obs_mean, obs_var, obs_n, Q, memoized_get_equalizer_matrix, partition, T)
 	return θ_cs
 
 end
@@ -270,7 +382,7 @@ get_mcmc_sampler_anova(spl::Turing.Inference.InferenceAlgorithm, args...) = spl
 get_mcmc_sampler_anova(::Symbol, model) = get_sampler(model)
 
 # for equalities
-get_mcmc_sampler_anova(spl::Real, model, _) = get_sampler(model, spl, :custom)
+get_mcmc_sampler_anova(spl::Real, model, _) = get_sampler(model, :custom, spl)
 function get_mcmc_sampler_anova(spl::Symbol, model, init_params)
 	ϵ = brute_force_ϵ(model, spl; init_params = init_params)
 	return get_sampler(model, spl, ϵ)
@@ -280,7 +392,8 @@ function fit_full_model(
 		df
 		;
 		spl = :custom,
-		mcmc_settings::MCMCSettings = MCMCSettings()
+		mcmc_settings::MCMCSettings = MCMCSettings(),
+		rng::Random.AbstractRNG = Random.GLOBAL_RNG
 	)
 
 	obs_mean, obs_var, obs_n, Q = prep_model_arguments(df)
@@ -288,7 +401,7 @@ function fit_full_model(
 	# mcmc_sampler = isnothing(spl) ? get_sampler(model, spl) : spl
 	mcmc_sampler = get_mcmc_sampler_anova(spl, model)
 
-	chain = sample_model(model, mcmc_sampler, mcmc_settings)::MCMCChains.Chains
+	chain = sample_model(model, mcmc_sampler, mcmc_settings, rng)::MCMCChains.Chains
 	return combine_chain_with_generated_quantities(model, chain, "θ_cs")
 
 end
@@ -298,11 +411,20 @@ function fit_eq_model(
 		partition_prior::EqualitySampler.AbstractMvUrnDistribution
 		;
 		spl = :custom,
-		mcmc_settings::MCMCSettings = MCMCSettings()
+		mcmc_settings::MCMCSettings = MCMCSettings(),
+		eq_model::Symbol = :old,
+		rng::Random.AbstractRNG = Random.GLOBAL_RNG
 	)
 
 	obs_mean, obs_var, obs_n, Q = prep_model_arguments(df)
-	model = one_way_anova_mv_ss_eq_submodel(obs_mean, obs_var, obs_n, Q, partition_prior)
+	if eq_model === :old
+		model = one_way_anova_mv_ss_eq_submodel(obs_mean, obs_var, obs_n, Q, partition_prior)
+	elseif eq_model === :matrix
+		model = one_way_anova_mv_ss_eq_submodel_matrix(obs_mean, obs_var, obs_n, Q, partition_prior)
+	elseif eq_model === :matrix_memoized
+		memoized_get_equality_matrix = build_get_equalizer_matrix_from_partition_with_cache()
+		model = one_way_anova_mv_ss_eq_submodel_matrix_memoized(obs_mean, obs_var, obs_n, Q, memoized_get_equality_matrix, partition_prior)
+	end
 	starting_values = get_starting_values(df)
 	init_params = get_init_params(starting_values...)
 
@@ -318,8 +440,11 @@ function fit_eq_model(
 	# 	mcmc_sampler = spl
 	# end
 
-	chain = sample_model(model, mcmc_sampler, mcmc_settings)::MCMCChains.Chains
+	chain = sample_model(model, mcmc_sampler, mcmc_settings, rng)::MCMCChains.Chains
 
+	if eq_model === :matrix_memoized
+		@show length(memoized_get_equality_matrix._cache) first(memoized_get_equality_matrix._cache)
+	end
 	return combine_chain_with_generated_quantities(model, chain, "θ_cs")
 end
 
@@ -394,12 +519,14 @@ function anova_test(
 	partition_prior::Union{Nothing, AbstractMvUrnDistribution},
 	;
 	spl = :custom,
-	mcmc_settings::MCMCSettings = MCMCSettings()
+	mcmc_settings::MCMCSettings = MCMCSettings(),
+	eq_model::Symbol = :old,
+	rng = Random.GLOBAL_RNG
 )
 	# TODO: dispatch based on Nothing vs AbstractMvUrnDistribution?
 	if isnothing(partition_prior)
-		return fit_full_model(df;                spl = spl, mcmc_settings = mcmc_settings)
+		return fit_full_model(df;                spl = spl, mcmc_settings = mcmc_settings, rng = rng)
 	else
-		return fit_eq_model(df, partition_prior; spl = spl, mcmc_settings = mcmc_settings)
+		return fit_eq_model(df, partition_prior; spl = spl, mcmc_settings = mcmc_settings, eq_model = eq_model, rng = rng)
 	end
 end

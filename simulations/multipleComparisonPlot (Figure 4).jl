@@ -9,11 +9,12 @@
 
 =#
 
-using EqualitySampler, EqualitySampler.Simulations, MCMCChains
+using EqualitySampler, EqualitySampler.Simulations, MCMCChains, Random
 import ProgressMeter, JLD2, Turing, Logging
 
 #region simulation functions
 function instantiate_prior(symbol::Symbol, k::Integer)
+	# this works nicely with jld2 but it's not type stable
 
 	symbol == :uniform				&&	return UniformMvUrnDistribution(k)
 	symbol == :BetaBinomial11		&&	return BetaBinomialMvUrnDistribution(k, 1.0, 1.0)
@@ -23,7 +24,8 @@ function instantiate_prior(symbol::Symbol, k::Integer)
 	symbol == :DirichletProcess0_5	&&	return DirichletProcessMvUrnDistribution(k, 0.5)
 	symbol == :DirichletProcess1_0	&&	return DirichletProcessMvUrnDistribution(k, 1.0)
 	symbol == :DirichletProcess2_0	&&	return DirichletProcessMvUrnDistribution(k, 2.0)
-	symbol == :DirichletProcessGP	&&	return DirichletProcessMvUrnDistribution(k, :Gopalan_Berry)
+	# symbol == :DirichletProcessGP	&&
+	return DirichletProcessMvUrnDistribution(k, :Gopalan_Berry)
 
 end
 
@@ -78,7 +80,7 @@ function prop_incorrect(x, hypothesis::Symbol, values_are_log_odds::Bool = false
 end
 
 function get_resultsdir()
-	results_dir = joinpath("simulations", "results_multiplecomparisonsplot_200_7")
+	results_dir = joinpath("simulations", "results_multiplecomparisonsplot_200_8")
 	!ispath(results_dir) && mkpath(results_dir)
 	return results_dir
 end
@@ -87,13 +89,13 @@ make_filename(results_dir, r, i, hypothesis) = joinpath(results_dir, "repeat_$(r
 
 function get_hyperparams()
 	n_obs_per_group = 100
-	repeats = 1:2# 30
+	repeats = 1:70
 	groups = 2:10
 	hypothesis=(:null, :full)
 	return n_obs_per_group, repeats, groups, hypothesis
 end
 
-function validate_r_hat(chn, tolerance = 1.05)
+function validate_r_hat(chn, tolerance = 1.2)
 	rhats = MCMCChains.summarystats(chn).nt.rhat
 	any(isnan, rhats) && return true, NaN
 	any(>(tolerance), rhats) && return true, mean(rhats)
@@ -111,18 +113,24 @@ function run_simulation()
 	nsim = length(sim_opts)
 	println("starting simulation of $(nsim) runs with $(length(priors)) priors and $(Threads.nthreads()) threads")
 
-	mcmc_settings = MCMCSettings(;iterations = 10_000, burnin = 2_000, chains = 1)
+	mcmc_settings = MCMCSettings(;iterations = 5_000, burnin = 1_000, chains = 1)
 	# mcmc_settings = MCMCSettings(;iterations = 200, burnin = 100, chains = 1)
 
 	p = ProgressMeter.Progress(nsim)
 	Turing.setprogress!(false)
 	Logging.disable_logging(Logging.Warn)
+	# Logging.disable_logging(Logging.Debug)
 
 	results_dir = get_resultsdir()
 
-	# (r, i, hypothesis) = first(sim_opts)
-	Threads.@threads for (r, i, hypothesis) in collect(sim_opts)
-	# for (r, i, hypothesis) in collect(sim_opts)
+	# how often to restart a run when the target rhats are not met
+	max_retries = 10
+
+	trngs = [MersenneTwister(i) for i in 1:Threads.nthreads()];
+
+	# (iteration, (r, i, hypothesis)) = first(enumerate(sim_opts))
+	Threads.@threads for (iteration, (r, i, hypothesis)) in collect(enumerate(sim_opts))
+	# for (iteration, (r, i, hypothesis)) in enumerate(sim_opts)
 
 		filename = make_filename(results_dir, r, i, hypothesis)
 		if !isfile(filename)
@@ -132,17 +140,20 @@ function run_simulation()
 			true_model = hypothesis === :null ? fill(1, n_groups) : collect(1:n_groups)
 			true_θ = normalize_θ(0.2, true_model)
 
-			data_obj = simulate_data_one_way_anova(n_groups, n_obs_per_group, true_θ);
+			rng = trngs[Threads.threadid()]
+			Random.seed!(rng, iteration)
+			data_obj = simulate_data_one_way_anova(rng, n_groups, n_obs_per_group, true_θ);
 			dat = data_obj.data
 
 			results = BitArray(undef, length(priors))
 			results_big = Array{Matrix{Float64}}(undef, length(priors))
-			results_rhat = BitArray(undef, length(priors))
+			results_rhat = Vector{Int}(undef, length(priors))
 
+			# j = 7; prior = priors[j]
 			# (j, prior) = first(enumerate(priors))
 			for (j, prior) in enumerate(priors)
 
-				@show r, i, hypothesis, j, prior
+				# @show iteration, r, i, hypothesis, j, prior
 
 				if prior === :Westfall
 
@@ -150,18 +161,20 @@ function run_simulation()
 					log_posterior_odds_mat = result.log_posterior_odds_mat
 					results[j] = any_incorrect(log_posterior_odds_mat, hypothesis, true)
 					results_big[j] = Matrix(log_posterior_odds_mat)
+					results_rhat[j] = 0
 
 				else
 
 					partition_prior = instantiate_prior(prior, n_groups)
-					for bad_rhat_count in 1:5
-					# while any_bad_rhats && bad_rhat_count <= 5
-					# chain = anova_test(dat, partition_prior; mcmc_settings = mcmc_settings, spl = :PG)
-					# chain = anova_test(dat, partition_prior; mcmc_settings = mcmc_settings, spl = Turing.SMC())
-						chain = anova_test(dat, partition_prior; mcmc_settings = mcmc_settings)
+					for retry in 1:max_retries
+
+						Random.seed!(rng, iteration + retry)
+						# chain = anova_test(dat, partition_prior; mcmc_settings = mcmc_settings, spl = :PG)
+						# chain = anova_test(dat, partition_prior; mcmc_settings = mcmc_settings, spl = Turing.SMC())
+						chain = anova_test(dat, partition_prior; mcmc_settings = mcmc_settings, rng = rng, spl = 0.0)
 						any_bad_rhats, mean_rhat_value = validate_r_hat(chain)
-						if any_bad_rhats
-							@error "This run had an bad r-hat:" r, i, hypothesis, j, prior bad_rhat_count, mean_rhat_value
+						if any_bad_rhats && retry != max_retries
+							# @error "This run had a bad r-hat:" r, i, hypothesis, j, prior, any_bad_rhats, mean_rhat_value, retry
 						else
 
 							partition_samples = Int.(Array(group(chain, :partition)))
@@ -169,7 +182,8 @@ function run_simulation()
 
 							results[j] = any_incorrect(post_probs, hypothesis)
 							results_big[j] = post_probs
-							results_rhat[j] = any_bad_rhats
+							results_rhat[j] = retry
+							break
 						end
 					end
 				end
@@ -198,26 +212,85 @@ function load_results()
 
 	results = BitArray(undef, len_priors, length(groups), no_repeats, no_hypotheses)
 	results_big = Array{Matrix{Float64}}(undef, len_priors, length(groups), no_repeats, no_hypotheses)
+	results_rhat = Array{Float64}(undef, len_priors, length(groups), no_repeats, no_hypotheses)
 
-	ProgressMeter.@showprogress for (r, i, hypothesis) in sim_opts
+	p = ProgressMeter.Progress(length(sim_opts))
+	generate_showvalues(filename) = () -> [(:filename,filename)]
+	# ProgressMeter.@showprogress
+	for (r, i, hypothesis) in sim_opts
 		filename = make_filename(results_dir, r, i, hypothesis)
 
 		hypothesis_idx = hypothesis === :null ? 1 : 2
 		if isfile(filename)
-			@show filename
+			# @show filename
 
 			temp = JLD2.jldopen(filename)
 			results[:, i, r, hypothesis_idx] .= temp["results"]
 			results_big[:, i, r, hypothesis_idx] .= temp["results_big"]
+			results_rhat .= temp["results_rhat"]
 
 		else
-			fill!(results[:, i, r, hypothesis_idx], 0)
+			results[:, i, r, hypothesis_idx] .= false
 			results_big[:, i, r, hypothesis_idx] .= [zeros(Float64, groups[i], groups[i]) for _ in 1:len_priors]
+			results_rhat[:, i, r, hypothesis_idx] .= 0.0
 			@warn "This file does not exist: " filename
 		end
+		ProgressMeter.next!(p; showvalues = generate_showvalues(filename))
 	end
 
-	return results, results_big
+	return results, results_big, results_rhat
+
+end
+
+function load_results_as_df()
+
+	_, repeats, groups, hypotheses = get_hyperparams()
+	priors = collect(get_priors())
+	repeats = 1:maximum(repeats)
+	no_groups     = length(groups)
+	no_repeats    = length(repeats)
+	no_hypotheses = length(hypotheses)
+	no_priors    = length(priors)
+	sim_opts = Iterators.product(repeats, eachindex(groups), hypotheses)
+
+	n_sim = length(sim_opts) * no_priors
+	df = DataFrame(
+		repeats        = repeat(repeats,             inner = no_priors,                                outer = no_groups * no_hypotheses),
+		groups         = repeat(groups,              inner = no_priors * no_repeats,                   outer = no_hypotheses),
+		hypotheses     = repeat(collect(hypotheses), inner = no_priors * no_repeats * no_groups        #= outer = 1=#),
+		prior          = repeat(priors,                      no_repeats * no_groups * no_hypotheses),
+		any_incorrect  = -1 .* ones(Int, n_sim),
+		prop_incorrect = -1.0 .* ones(Float64, n_sim),
+		results_rhat   = -1.0 .* ones(Float64, n_sim)
+	)
+
+	results_dir = get_resultsdir()
+
+	p = ProgressMeter.Progress(length(sim_opts))
+	generate_showvalues(filename) = () -> [(:filename,filename)]
+	# ProgressMeter.@showprogress
+	rowRange = 1:no_priors
+	values_are_log_odds = priors .=== :Westfall
+	# (r, i, hypothesis) = first(sim_opts)
+	for (r, i, hypothesis) in sim_opts
+
+		filename = make_filename(results_dir, r, i, hypothesis)
+
+		if isfile(filename)
+
+			temp = JLD2.jldopen(filename)
+			df[rowRange, :any_incorrect]  .= temp["results"]
+			df[rowRange, :results_rhat]   .= temp["results_rhat"]
+			df[rowRange, :prop_incorrect] .= prop_incorrect.(temp["results_big"], hypothesis, values_are_log_odds)
+
+		else
+			@warn "This file does not exist: " filename
+		end
+		rowRange = rowRange .+ no_priors
+		ProgressMeter.next!(p; showvalues = generate_showvalues(filename))
+	end
+
+	return df
 
 end
 
@@ -243,7 +316,175 @@ if simulate_only()
 	exit()
 end
 
-results, results_big = load_results()
+using Plots, Plots.PlotMeasures, DataFrames, Chain, Colors, ColorSchemes
+using LaTeXStrings
+
+plot([1, 1], title=L"\mathrm{BB}\,\,\alpha=K, \beta=\binom{K}{2}")
+# import StatsPlots # for @df, but maybe unnecessary
+
+results_df = load_results_as_df()
+reduced_results_df = combine(groupby(results_df, Cols(:prior, :groups, :hypotheses)), :any_incorrect => mean, :prop_incorrect => mean)
+
+reduced_results_df = @chain results_df begin
+	groupby(Cols(:prior, :groups, :hypotheses))
+	combine(:any_incorrect => mean, :prop_incorrect => mean)
+	groupby(:hypotheses)
+end
+
+function get_labels(priors)
+	# lookup = Dict(
+	# 	:uniform              => "Uniform",
+	# 	:BetaBinomial11       => "Beta",
+	# 	:BetaBinomialk1       => "Beta-binomial α=K, β=1",
+	# 	:BetaBinomial1k       => "Beta-binomial α=1, β=K",
+	# 	:BetaBinomial1binomk2 => "Beta-binomial α=K, β=binomial(K,2)",
+	# 	:DirichletProcess0_5  => "DPP α=0.5",
+	# 	:DirichletProcess1_0  => "DPP α=1",
+	# 	:DirichletProcess2_0  => "DPP α=2",
+	# 	:DirichletProcessGP   => "DPP α=Gopalan & Berry",
+	# 	:Westfall             => "Westfall"
+	# )
+	lookup = Dict(
+		:uniform				=> "Uniform",
+		:BetaBinomial11			=> "BB α=1, β=1",
+		:BetaBinomialk1			=> "BB α=K, β=1",
+		:BetaBinomial1k			=> "BB α=1, β=K",
+		:BetaBinomial1binomk2	=> "BB α=K, β=binom(K,2)",
+		# :BetaBinomial1binomk2	=> L"\mathrm{BB}\,\,\alpha=K, \beta=\binom{K}{2}",
+		:DirichletProcess0_5	=> "DPP α=0.5",
+		:DirichletProcess1_0	=> "DPP α=1",
+		:DirichletProcess2_0	=> "DPP α=2",
+		# :DirichletProcessGP		=> "DPP α=Gopalan & Berry",
+		:DirichletProcessGP		=> "DPP α=G&B",
+		:Westfall				=> "Westfall"
+	)
+	priors_set = sort!(unique(priors))
+	return reshape([lookup[prior] for prior in priors_set], 1, length(priors_set))
+end
+
+function get_colors(priors, alpha = 0.75)
+	# colors = alphacolor.(distinguishable_colors(4, RGB(.4,.5,.6)), alpha)
+	# colors = alphacolor.(ColorSchemes.seaborn_colorblind6[1:4], alpha)
+	# lookup = Dict(
+	# 	:uniform              => colors[2],
+	# 	:BetaBinomial11       => colors[3],
+	# 	:BetaBinomialk1       => colors[3],
+	# 	:BetaBinomial1k       => colors[3],
+	# 	:BetaBinomial1binomk2 => colors[3],
+	# 	:DirichletProcess0_5  => colors[4],
+	# 	:DirichletProcess1_0  => colors[4],
+	# 	:DirichletProcess2_0  => colors[4],
+	# 	:DirichletProcessGP   => colors[4],
+	# 	:Westfall             => colors[1]
+	# )
+	# return [lookup[prior] for prior in priors]
+	colors = alphacolor.(ColorSchemes.seaborn_colorblind[1:10], alpha)
+	lookup = Dict(
+		:uniform              => colors[1],
+		:BetaBinomial11       => colors[2],
+		:BetaBinomialk1       => colors[3],
+		:BetaBinomial1k       => colors[4],
+		:BetaBinomial1binomk2 => colors[5],
+		:DirichletProcess0_5  => colors[6],
+		:DirichletProcess1_0  => colors[7],
+		:DirichletProcess2_0  => colors[8],
+		:DirichletProcessGP   => colors[9],
+		:Westfall             => colors[10]
+	)
+	return [lookup[prior] for prior in priors]
+end
+
+function get_shapes(priors)
+	lookup = Dict(
+		:uniform              => :rect,
+		:BetaBinomial11       => :utriangle,
+		:BetaBinomialk1       => :rtriangle,
+		:BetaBinomial1k       => :ltriangle,
+		:BetaBinomial1binomk2 => :dtriangle,
+		:DirichletProcess0_5  => :star4,
+		:DirichletProcess1_0  => :star5,
+		:DirichletProcess2_0  => :star6,
+		:DirichletProcessGP   => :star8,
+		:Westfall             => :circle
+	)
+	return [lookup[prior] for prior in priors]
+end
+
+function make_figure(df, y_symbol; kwargs...)
+	# colors1 = get_colors(df[!, :prior], .8)
+	colors2 = get_colors(df[!, :prior], .5)
+	shapes = get_shapes(df[!, :prior])
+	Plots.plot(
+		df[!, :groups],
+		df[!, y_symbol],
+		group = df[!, :prior],
+
+		linecolor			= colors2,
+		markercolor			= colors2,
+		markershape			= shapes,
+		# markerstrokealpha	= 0.0,
+		markerstrokewidth	= 0,
+		# markerstrokecolor	= colors1,
+		labels				= get_labels(df[!, :prior]),
+		markersize			= 7,
+		markeralpha			= 0.75,
+
+		ylim   = (0, 1.05),
+		yticks = 0:.2:1,
+		xlim   = (1, 11),
+
+		background_color_legend = nothing,
+		foreground_color_legend = nothing
+		;
+		kwargs...
+	)
+end
+
+p_null_any  = make_figure(reduced_results_df[(hypotheses=:null,)], :any_incorrect_mean;  xlabel = "",           ylabel = "P(one or more errors)", title = "Null model",  legend = :topleft);
+p_null_prop = make_figure(reduced_results_df[(hypotheses=:null,)], :prop_incorrect_mean; xlabel = "no. groups", ylabel = "Proportion of errors",  title = "",            legend = false#=:topleft=#);
+p_full_any  = make_figure(reduced_results_df[(hypotheses=:full,)], :any_incorrect_mean;  xlabel = "",           ylabel = "",                      title = "Full  model", legend = false#=:right=#);
+p_full_prop = make_figure(reduced_results_df[(hypotheses=:full,)], :prop_incorrect_mean; xlabel = "no. groups", ylabel = "",                      title = "",            legend = false#=:topright=#);
+
+joined_plot = plot(
+	p_null_any,
+	p_full_any,
+	p_null_prop,
+	p_full_prop,
+	layout = (2, 2),
+	left_margin = 4mm
+);
+savefig(plot(joined_plot, size = (900, 900)), joinpath("figures", "multipleComparisonPlot_4x4.pdf"))
+
+
+reduced_results_df_null = filter(:hypotheses => ==(:null), reduced_results_df)
+plot(
+	reduced_results_df_null[!, :groups],
+	reduced_results_df_null[!, :any_incorrect_mean],
+	group = reduced_results_df_null[!, :prior],
+
+	markershape			= shapes,
+	legend				= :topleft,
+	# labels				= labels,
+	markeralpha			= 0.75,
+
+	xlabel = "no. groups",
+	ylabel = "P(one or more errors)",
+	ylim   = (0, 1.05),
+	yticks = 0:.2:1,
+	xlim   = (1, 11),
+
+	background_color_legend = nothing,
+	foreground_color_legend = nothing
+)
+@chain reduced_results_df begin
+	plot(x = :groups)
+end
+results_df |>
+	groupby(Cols(:prior, :groups, :hypotheses))
+plot()
+
+
+results, results_big, results_rhat = load_results()
 
 
 function make_figure(x, y, ylab, labels; shapes = :auto, kwargs...)
@@ -269,12 +510,6 @@ function make_figure(x, y, ylab, labels; shapes = :auto, kwargs...)
 	)
 end
 
-using Plots, Plots.PlotMeasures
-# using PlotlyJS
-# plotlyjs()
-
-# gr()
-
 groups = 2:10
 labels = string.(collect(get_priors()))
 # labels = ["Uniform", "Beta-binomial α=1, β=1", "Beta-binomial α=K, β=1", "Beta-binomial α=1, β=K", "Beta-binomial α=1, β=binomial(K, 2)", "DPP α=0.5", "DPP α=1", "DPP α=2", "DPP α=Gopalan & Berry"]
@@ -282,6 +517,7 @@ keep = eachindex(labels)#[1, 2, 3, 5]
 labels = reshape(labels[keep], 1, length(keep))
 
 shapes = :auto#[:circle :rect :star5 :diamond :hexagon :utriangle]
+
 
 mu = dropdims(mean(view(results, :, :, :, 1), dims = 3), dims = 3)[keep, :]
 # [mean(results[i, g, :]) for i in axes(results, 1), g in axes(results, 2)] == mu

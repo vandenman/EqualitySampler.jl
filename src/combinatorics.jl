@@ -29,12 +29,12 @@ log_count_combinations(k::T, islands::U) where {T<:Integer, U<:Integer} = log_co
 function count_combinations(s::AbstractString)
 	s = filter(!isspace, s)
 	k = length(s)
-	islands = length(unique(s))
+	islands = no_distinct_groups_in_partition(s)
 	return count_combinations(k, islands)
 end
-count_combinations(x::AbstractVector) = count_combinations(length(x), length(unique(x)))
+count_combinations(x::AbstractVector) = count_combinations(length(x), no_distinct_groups_in_partition(x))
 
-log_count_combinations(x::AbstractVector) = log_count_combinations(length(x), length(unique(x)))
+log_count_combinations(x::AbstractVector) = log_count_combinations(length(x), no_distinct_groups_in_partition(x))
 
 """
 	count_distinct_models(k::Int)

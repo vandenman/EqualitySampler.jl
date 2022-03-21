@@ -105,10 +105,14 @@ end
 function log_model_probs_by_incl(d::BetaBinomialMvUrnDistribution{T}) where T
 	Distributions.logpdf.(Distributions.BetaBinomial(d.k - one(T), d.α, d.β), zero(T):d.k - one(T)) .- log_expected_equality_counts(d.k)
 end
+function log_model_probs_by_incl(d::BetaBinomialMvUrnDistribution{T}, no_parameters::Integer) where T
+	Distributions.logpdf(Distributions.BetaBinomial(d.k - one(T), d.α, d.β), no_parameters - one(T)) - log_expected_equality_counts(d.k, no_parameters)
+end
 logpdf_model_distinct(d::BetaBinomialMvUrnDistribution, x::AbstractVector{<:Integer}) = logpdf_model_distinct(d, count_parameters(x))
 function logpdf_model_distinct(d::BetaBinomialMvUrnDistribution, no_parameters::Integer)
 	in_eqsupport(d, no_parameters) || return -Inf
-	log_model_probs_by_incl(d)[no_parameters]
+	# log_model_probs_by_incl(d)[no_parameters]
+	log_model_probs_by_incl(d, no_parameters)
 end
 
 function logpdf_incl(d::BetaBinomialMvUrnDistribution, no_parameters::Integer)
@@ -222,21 +226,38 @@ function logpdf_model_distinct(d::RandomProcessMvUrnDistribution{W, T}, no_param
 	return res / sum(counts)
 end
 
-function logpdf_model_distinct(d::RandomProcessMvUrnDistribution{RPM, T}, urns::AbstractVector{<:Integer})  where {RPM<:RandomMeasures.DirichletProcess, T<:Integer}
+# function logpdf_model_distinct(d::RandomProcessMvUrnDistribution{RPM, T}, urns::AbstractVector{<:Integer})  where {RPM<:RandomMeasures.DirichletProcess, T<:Integer}
+
+# 	U = T === BigInt ? BigFloat : Float64
+# 	in_eqsupport(d, urns) || return U(-Inf)
+
+# 	n = length(d)
+# 	M = d.rpm.α
+# 	cc = StatsBase.countmap(urns)
+
+# 	return length(cc) * log(M) +
+# 		logabsgamma(M) -
+# 		logabsgamma(M + n) +
+# 		sum(logabsgamma, values(cc))
+
+# end
+
+function logpdf_model_distinct(d::RandomProcessMvUrnDistribution{RPM, T}, partition::AbstractVector{<:Integer})  where {RPM<:Turing.RandomMeasures.DirichletProcess, T<:Integer}
 
 	U = T === BigInt ? BigFloat : Float64
-	in_eqsupport(d, urns) || return U(-Inf)
+	in_eqsupport(d, partition) || return U(-Inf)
 
 	n = length(d)
 	M = d.rpm.α
-	cc = StatsBase.countmap(urns)
+	cc = fast_countmap_partition(partition)
 
 	return length(cc) * log(M) +
-		logabsgamma(M) -
-		logabsgamma(M + n) +
-		sum(logabsgamma, values(cc))
+		EqualitySampler.logabsgamma(M) -
+		EqualitySampler.logabsgamma(M + n) +
+		sum(EqualitySampler.logabsgamma, cc)
 
 end
+
 
 function logpdf_incl(d::RandomProcessMvUrnDistribution{RPM, T}, no_parameters::Integer) where {RPM<:RandomMeasures.DirichletProcess, T<:Integer}
 

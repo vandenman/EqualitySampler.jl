@@ -67,7 +67,7 @@ end
 compute_incl_probs(chn::MCMCChains.Chains; add_missing_inclusions::Bool = true) = compute_incl_probs(get_eq_samples(chn); add_missing_inclusions=add_missing_inclusions)
 function compute_incl_probs(partition_samples::AbstractMatrix; add_missing_inclusions::Bool = true)
 	k = size(partition_samples)[2]
-	inclusions_per_model = vec(mapslices(x->k - length(Set(x)), partition_samples, dims = 2))
+	inclusions_per_model = vec(mapslices(x->k - no_distinct_groups_in_partition(x)), partition_samples, dims = 2)
 	count = countmap(inclusions_per_model)
 	if add_missing_inclusions && length(count) != k
 		for i in 1:k

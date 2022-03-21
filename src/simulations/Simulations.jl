@@ -7,7 +7,8 @@ using ..EqualitySampler
 # stdlib
 import
 	LinearAlgebra,
-	Logging
+	Logging,
+	Random
 
 import
 	Statistics: mean, var
@@ -57,14 +58,3 @@ include("westfall_functions.jl")
 # include("variance_functions.jl") # <- TODO
 
 end
-
-# module Atest
-# 	export f
-# 	f(x) = x+1
-# 	module Btest
-# 		# import ..Atest
-# 		# g(x) = Atest.f(x)
-# 		using ..Atest
-# 		g(x) = f(x)
-# 	end
-# end

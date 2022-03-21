@@ -72,7 +72,7 @@ function get_conditional_counts(n::Int, known::AbstractVector{T} = [1], include_
 	# NOTE: profiling shows that reduce_model is by far the most expensive function here
 
 	# known = reduce_model(known) # TODO: double check that this is unnecessary!
-	refinement = length(unique(known))
+	# refinement = length(unique(known))
 	n_known = length(known)
 
 	res = zeros(Int, n_known + (include_new ? 1 : 0))
@@ -89,7 +89,7 @@ end
 
 function get_idx_for_conditional_counts(known)
 
-	idx = Vector{Int}(undef, length(Set(known)))
+	idx = Vector{Int}(undef, no_distinct_groups_in_partition(known))
 	s = Set{Int}()
 	count = 1
 	for i in eachindex(known)
@@ -103,10 +103,10 @@ function get_idx_for_conditional_counts(known)
 
 end
 
-count_equalities(urns::AbstractVector{T}) where T <: Integer = length(urns) - length(Set(urns))
-count_equalities(urns::AbstractString) = length(urns) - length(Set(urns))
+count_equalities(urns::AbstractVector{T}) where T <: Integer = length(urns) - no_distinct_groups_in_partition(urns)
+count_equalities(urns::AbstractString) = length(urns) - no_distinct_groups_in_partition(urns)
 
-count_parameters(urns::U) where U <: Union{AbstractVector{<:Integer}, AbstractString} = length(Set(urns))
+count_parameters(urns::U) where U <: Union{AbstractVector{<:Integer}, AbstractString} = no_distinct_groups_in_partition(urns)
 
 #region AbstractConditionalUrnDistribution
 abstract type AbstractConditionalUrnDistribution{T} <: Distributions.DiscreteUnivariateDistribution where T <: Integer end
@@ -328,6 +328,7 @@ function expected_inclusion_probabilities(k::Integer)
 	return counts ./ sum(counts)
 end
 log_expected_equality_counts(k::Integer) = logstirlings2.(k, 1:k)
+log_expected_equality_counts(k::Integer, j::Integer) = logstirlings2(k, j)
 
 
 const UniformUrnDists = Union{UniformConditionalUrnDistribution, UniformMvUrnDistribution}
