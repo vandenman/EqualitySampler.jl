@@ -321,7 +321,7 @@ using Plots, Plots.PlotMeasures, DataFrames, Chain, Colors, ColorSchemes, Printf
 
 results_df = load_results_as_df()
 
-priors_to_remove = Set((:BetaBinomialk1, :DirichletProcessGP, :DirichletProcess2_0))
+priors_to_remove = Set((:BetaBinomialk1, #=:DirichletProcessGP,=# :DirichletProcess2_0))
 reduced_results_df = @chain results_df begin
 	filter(:prior => x -> x ∉ priors_to_remove, _)
 	groupby(Cols(:prior, :groups, :hypotheses))
@@ -489,8 +489,8 @@ savefig(plot(joined_plot_lambda, size = (900, 900)), joinpath("figures", "multip
 
 joined_plot_lambda = plot(
 	p_null_prop2,
-	plot(p_full_prop2, xlab = "No. groups"),
-	plot(p_lambda_0_50, xlab = ""),
+	plot(p_full_prop2, xlab = "Number of groups"),
+	plot(p_lambda_0_50, xlab = "", title = "Null model + Full model"),
 	layout = (1, 3),
 	left_margin = 7mm,
 	bottom_margin = 7mm

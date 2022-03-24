@@ -104,9 +104,10 @@ function get_idx_for_conditional_counts(known)
 end
 
 count_equalities(urns::AbstractVector{T}) where T <: Integer = length(urns) - no_distinct_groups_in_partition(urns)
-count_equalities(urns::AbstractString) = length(urns) - no_distinct_groups_in_partition(urns)
+count_equalities(urns::AbstractString) = length(urns) - length(Set(urns))
 
-count_parameters(urns::U) where U <: Union{AbstractVector{<:Integer}, AbstractString} = no_distinct_groups_in_partition(urns)
+count_parameters(urns::AbstractString) = length(Set(urns))
+count_parameters(urns::AbstractVector{<:Integer}) = no_distinct_groups_in_partition(urns)
 
 #region AbstractConditionalUrnDistribution
 abstract type AbstractConditionalUrnDistribution{T} <: Distributions.DiscreteUnivariateDistribution where T <: Integer end
