@@ -321,13 +321,16 @@ using Plots, Plots.PlotMeasures, DataFrames, Chain, Colors, ColorSchemes, Printf
 
 results_df = load_results_as_df()
 
+priors_to_remove = Set((:BetaBinomialk1, :DirichletProcessGP, :DirichletProcess2_0))
 reduced_results_df = @chain results_df begin
+	filter(:prior => x -> x ∉ priors_to_remove, _)
 	groupby(Cols(:prior, :groups, :hypotheses))
 	combine(:any_incorrect => mean, :prop_incorrect => mean)
 	groupby(:hypotheses)
 end
 
 lambda_results_df = @chain results_df begin
+	filter(:prior => x -> x ∉ priors_to_remove, _)
 	unstack([:repeats, :groups, :prior], :hypotheses, :prop_incorrect)
 	transform(
 		[:null, :full] => ((n, f) -> 0.50 * n + 0.50 * f) => :lambda_0_50,
@@ -483,6 +486,17 @@ joined_plot_lambda = plot(
 	left_margin = 4mm
 );
 savefig(plot(joined_plot_lambda, size = (900, 900)), joinpath("figures", "multipleComparisonPlot_lambda_4x4.pdf"))
+
+joined_plot_lambda = plot(
+	p_null_prop2,
+	plot(p_full_prop2, xlab = "No. groups"),
+	plot(p_lambda_0_50, xlab = ""),
+	layout = (1, 3),
+	left_margin = 7mm,
+	bottom_margin = 7mm
+);
+savefig(plot(joined_plot_lambda, size = (3*450, 450)), joinpath("figures", "multipleComparisonPlot_lambda_4x4_2.pdf"))
+
 
 reduced_results_df_null = filter(:hypotheses => ==(:null), reduced_results_df)
 plot(
