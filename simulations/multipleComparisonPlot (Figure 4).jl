@@ -89,7 +89,8 @@ make_filename(results_dir, r, i, hypothesis) = joinpath(results_dir, "repeat_$(r
 
 function get_hyperparams()
 	n_obs_per_group = 100
-	repeats = 1:70
+	# repeats = 1:70
+	repeats = 1:200
 	groups = 2:10
 	hypothesis=(:null, :full)
 	return n_obs_per_group, repeats, groups, hypothesis
@@ -316,19 +317,24 @@ if simulate_only()
 	exit()
 end
 
-using Plots, Plots.PlotMeasures, DataFrames, Chain, Colors, ColorSchemes
-using LaTeXStrings
-
-plot([1, 1], title=L"\mathrm{BB}\,\,\alpha=K, \beta=\binom{K}{2}")
-# import StatsPlots # for @df, but maybe unnecessary
+using Plots, Plots.PlotMeasures, DataFrames, Chain, Colors, ColorSchemes, Printf
 
 results_df = load_results_as_df()
-reduced_results_df = combine(groupby(results_df, Cols(:prior, :groups, :hypotheses)), :any_incorrect => mean, :prop_incorrect => mean)
 
 reduced_results_df = @chain results_df begin
 	groupby(Cols(:prior, :groups, :hypotheses))
 	combine(:any_incorrect => mean, :prop_incorrect => mean)
 	groupby(:hypotheses)
+end
+
+lambda_results_df = @chain results_df begin
+	unstack([:repeats, :groups, :prior], :hypotheses, :prop_incorrect)
+	transform(
+		[:null, :full] => ((n, f) -> 0.50 * n + 0.50 * f) => :lambda_0_50,
+		[:null, :full] => ((n, f) -> 0.95 * n + 0.05 * f) => :lambda_0_95
+	)
+	groupby(Cols(:prior, :groups))
+	combine(:lambda_0_50 => mean, :lambda_0_95 => mean)
 end
 
 function get_labels(priors)
@@ -349,7 +355,7 @@ function get_labels(priors)
 		:BetaBinomial11			=> "BB α=1, β=1",
 		:BetaBinomialk1			=> "BB α=K, β=1",
 		:BetaBinomial1k			=> "BB α=1, β=K",
-		:BetaBinomial1binomk2	=> "BB α=K, β=binom(K,2)",
+		:BetaBinomial1binomk2	=> "BB α=1, β=binom(K,2)",
 		# :BetaBinomial1binomk2	=> L"\mathrm{BB}\,\,\alpha=K, \beta=\binom{K}{2}",
 		:DirichletProcess0_5	=> "DPP α=0.5",
 		:DirichletProcess1_0	=> "DPP α=1",
@@ -414,8 +420,15 @@ function make_figure(df, y_symbol; kwargs...)
 	# colors1 = get_colors(df[!, :prior], .8)
 	colors2 = get_colors(df[!, :prior], .5)
 	shapes = get_shapes(df[!, :prior])
+	offset_size = 0.1
+	offset_lookup = Dict(
+		((:BetaBinomial11, :BetaBinomialk1, :BetaBinomial1k, :BetaBinomial1binomk2) .=> -offset_size)...,
+		((:DirichletProcess0_5, :DirichletProcess1_0, :DirichletProcess2_0, :DirichletProcessGP) .=> offset_size)...,
+		((:uniform, :Westfall) .=> 0.0)...
+	)
+	offset = [offset_lookup[prior] for prior in df[!, :prior]]
 	Plots.plot(
-		df[!, :groups],
+		df[!, :groups] .+ offset,
 		df[!, y_symbol],
 		group = df[!, :prior],
 
@@ -455,6 +468,21 @@ joined_plot = plot(
 );
 savefig(plot(joined_plot, size = (900, 900)), joinpath("figures", "multipleComparisonPlot_4x4.pdf"))
 
+make_title(λ) = @sprintf "%.2f * (errors | null model) +\n%.2f * (errors | full model)    " λ 1 - λ
+p_null_prop2  = make_figure(reduced_results_df[(hypotheses=:null,)], :prop_incorrect_mean; xlabel = "",           ylabel = "Proportion of errors",            title = "Null model",     legend = :topleft);
+p_full_prop2  = make_figure(reduced_results_df[(hypotheses=:full,)], :prop_incorrect_mean; xlabel = "",           ylabel = "",                                title = "Full model",     legend = false#=:topright=#);
+p_lambda_0_95 = make_figure(lambda_results_df,                       :lambda_0_95_mean;    xlabel = "No. groups", ylabel = "Weighted proportion of errors",   title = make_title(0.95), legend = false#=:right=#);
+p_lambda_0_50 = make_figure(lambda_results_df,                       :lambda_0_50_mean;    xlabel = "No. groups", ylabel = "",                                title = make_title(0.50), legend = false#=:right=#);
+
+joined_plot_lambda = plot(
+	p_null_prop2,
+	p_full_prop2,
+	p_lambda_0_95,
+	p_lambda_0_50,
+	layout = (2, 2),
+	left_margin = 4mm
+);
+savefig(plot(joined_plot_lambda, size = (900, 900)), joinpath("figures", "multipleComparisonPlot_lambda_4x4.pdf"))
 
 reduced_results_df_null = filter(:hypotheses => ==(:null), reduced_results_df)
 plot(
