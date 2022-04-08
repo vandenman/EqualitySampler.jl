@@ -18,6 +18,7 @@ Distributions.logpdf(::AbstractMvUrnDistribution, ::AbstractVector{T}) where T <
 Distributions.pdf(::AbstractMvUrnDistribution, ::AbstractVector{T}) where T <: Real = zero(T)
 Distributions.pdf(d::AbstractMvUrnDistribution, x::AbstractVector{<:Integer}) = exp(Distributions.logpdf(d, x))
 
+# TODO: perhaps this should just be Int? Or create some other way to specify the type when doing rand?
 Distributions.eltype(::AbstractMvUrnDistribution{T}) where T = T
 
 in_eqsupport(d::AbstractMvUrnDistribution, no_parameters::T) where T<:Integer = one(T) <= no_parameters <= length(d)
@@ -28,20 +29,20 @@ function in_eqsupport(d::AbstractMvUrnDistribution, x::AbstractVector{T}) where 
 	end
 	return true
 end
-function Distributions._rand!(rng::Random.AbstractRNG, d::AbstractMvUrnDistribution, x::AbstractArray{T,2} where T)
+function Distributions._rand!(rng::Random.AbstractRNG, d::AbstractMvUrnDistribution, x::AbstractArray{T,2}) where T
 	for i in axes(x, 2)
 		Distributions._rand!(rng, d, view(x, :, i))
 	end
 	x
 end
 
-function Distributions._rand!(rng::Random.AbstractRNG, d::AbstractMvUrnDistribution, x::AbstractVector)
+function Distributions._rand!(rng::Random.AbstractRNG, d::AbstractMvUrnDistribution, x::AbstractVector{T}) where {T<:Integer}
 
 	probvec = zeros(Float64, length(x))
 
 	for i in eachindex(x)
 
-		_pdf_helper!(probvec, d, i, x)
+		_pdf_helper!(probvec, d, T(i), x)
 		x[i] = rand(rng, Distributions.Categorical(probvec))
 
 	end
@@ -122,6 +123,45 @@ end
 
 #endregion
 
+#region CustomInclusionMvUrnDistribution
+"""
+CustomInclusionMvUrnDistribution is similar to the BetaBinomialMvUrnDistribution in that the model probabilities are completely determined by the size of the partition.
+Whereas the BetaBinomialMvUrnDistribution uses a BetaBinomial distribution to obtain the probabilities, the CustomInclusionMvUrnDistribution can be used to specify any vector of probabilities.
+This distribution is particularly useful to sample uniformly from partitions of a given size.
+For example:
+```julia
+rand(CustomInclusionMvUrnDistribution(4, ntuple(i->log(i==1), Val(4)))) # always all equal (1 parameter)
+rand(CustomInclusionMvUrnDistribution(4, ntuple(i->log(i==3), Val(4)))) # always 3 parameters
+rand(CustomInclusionMvUrnDistribution(4, ntuple(i->log(i==4), Val(4)))) # always completely distinct (4 parameters)
+```
+The function does not check if sum(exp, logpdf) ≈ 1.0, that is the callers responsibility.
+"""
+struct CustomInclusionMvUrnDistribution{T <: Integer, N} <: AbstractMvUrnDistribution{T}
+	k::T
+	logpdf::NTuple{N, Float64}
+	function CustomInclusionMvUrnDistribution(k::T, logpdf::NTuple{N, Float64}) where {T<:Integer, N}
+		k != length(logpdf) && throw(DomainError(logpdf, "Length musth match k"))
+		new{T, N}(k, logpdf)
+	end
+end
+CustomInclusionMvUrnDistribution(k::Integer, logpdf::AbstractVector) = CustomInclusionMvUrnDistribution(k, Tuple(logpdf))
+
+log_model_probs_by_incl(d::CustomInclusionMvUrnDistribution) = d.logpdf .- log_expected_equality_counts(d.k)
+log_model_probs_by_incl(d::CustomInclusionMvUrnDistribution, no_parameters::Integer) = d.logpdf[no_parameters] - log_expected_equality_counts(d.k)
+logpdf_model_distinct(d::CustomInclusionMvUrnDistribution, x::AbstractVector{<:Integer}) = logpdf_model_distinct(d, count_parameters(x))
+function logpdf_model_distinct(d::CustomInclusionMvUrnDistribution, no_parameters::Integer)
+	in_eqsupport(d, no_parameters) || return -Inf
+	log_model_probs_by_incl(d, no_parameters)
+end
+
+function logpdf_incl(d::CustomInclusionMvUrnDistribution, no_parameters::Integer)
+	in_eqsupport(d, no_parameters) || return -Inf
+	d.logpdf[no_parameters - 1]
+end
+
+
+#endregion
+
 struct RandomProcessMvUrnDistribution{RPM <: Turing.RandomMeasures.AbstractRandomProbabilityMeasure, T <: Integer} <: AbstractMvUrnDistribution{T}
 	k::T
 	rpm::RPM
@@ -143,7 +183,7 @@ DirichletProcessMvUrnDistribution(k::Integer, α::Real) = DirichletProcessMvUrnD
 # whats the best way to do this ↓ ?
 # const DirichletProcessMvUrnDistributionType{T} = RandomProcessMvUrnDistribution{Turing.RandomMeasures.DirichletProcess{Float64}, T}
 
-function Distributions._rand!(rng::Random.AbstractRNG, d::RandomProcessMvUrnDistribution, x::AbstractVector)
+function Distributions._rand!(rng::Random.AbstractRNG, d::RandomProcessMvUrnDistribution, x::AbstractVector{T}) where T<:Integer
 	_sample_process!(rng, rpm(d), x)
 end
 

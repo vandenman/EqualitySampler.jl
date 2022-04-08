@@ -29,6 +29,7 @@ export
 	AbstractConditionalUrnDistribution,
 	UniformConditionalUrnDistribution,
 	BetaBinomialConditionalUrnDistribution,
+	CustomInclusionMvUrnDistribution,
 	stirlings2,
 	stirlings2r,
 	logstirlings2,

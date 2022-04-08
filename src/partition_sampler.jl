@@ -11,7 +11,7 @@ end
 Base.rand(::Random.AbstractRNG, d::PartitionSampler) = d.nextValues
 
 function (o::PartitionSampler)(c)
-	o.nextValues = sample_next_values(c, o)
+	o.nextValues .= sample_next_values(c, o)
 	return o
 end
 
@@ -23,23 +23,14 @@ function sample_next_values(c, o)
 	cache_idx = 0
 	cache_value = -Inf # defined here to extend the scope beyond the if statement and for loop
 
-	#=
-		TODO: rather than enumerating all values, this could also enumerate the distinct models
-		for example, given partition = [1, 2, 1, 1, 1] and j = 2 it makes no sense for to enumerate i = 1:5
-		instead we can recognize that [1, 2, 1, 1, 1] = [1, 3, 1, 1, 1] = ... = [1, 5, 1, 1, 1]
-		this implies we would do
-		probvec[1] = logpdf(..., partition = [1, 1, 1, 1, 1])    (i = 1)
-		probvec[2:5] .= logpdf(..., partition = [1, 2, 1, 1, 1]) (i = 2)
-		which should save a bunch of likelihood evaluations whenever the current partition is far a model that implies everything is distinct
-	=#
-
 	new_label_log_posterior = 0.0
 	new_label_log_posterior_computed = false
 	present_labels = fast_countmap_partition_incl_zero(nextValues)
 
-	# ~O(k^2) (double look over k) with at worst k * (k-1) likelihood evaluations if all labels are distinct and at best k * 2 likelihood evaluations
-	for j in eachindex(probvec)
+	# O(k^2) with at worst k*(k-1) likelihood evaluations if all labels are distinct and at best 2k likelihood evaluations
+	@inbounds for j in eachindex(probvec)
 
+		oldValue = nextValues[j]
 		for i in eachindex(probvec)
 
 			nextValues[j] = i
@@ -73,10 +64,16 @@ function sample_next_values(c, o)
 		end
 
 		if Distributions.isprobvec(probvec_normalized)
-			# TODO: consider disabling the isprobvec check with check_args = false?
-			present_labels[nextValues[j]] -= 1
-			nextValues[j] = rand(Distributions.Categorical(probvec_normalized))
-			present_labels[nextValues[j]] += 1
+			# decrement the occurence of the old value
+			@inbounds present_labels[oldValue] -= 1
+			@inbounds nextValues[j] = rand(Distributions.Categorical(probvec_normalized))
+			# increment the occurence of the newly sampled value
+			@inbounds present_labels[nextValues[j]] += 1
+
+			if !all(>=(0), present_labels) || sum(present_labels) != length(present_labels)
+				@show present_labels
+				error("This should be impossible!")
+			end
 
 		elseif all(isinf, probvec) # not possible to recover from this
 			return nextValues
@@ -92,7 +89,7 @@ function sample_next_values(c, o)
 	end
 	return nextValues
 
-	# ~O(k^2) (double look over k) with k * (k-1) likelihood evaluations
+	# O(k^2) with k * (k-1) likelihood evaluations
 	# for j in eachindex(probvec)
 
 	# 	# originalValue = nextValues[j]

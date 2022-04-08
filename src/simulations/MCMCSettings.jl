@@ -47,5 +47,13 @@ function MCMCSettings(;iterations::Integer=10_000, burnin::Integer=1_000, chains
 end
 
 function sample_model(model, spl, settings::MCMCSettings{T, U}, rng = Random.GLOBAL_RNG; kwargs...) where {T, U<:AbstractMCMC.AbstractMCMCEnsemble}
-	AbstractMCMC.sample(rng, model, spl, U(), settings.iterations, settings.chains; discard_initial = settings.burnin, thinning = settings.thinning)
+	# @show "sample_model" kwargs, settings, spl
+	AbstractMCMC.sample(rng, model, spl, settings.iterations; kwargs)
+	# AbstractMCMC.sample(rng, model, spl, U(), settings.iterations, settings.chains; discard_initial = settings.burnin, thinning = settings.thinning, kwargs)
 end
+
+# function sample_model(model, spl::W, settings::MCMCSettings{T, U}, rng = Random.GLOBAL_RNG; kwargs...) where {T, U<:AbstractMCMC.AbstractMCMCEnsemble, W <:Turing.SMC}
+#	# see https://github.com/TuringLang/Turing.jl/issues/1811, perhaps this is just meaningless though
+# 	chain = AbstractMCMC.sample(rng, model, spl, U(), settings.iterations + settings.burnin - 1, settings.chains; discard_initial = 1, thinning = settings.thinning)
+# 	return chain[settings.burnin+1:end, :, :]
+# end

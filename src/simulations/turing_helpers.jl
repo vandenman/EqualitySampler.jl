@@ -60,14 +60,37 @@ compute_post_prob_eq(chn::MCMCChains.Chains) = compute_post_prob_eq(get_eq_sampl
 function compute_post_prob_eq(partition_samples::AbstractMatrix)
 	n_samps, n_groups = size(partition_samples)
 	probs = zeros(Float64, n_groups, n_groups)
-	for row in eachrow(partition_samples)
-		for j in eachindex(row)
-			idx = j .+ findall(==(row[j]), row[j+1:end])
-			probs[idx, j] .+= 1.0
+	@inbounds for k in axes(partition_samples, 1)
+		for j in 1:n_groups-1
+			for i in j+1:n_groups
+				if partition_samples[k, i] == partition_samples[k, j]
+					probs[i, j] += 1.0
+				end
+			end
+			# idx = j .+ findall(==(row[j]), row[j+1:end])
+			# probs[idx, j] .+= 1.0
 		end
 	end
 	return probs ./ n_samps
 end
+
+function compute_post_prob_eq(partition_samples::AbstractArray{T, 3}) where T
+	n_samps, n_groups, n_chains = size(partition_samples)
+	probs = zeros(Float64, n_groups, n_groups)
+	@inbounds for l in axes(partition_samples, 3)
+		for k in axes(partition_samples, 1)
+			for j in 1:n_groups-1
+				for i in j+1:n_groups
+					if partition_samples[k, i, l] == partition_samples[k, j, l]
+						probs[i, j] += 1.0
+					end
+				end
+			end
+		end
+	end
+	return probs ./ (n_samps * n_chains)
+end
+
 
 """
 	compute how often each model is visited

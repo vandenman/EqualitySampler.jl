@@ -269,7 +269,7 @@ _pdf(d::BetaBinomialConditionalUrnDistribution) = _pdf_helper(d, d.index, d.urns
 
 log_model_probs_by_incl(d::BetaBinomialConditionalUrnDistribution) = d._log_model_probs_by_incl
 function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, d::T, index::U, complete_urns::AbstractVector{U}) where
-	{U<:Integer, T<:Union{BetaBinomialConditionalUrnDistribution{U}, BetaBinomialMvUrnDistribution{U}}}
+	{U<:Integer, T<:Union{BetaBinomialConditionalUrnDistribution{U}, BetaBinomialMvUrnDistribution{U}, CustomInclusionMvUrnDistribution}}
 
 	k = length(result)
 	if isone(index)

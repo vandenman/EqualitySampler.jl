@@ -181,7 +181,7 @@ function build_get_equalizer_matrix_from_partition_with_cache()
 	end
 end
 
-function get_starting_values(df)
+function get_starting_values(df, full_model_partition=true)
 
 	coefs, cis, fit = fit_lm(df)
 
@@ -194,14 +194,22 @@ function get_starting_values(df)
 	Q = getQ_Rouder(n_groups)
 
 	y = df.y
-	partition_start	= map(x->findfirst(isone, x), eachcol(adj_mat))::Vector{Int}
+	if full_model_partition
+		partition_start	= collect(axes(Q, 1))
+	else
+		partition_start	= map(x->findfirst(isone, x), eachcol(adj_mat))::Vector{Int}
+	end
 	n_partitions	= EqualitySampler.no_distinct_groups_in_partition(partition_start)
 	σ_start			= var(GLM.residuals(fit))
 	μ_start			= mean(y)
 	θ_c_start		= isone(n_partitions) ? zeros(n_groups) : average_equality_constraints(coefs, partition_start)
 	# this is faster than Q \ θ_c_start which uses a qr decomposition
 	θ_start_0		= LinearAlgebra.pinv(Q) * θ_c_start
-	g_start			= isone(n_partitions) ? 1.0 : var(θ_start_0)
+	if full_model_partition
+		g_start = 1.0
+	else
+		g_start = isone(n_partitions) ? 1.0 : var(θ_start_0; corrected = false)
+	end
 	θ_start			= vec(θ_start_0 ./ sqrt.(g_start))
 
 	# @assert Q * (sqrt(g_start) .* θ_start) ≈ θ_c_start
@@ -245,13 +253,7 @@ end
 function get_init_params(partition::Vector{Int}, θ_r::Vector{Float64}, μ = 0.0, σ² = 1.0, g = 1.0)
 	#  get_init_params(model, ...) also works and can be used to verify the order,
 	# but that does a lot of type unstabled and complicated things that essentially boil down to this
-	return vcat(
-		partition,
-		μ,
-		σ²,
-		g,
-		θ_r
-	)
+	return vcat(partition, μ, σ², g, θ_r)
 end
 
 DynamicPPL.@model function one_way_anova_mv_ss_submodel(obs_mean, obs_var, obs_n, Q, partition = nothing, ::Type{T} = Float64) where {T}
@@ -265,6 +267,7 @@ DynamicPPL.@model function one_way_anova_mv_ss_submodel(obs_mean, obs_var, obs_n
 	# The setup for θ follows Rouder et al., 2012, p. 363
 	g   ~ Distributions.InverseGamma(0.5, 0.5; check_args = false)
 
+	# θ_r ~ Distributions.MvNormal(LinearAlgebra.Diagonal(FillArrays.Fill(1.0, n_groups - 1)))
 	θ_r ~ Distributions.MvNormal(LinearAlgebra.Diagonal(FillArrays.Fill(1.0, n_groups - 1)))
 
 	# ensure the sum to zero constraint
@@ -275,7 +278,8 @@ DynamicPPL.@model function one_way_anova_mv_ss_submodel(obs_mean, obs_var, obs_n
 
 	# definition from Rouder et. al., (2012) eq 6.
 	for i in eachindex(obs_mean)
-		Turing.@addlogprob! EqualitySampler._univariate_normal_likelihood(obs_mean[i], obs_var[i], obs_n[i], μ_grand + sqrt(σ²) * θ_cs[i], σ²)
+		# Turing.@addlogprob! EqualitySampler._univariate_normal_likelihood(obs_mean[i], obs_var[i], obs_n[i], μ_grand + sqrt(σ²) * θ_cs[i], σ²)
+		obs_mean[i] ~ EqualitySampler.NormalSuffStat(obs_var[i], μ_grand + sqrt(σ²) * θ_cs[i], σ², obs_n[i])
 	end
 
 	return θ_cs
@@ -401,7 +405,7 @@ function fit_full_model(
 	# mcmc_sampler = isnothing(spl) ? get_sampler(model, spl) : spl
 	mcmc_sampler = get_mcmc_sampler_anova(spl, model)
 
-	chain = sample_model(model, mcmc_sampler, mcmc_settings, rng)::MCMCChains.Chains
+	chain = sample_model(model, mcmc_sampler, mcmc_settings, rng; init_params = init_params)::MCMCChains.Chains
 	return combine_chain_with_generated_quantities(model, chain, "θ_cs")
 
 end
@@ -440,7 +444,7 @@ function fit_eq_model(
 	# 	mcmc_sampler = spl
 	# end
 
-	chain = sample_model(model, mcmc_sampler, mcmc_settings, rng)::MCMCChains.Chains
+	chain = sample_model(model, mcmc_sampler, mcmc_settings, rng; init_params = init_params)::MCMCChains.Chains
 
 	if eq_model === :matrix_memoized
 		@show length(memoized_get_equality_matrix._cache) first(memoized_get_equality_matrix._cache)

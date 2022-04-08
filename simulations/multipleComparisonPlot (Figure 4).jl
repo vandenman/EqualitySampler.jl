@@ -12,6 +12,27 @@
 using EqualitySampler, EqualitySampler.Simulations, MCMCChains, Random
 import ProgressMeter, JLD2, Turing, Logging
 
+include("simulation_helpers.jl")
+
+# could also be a const global
+simulate_only() = length(ARGS) > 0 && first(ARGS) === "simulate_only"
+
+if simulate_only()
+
+	n_obs_per_group, repeats, groups, hypotheses, offset, priors = get_hyperparams_small()
+	results_dir = "simulations/small_simulation_runs"
+	@info "Starting simulation" simulate_only = simulate_only() pwd = pwd() results_dir = results_dir threads = Threads.nthreads()
+
+	priors = (:uniform,)
+	run_simulation(
+		n_obs_per_group, 1:10, groups, hypotheses, offset, priors,
+		results_dir = results_dir
+	)
+	exit()
+else
+	@info "Not running simulation" simulate_only = simulate_only()
+end
+
 #region simulation functions
 function instantiate_prior(symbol::Symbol, k::Integer)
 	# this works nicely with jld2 but it's not type stable
@@ -112,10 +133,12 @@ function run_simulation()
 	priors = get_priors()
 
 	nsim = length(sim_opts)
-	println("starting simulation of $(nsim) runs with $(length(priors)) priors and $(Threads.nthreads()) threads")
 
 	mcmc_settings = MCMCSettings(;iterations = 5_000, burnin = 1_000, chains = 1)
 	# mcmc_settings = MCMCSettings(;iterations = 200, burnin = 100, chains = 1)
+
+	println("starting simulation of $(nsim) runs with $(length(priors)) priors and $(Threads.nthreads()) threads")
+	@info "Starting simulation"	pwd = pwd() results_dir = results_dir threads = Threads.nthreads() mcmc_settings = mcmc_settings no_runs = nsim, sim_opts = sim_opts
 
 	p = ProgressMeter.Progress(nsim)
 	Turing.setprogress!(false)
@@ -218,6 +241,7 @@ function load_results()
 	p = ProgressMeter.Progress(length(sim_opts))
 	generate_showvalues(filename) = () -> [(:filename,filename)]
 	# ProgressMeter.@showprogress
+	# (r, i, hypothesis) = first(sim_opts)
 	for (r, i, hypothesis) in sim_opts
 		filename = make_filename(results_dir, r, i, hypothesis)
 
@@ -284,6 +308,8 @@ function load_results_as_df()
 			df[rowRange, :results_rhat]   .= temp["results_rhat"]
 			df[rowRange, :prop_incorrect] .= prop_incorrect.(temp["results_big"], hypothesis, values_are_log_odds)
 
+			prop_incorrect.(temp["results_big"], Ref(ones(Int, i+1)), values_are_log_odds)
+
 		else
 			@warn "This file does not exist: " filename
 		end
@@ -299,39 +325,23 @@ end
 
 #endregion
 
-# could also be a const global
-simulate_only() = length(ARGS) > 0 && first(ARGS) === "simulate_only"
-if (simulate_only())
-	println("""
-		simulate_only() = true
-		get_resultsdir() = $(get_resultsdir())
-		pwd() = $(pwd())
-		threads = $(Threads.nthreads())
-	""")
-else
-	println("simulate_only() = false")
-end
-
-if simulate_only()
-	run_simulation()
-	exit()
-end
-
 using Plots, Plots.PlotMeasures, DataFrames, Chain, Colors, ColorSchemes, Printf
 
-results_df = load_results_as_df()
+results_df = read_results("simulations/small_simulation_runs")
+
+# results_df = load_results_as_df()
 
 priors_to_remove = Set((:BetaBinomialk1, #=:DirichletProcessGP,=# :DirichletProcess2_0))
 reduced_results_df = @chain results_df begin
 	filter(:prior => x -> x ∉ priors_to_remove, _)
-	groupby(Cols(:prior, :groups, :hypotheses))
+	groupby(Cols(:prior, :groups, :hypothesis))
 	combine(:any_incorrect => mean, :prop_incorrect => mean)
-	groupby(:hypotheses)
+	groupby(:hypothesis)
 end
 
 lambda_results_df = @chain results_df begin
 	filter(:prior => x -> x ∉ priors_to_remove, _)
-	unstack([:repeats, :groups, :prior], :hypotheses, :prop_incorrect)
+	unstack([:repeat, :groups, :prior], :hypothesis, :prop_incorrect)
 	transform(
 		[:null, :full] => ((n, f) -> 0.50 * n + 0.50 * f) => :lambda_0_50,
 		[:null, :full] => ((n, f) -> 0.95 * n + 0.05 * f) => :lambda_0_95
@@ -456,10 +466,10 @@ function make_figure(df, y_symbol; kwargs...)
 	)
 end
 
-p_null_any  = make_figure(reduced_results_df[(hypotheses=:null,)], :any_incorrect_mean;  xlabel = "",           ylabel = "P(one or more errors)", title = "Null model",  legend = :topleft);
-p_null_prop = make_figure(reduced_results_df[(hypotheses=:null,)], :prop_incorrect_mean; xlabel = "no. groups", ylabel = "Proportion of errors",  title = "",            legend = false#=:topleft=#);
-p_full_any  = make_figure(reduced_results_df[(hypotheses=:full,)], :any_incorrect_mean;  xlabel = "",           ylabel = "",                      title = "Full  model", legend = false#=:right=#);
-p_full_prop = make_figure(reduced_results_df[(hypotheses=:full,)], :prop_incorrect_mean; xlabel = "no. groups", ylabel = "",                      title = "",            legend = false#=:topright=#);
+p_null_any  = make_figure(reduced_results_df[(hypothesis=:null,)], :any_incorrect_mean;  xlabel = "",           ylabel = "P(one or more errors)", title = "Null model",  legend = :topleft);
+p_null_prop = make_figure(reduced_results_df[(hypothesis=:null,)], :prop_incorrect_mean; xlabel = "no. groups", ylabel = "Proportion of errors",  title = "",            legend = false#=:topleft=#);
+p_full_any  = make_figure(reduced_results_df[(hypothesis=:full,)], :any_incorrect_mean;  xlabel = "",           ylabel = "",                      title = "Full  model", legend = false#=:right=#);
+p_full_prop = make_figure(reduced_results_df[(hypothesis=:full,)], :prop_incorrect_mean; xlabel = "no. groups", ylabel = "",                      title = "",            legend = false#=:topright=#);
 
 joined_plot = plot(
 	p_null_any,
@@ -472,8 +482,8 @@ joined_plot = plot(
 savefig(plot(joined_plot, size = (900, 900)), joinpath("figures", "multipleComparisonPlot_4x4.pdf"))
 
 make_title(λ) = @sprintf "%.2f * (errors | null model) +\n%.2f * (errors | full model)    " λ 1 - λ
-p_null_prop2  = make_figure(reduced_results_df[(hypotheses=:null,)], :prop_incorrect_mean; xlabel = "",           ylabel = "Proportion of errors",            title = "Null model",     legend = :topleft);
-p_full_prop2  = make_figure(reduced_results_df[(hypotheses=:full,)], :prop_incorrect_mean; xlabel = "",           ylabel = "",                                title = "Full model",     legend = false#=:topright=#);
+p_null_prop2  = make_figure(reduced_results_df[(hypothesis=:null,)], :prop_incorrect_mean; xlabel = "",           ylabel = "Proportion of errors",            title = "Null model",     legend = :topleft);
+p_full_prop2  = make_figure(reduced_results_df[(hypothesis=:full,)], :prop_incorrect_mean; xlabel = "",           ylabel = "",                                title = "Full model",     legend = false#=:topright=#);
 p_lambda_0_95 = make_figure(lambda_results_df,                       :lambda_0_95_mean;    xlabel = "No. groups", ylabel = "Weighted proportion of errors",   title = make_title(0.95), legend = false#=:right=#);
 p_lambda_0_50 = make_figure(lambda_results_df,                       :lambda_0_50_mean;    xlabel = "No. groups", ylabel = "",                                title = make_title(0.50), legend = false#=:right=#);
 

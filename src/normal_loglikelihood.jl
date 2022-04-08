@@ -38,6 +38,7 @@ end
 
 function _univariate_normal_likelihood(obs_mean, obs_var, obs_n, pop_mean, pop_var)
 
+	# TODO: use obs_n and don't use corrected variance!
 	return -obs_n / 2.0 * (log(2pi) + log(pop_var)) - 1 / (2.0pop_var) * ((obs_n - 1) * obs_var + obs_n * (obs_mean - pop_mean)^2)
 	# pop_prec = 1.0 / (pop_sds * pop_sds)
 	# result =
