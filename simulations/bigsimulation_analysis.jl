@@ -1,4 +1,5 @@
 using Plots, Plots.PlotMeasures, DataFrames, Chain, Colors, ColorSchemes, Printf
+using Statistics
 
 include("simulation_helpers.jl")
 
@@ -10,21 +11,22 @@ priors_to_remove = Set((:BetaBinomialk1, #=:DirichletProcessGP,=# :DirichletProc
 reduced_results_df = @chain results_df begin
 	filter(:prior => x -> x ∉ priors_to_remove, _)
 	groupby(Cols(:obs_per_group, :prior, :groups, :hypothesis))
-	combine(:any_incorrect => mean, :prop_incorrect => mean)
+	# combine(:any_incorrect => mean, :prop_incorrect => mean)
+	combine([:any_incorrect, :prop_incorrect, :α_error_prop, :β_error_prop] .=> mean)
 	sort([order(:hypothesis, by=x->parse(Int, string(x)[2:end]), rev=true), order(:obs_per_group)])
 	groupby(Cols(:hypothesis, :groups))
 end
 
-lambda_results_df = @chain results_df begin
-	filter(:prior => x -> x ∉ priors_to_remove, _)
-	unstack([:obs_per_group, :repeat, :groups, :prior], :hypothesis, :prop_incorrect)
-	# transform(
-	# 	[:null, :full] => ((n, f) -> 0.50 * n + 0.50 * f) => :lambda_0_50,
-	# 	[:null, :full] => ((n, f) -> 0.95 * n + 0.05 * f) => :lambda_0_95
-	# )
-	groupby(Cols(:obs_per_group, :prior, :groups))
-	combine([:p00, :p25, :p50, :p75, :p100] .=> mean)
-end
+# lambda_results_df = @chain results_df begin
+# 	filter(:prior => x -> x ∉ priors_to_remove, _)
+# 	unstack([:obs_per_group, :repeat, :groups, :prior], :hypothesis, [:α_error_prop, :β_error_prop])
+# 	# transform(
+# 	# 	[:null, :full] => ((n, f) -> 0.50 * n + 0.50 * f) => :lambda_0_50,
+# 	# 	[:null, :full] => ((n, f) -> 0.95 * n + 0.05 * f) => :lambda_0_95
+# 	# )
+# 	groupby(Cols(:obs_per_group, :prior, :groups))
+# 	combine([:p00, :p25, :p50, :p75, :p100] .=> mean)
+# end
 
 function get_labels(priors)
 	lookup = Dict(
@@ -107,8 +109,8 @@ function make_figure(df, y_symbol; kwargs...)
 		markersize			= 7,
 		markeralpha			= 0.75,
 
-		ylim   = (0, 1.05),
-		yticks = 0:.2:1,
+		# ylim   = (0, 1.05),
+		# yticks = 0:.2:1,
 		xticks = [250, 500, 750, 1000],
 		xlim   = (200, 1050),
 		# xlim   = (1, 11),
@@ -124,24 +126,53 @@ end
 # keys_ordered = keys(reduced_results_df)[[1, 3, 4, 5, 2]]
 # keys_ordered = keys(reduced_results_df)[[1, 3, 4, 5, 2, 6, 8, 9, 10, 7]]
 keys_ordered = sort(keys(reduced_results_df), by = x-> 1000*x[2] + parse(Int, string(x[1])[2:end]))
-plt_prop = [
+keys_α = filter(x->x.hypothesis != :p100, keys_ordered)
+keys_β = filter(x->x.hypothesis != :p00,  keys_ordered)
+plts_α = [
 	make_figure(
 		reduced_results_df[key],
-		:prop_incorrect_mean;
+		:α_error_prop_mean;
 		# xlabel = "no. observations",
 		xlabel = key[2] == 9 ? "no. observations" : "",
 		ylabel = key[1] === :p00 ? "Proportion of errors" : "",
 		title = join(key, "-"),
-		legend = key[1] === :p100 && key[2] == 5 ? :topleft : false
+		legend = key[1] === :p75 && key[2] == 5 ? :topright : false,
+		ylim = (0, key[2] == 5 ? 0.4 : 1.05)
 	)
-	for key in keys_ordered
+	for key in keys_α
+]
+
+plts_β = [
+	make_figure(
+		reduced_results_df[key],
+		:β_error_prop_mean;
+		# xlabel = "no. observations",
+		xlabel = key[2] == 9 ? "no. observations" : "",
+		ylabel = key[1] === :p00 ? "Proportion of errors" : "",
+		title = join(key, "-"),
+		legend = key[1] === :p100 && key[2] == 5 ? :topright : false,
+		ylim   = (0, 0.4),
+	)
+	for key in keys_β
 ]
 
 # layout = (1, 5)
-layout = (2, 5)
-plt_joined = plot(
-	plt_prop..., layout = layout, size = 400 .* reverse(layout),
+layout = (2, 4)
+plt_α_joined = plot(
+	plts_α..., layout = layout, size = 400 .* reverse(layout),
 	bottom_margin = 8mm,
 	left_margin = 12mm
 )
-savefig(plt_joined, joinpath("figures", "bigsimulation_rep_10_initialplot.pdf"))
+plt_β_joined = plot(
+	plts_β..., layout = layout, size = 400 .* reverse(layout),
+	bottom_margin = 8mm,
+	left_margin = 12mm
+)
+
+savefig(plt_α_joined, joinpath("figures", "bigsimulation_rep_40_partial_alpha_initialplot.pdf"))
+savefig(plt_β_joined, joinpath("figures", "bigsimulation_rep_40_partial_beta_initialplot.pdf"))
+
+
+prop_incorrect_αβ(results_df[1, :post_probs], results_df[1, :true_model])
+prop_incorrect_αβ(results_df[3592, :post_probs], results_df[3592, :true_model])
+

@@ -256,6 +256,10 @@ function get_init_params(partition::Vector{Int}, θ_r::Vector{Float64}, μ = 0.0
 	return vcat(partition, μ, σ², g, θ_r)
 end
 
+function get_init_params(θ_r::Vector{Float64}, μ::Float64 = 0.0, σ² = 1.0, g = 1.0)
+	return vcat(μ, σ², g, θ_r)
+end
+
 DynamicPPL.@model function one_way_anova_mv_ss_submodel(obs_mean, obs_var, obs_n, Q, partition = nothing, ::Type{T} = Float64) where {T}
 
 	n_groups = length(obs_mean)
@@ -374,6 +378,74 @@ DynamicPPL.@model function one_way_anova_mv_ss_eq_submodel_matrix_memoized(obs_m
 
 end
 
+function precompute_integrated_log_lik(dat)
+
+	y = dat.y
+	N, P = length(y), length(dat.g)
+	X = zeros(N, P)
+	for (i, idx) in enumerate(dat.g)
+		X[idx, i] .= 1.0
+	end
+
+	# P0 = 1 / N * ones(N) * ones(N)'
+	P0 = FillArrays.Fill(1 / N, N, N)
+
+	Q = EqualitySampler.Simulations.getQ_Rouder(P)
+	X = X * Q
+
+	# ỹ = (LinearAlgebra.I-P0) * y
+	# X̃ = (LinearAlgebra.I-P0) * X
+	# avoids forming LinearAlgebra.I-P0
+	ỹ = y - P0 * y
+	X̃ = X - P0 * X
+
+	ỹTỹ = ỹ'ỹ
+	ỹTX̃ = ỹ'X̃
+	X̃TX̃ = X̃'X̃
+	gamma_a = EqualitySampler.logabsgamma((N-1)/2)
+
+	return (; ỹTỹ, ỹTX̃, X̃TX̃, gamma_a, N)
+end
+
+
+function integrated_log_lik(ỹTỹ, ỹTX̃, X̃TX̃, gamma_a, N, g)
+
+	# G = LinearAlgebra.Diagonal(fill(g, length(ỹTX̃)))
+	# Vg = X̃TX̃ + inv(G)
+	invG = LinearAlgebra.Diagonal(fill(1 / g, length(ỹTX̃)))
+	Vg = X̃TX̃ + invG
+
+	a = (N - 1) / 2
+	b = ỹTỹ - ỹTX̃ / Vg * ỹTX̃'
+
+	return @inbounds gamma_a - (
+		a * log(2*pi) + (log(N) - LinearAlgebra.logabsdet(invG)[1] + LinearAlgebra.logabsdet(Vg)[1]) / 2 + a * log(b)
+	)
+
+end
+
+function integrated_log_lik(ỹTỹ, ỹTX̃, X̃TX̃, gamma_a, N, g, Q, partition)
+
+	Ρ = EqualitySampler.Simulations.get_equalizer_matrix_from_partition(partition)
+	B = Q'Ρ*Q
+	ỹTX̃ = ỹTX̃ * B
+	X̃TX̃ = B * X̃TX̃ * B
+
+	return integrated_log_lik(ỹTỹ, ỹTX̃, X̃TX̃, gamma_a, N, g)
+end
+
+
+DynamicPPL.@model function integrated_full_model(ỹTỹ, ỹTX̃, X̃TX̃, gamma_a, N)
+	g ~ Distributions.InverseGamma(0.5, 0.5; check_args = false)
+	Turing.@addlogprob! integrated_log_lik(ỹTỹ, ỹTX̃, X̃TX̃, gamma_a, N, g)
+end
+
+DynamicPPL.@model function integrated_partition_model(ỹTỹ, ỹTX̃, X̃TX̃, gamma_a, N, Q, partition_prior)
+	g ~ Distributions.InverseGamma(0.5, 0.5; check_args = false)
+	partition ~ partition_prior
+	Turing.@addlogprob! integrated_log_lik(ỹTỹ, ỹTX̃, X̃TX̃, gamma_a, N, g, Q, partition)
+end
+
 function prep_model_arguments(df)
 	obs_mean, obs_var, obs_n = get_suff_stats(df)
 	n_groups = length(obs_mean)
@@ -397,16 +469,33 @@ function fit_full_model(
 		;
 		spl = :custom,
 		mcmc_settings::MCMCSettings = MCMCSettings(),
+		modeltype::Symbol = :old,
 		rng::Random.AbstractRNG = Random.GLOBAL_RNG
 	)
 
-	obs_mean, obs_var, obs_n, Q = prep_model_arguments(df)
-	model = one_way_anova_mv_ss_submodel(obs_mean, obs_var, obs_n, Q)
-	# mcmc_sampler = isnothing(spl) ? get_sampler(model, spl) : spl
-	mcmc_sampler = get_mcmc_sampler_anova(spl, model)
+	if modeltype === :old
+		obs_mean, obs_var, obs_n, Q = prep_model_arguments(df)
+		model = one_way_anova_mv_ss_submodel(obs_mean, obs_var, obs_n, Q)
 
+		starting_values = get_starting_values(df, true)
+		init_params = get_init_params(Base.structdiff(starting_values, (partition=nothing, ))...)
+	else#if modeltype === :reduced
+
+		ỹTỹ, ỹTX̃, X̃TX̃, gamma_a, N = precompute_integrated_log_lik(df)
+		model = integrated_full_model(ỹTỹ, ỹTX̃, X̃TX̃, gamma_a, N)
+		starting_values = get_starting_values(df, true)
+		init_params = [starting_values.g]
+
+	end
+
+	mcmc_sampler = get_mcmc_sampler_anova(spl, model)
 	chain = sample_model(model, mcmc_sampler, mcmc_settings, rng; init_params = init_params)::MCMCChains.Chains
-	return combine_chain_with_generated_quantities(model, chain, "θ_cs")
+
+	if modeltype === :old
+		return combine_chain_with_generated_quantities(model, chain, "θ_cs")
+	else
+		return chain
+	end
 
 end
 
@@ -420,36 +509,35 @@ function fit_eq_model(
 		rng::Random.AbstractRNG = Random.GLOBAL_RNG
 	)
 
-	obs_mean, obs_var, obs_n, Q = prep_model_arguments(df)
-	if eq_model === :old
-		model = one_way_anova_mv_ss_eq_submodel(obs_mean, obs_var, obs_n, Q, partition_prior)
-	elseif eq_model === :matrix
-		model = one_way_anova_mv_ss_eq_submodel_matrix(obs_mean, obs_var, obs_n, Q, partition_prior)
-	elseif eq_model === :matrix_memoized
-		memoized_get_equality_matrix = build_get_equalizer_matrix_from_partition_with_cache()
-		model = one_way_anova_mv_ss_eq_submodel_matrix_memoized(obs_mean, obs_var, obs_n, Q, memoized_get_equality_matrix, partition_prior)
+	if eq_model === :reduced
+		ỹTỹ, ỹTX̃, X̃TX̃, gamma_a, N = precompute_integrated_log_lik(df)
+		Q = getQ_Rouder(length(df.g))
+		model = integrated_partition_model(ỹTỹ, ỹTX̃, X̃TX̃, gamma_a, N, Q, partition_prior)
+		starting_values = get_starting_values(df, false)
+		init_params = vcat(starting_values.g, starting_values.partition)
+	else
+		obs_mean, obs_var, obs_n, Q = prep_model_arguments(df)
+		if eq_model === :old
+			model = one_way_anova_mv_ss_eq_submodel(obs_mean, obs_var, obs_n, Q, partition_prior)
+		elseif eq_model === :matrix
+			model = one_way_anova_mv_ss_eq_submodel_matrix(obs_mean, obs_var, obs_n, Q, partition_prior)
+		elseif eq_model === :matrix_memoized
+			memoized_get_equality_matrix = build_get_equalizer_matrix_from_partition_with_cache()
+			model = one_way_anova_mv_ss_eq_submodel_matrix_memoized(obs_mean, obs_var, obs_n, Q, memoized_get_equality_matrix, partition_prior)
+		end
+		starting_values = get_starting_values(df)
+		init_params = get_init_params(starting_values...)
 	end
-	starting_values = get_starting_values(df)
-	init_params = get_init_params(starting_values...)
 
-	# maybe this should be a separate function to ease the compilers work
 	mcmc_sampler = get_mcmc_sampler_anova(spl, model, init_params)
-
-	# if spl isa Symbol
-	# 	ϵ = brute_force_ϵ(model, spl; init_params = init_params)
-	# 	mcmc_sampler = get_sampler(model, ϵ, spl)
-	# elseif spl isa Real
-	# 	mcmc_sampler = get_sampler(model, spl, :custom)
-	# else
-	# 	mcmc_sampler = spl
-	# end
 
 	chain = sample_model(model, mcmc_sampler, mcmc_settings, rng; init_params = init_params)::MCMCChains.Chains
 
-	if eq_model === :matrix_memoized
-		@show length(memoized_get_equality_matrix._cache) first(memoized_get_equality_matrix._cache)
+	if eq_model === :reduced
+		return chain
+	else
+		return combine_chain_with_generated_quantities(model, chain, "θ_cs")
 	end
-	return combine_chain_with_generated_quantities(model, chain, "θ_cs")
 end
 
 function get_generated_quantities(model, chain)
@@ -467,9 +555,10 @@ end
 function combine_chain_with_generated_quantities(model, chain, parameter_name::AbstractString)
 
 	constrained_samples = get_generated_quantities(model, chain)
+	new_dims = (size(chain, 1), size(constrained_samples, 2), size(chain, 3))
 
 	constrained_chain = MCMCChains.setrange(
-		MCMCChains.Chains(constrained_samples, collect(Symbol(parameter_name, "["* string(i) * "]") for i in axes(constrained_samples, 2))),
+		MCMCChains.Chains(reshape(constrained_samples, new_dims), collect(Symbol(parameter_name, "["* string(i) * "]") for i in axes(constrained_samples, 2))),
 		range(chain)
 	)
 
@@ -524,13 +613,13 @@ function anova_test(
 	;
 	spl = :custom,
 	mcmc_settings::MCMCSettings = MCMCSettings(),
-	eq_model::Symbol = :old,
+	modeltype::Symbol = :old,
 	rng = Random.GLOBAL_RNG
 )
 	# TODO: dispatch based on Nothing vs AbstractMvUrnDistribution?
 	if isnothing(partition_prior)
-		return fit_full_model(df;                spl = spl, mcmc_settings = mcmc_settings, rng = rng)
+		return fit_full_model(df;                spl = spl, mcmc_settings = mcmc_settings, modeltype = modeltype, rng = rng)
 	else
-		return fit_eq_model(df, partition_prior; spl = spl, mcmc_settings = mcmc_settings, eq_model = eq_model, rng = rng)
+		return fit_eq_model(df, partition_prior; spl = spl, mcmc_settings = mcmc_settings, eq_model = modeltype, rng = rng)
 	end
 end

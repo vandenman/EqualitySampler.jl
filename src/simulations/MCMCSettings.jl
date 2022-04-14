@@ -48,8 +48,8 @@ end
 
 function sample_model(model, spl, settings::MCMCSettings{T, U}, rng = Random.GLOBAL_RNG; kwargs...) where {T, U<:AbstractMCMC.AbstractMCMCEnsemble}
 	# @show "sample_model" kwargs, settings, spl
-	AbstractMCMC.sample(rng, model, spl, settings.iterations; kwargs)
-	# AbstractMCMC.sample(rng, model, spl, U(), settings.iterations, settings.chains; discard_initial = settings.burnin, thinning = settings.thinning, kwargs)
+	# AbstractMCMC.sample(rng, model, spl, settings.iterations; kwargs)
+	AbstractMCMC.sample(rng, model, spl, U(), settings.iterations, settings.chains; discard_initial = settings.burnin, thinning = settings.thinning, kwargs)
 end
 
 # function sample_model(model, spl::W, settings::MCMCSettings{T, U}, rng = Random.GLOBAL_RNG; kwargs...) where {T, U<:AbstractMCMC.AbstractMCMCEnsemble, W <:Turing.SMC}

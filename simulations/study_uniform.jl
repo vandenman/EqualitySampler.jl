@@ -9,7 +9,22 @@ true_partition = ones(Int, no_groups)
 true_θ = zeros(Float64, no_groups)
 
 
-mcmc_settings = MCMCSettings(;iterations = 7000, chains = 1)
+mcmc_settings = MCMCSettings(;iterations = 1000, chains = 1)
+data = simulate_data_one_way_anova(no_groups, no_obs_per_group, true_θ, true_partition)
+dat = data.data
+
+chain = anova_test(dat, partition_prior; mcmc_settings = mcmc_settings)
+partition_samples = Int.(Array(group(chain, :partition)))
+post_probs = compute_post_prob_eq(partition_samples)
+prop_incorrect_αβ(post_probs, true_partition)
+
+westfall = Simulations.westfall_test(dat)
+prop_incorrect_αβ(westfall.log_posterior_odds_mat, true_partition, true)
+prop_incorrect_αβ(westfall.logbf_matrix, true_partition, true)
+
+i = 1;j = 2
+Simulations.ttest_test(view(dat.y, dat.g[j]), view(dat.y, dat.g[i]), 0.5*sqrt(2)).logbf
+
 mcmc_settings2 = MCMCSettings(;iterations = 5000, burnin=1, chains = 1)
 
 spl = 0.00

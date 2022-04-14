@@ -115,6 +115,33 @@ function prop_correct(x, true_model::Vector{Int}, values_are_log_odds::Bool = fa
 	return count / (n * (n - 1) ÷ 2)
 end
 
+function prop_incorrect_αβ(x, true_model::Vector{Int}, values_are_log_odds::Bool = false)
+
+	reference, comparison = get_reference_and_comparison(values_are_log_odds)
+	α_error_count, β_error_count = 0, 0
+	α_count, β_count = 0, 0
+	n = size(x, 1)
+	for j in 1:n-1, i in j+1:n
+		if true_model[i] == true_model[j]
+			α_count += 1
+			if comparison(x[i, j], reference)
+				α_error_count += 1
+			end
+		elseif true_model[i] != true_model[j]
+			β_count += 1
+			if !comparison(x[i, j], reference)
+				β_error_count += 1
+			end
+		end
+	end
+
+	α_error_prop = iszero(α_count) ? 0.0 : α_error_count / α_count
+	β_error_prop = iszero(β_count) ? 0.0 : β_error_count / β_count
+	total_count = (n * (n - 1) ÷ 2)
+	return (; α_error_prop, β_error_prop, α_error_count, β_error_count, α_count, β_count, total_count)
+end
+
+
 
 function which_incorrect(x, true_model::Vector{Int}, values_are_log_odds::Bool = false)
 	reference, comparison = get_reference_and_comparison(values_are_log_odds)
@@ -224,34 +251,53 @@ function run_simulation(n_obs_per_group::AbstractVecOrSingle{Int}, repeats::Abst
 	# results_dir = "simulations/bigsimulation"
 	# n_obs_per_group, repeats, groups, hypotheses, offset, priors = get_hyperparams_big()
 
+
 	!ispath(results_dir) && mkpath(results_dir)
 	sim_opts = Iterators.product(n_obs_per_group, repeats, groups, hypotheses, offset, priors)
 
 	nsim = length(sim_opts)
-	nsim_without_priors = length(Iterators.product(n_obs_per_group, repeats, groups, hypotheses, offset))
-	sim_opts_with_seed = zip(sim_opts, Iterators.repeat(1:nsim_without_priors, length(priors)))
-	# collect(sim_opts_with_seed)[range(25, step=4800, length=10)] # shows the seed is the same for the same priors
-
-	@info "Starting simulation" runs=nsim length(priors) threads = Threads.nthreads()
+	sim_opts_without_priors = Iterators.product(n_obs_per_group, repeats, groups, hypotheses, offset)
+	seeds = vec(Base.hash.(sim_opts_without_priors))
+	sim_opts_with_seed = zip(sim_opts, Iterators.repeat(seeds, length(priors)))
 
 	# for
 	# mcmc_settings = Simulations.MCMCSettings(;iterations = 5_000, burnin = 1_000, chains = 1)
 	# for SMC
 	mcmc_settings = Simulations.MCMCSettings(;iterations = 10_000, burnin = 1, chains = 1)
+	# for testing
 	# mcmc_settings = MCMCSettings(;iterations = 200, burnin = 100, chains = 1)
 
 	p = ProgressMeter.Progress(nsim)
-	Turing.setprogress!(false)
-	Logging.disable_logging(Logging.Warn)
 
 	# separate RNGs per thread
 	trngs = [Random.MersenneTwister(i) for i in 1:Threads.nthreads()];
 	# ((obs_per_group, r, n_groups, hypothesis, offset, prior), seed) = first(sim_opts_with_seed)
-	Threads.@threads for ((obs_per_group, r, n_groups, hypothesis, offset, prior), seed) in collect(sim_opts_with_seed)
+	collected_opts = collect(sim_opts_with_seed)
+
+	# assert there are no hash collisions, i.e., all seeds are distinct
+	@assert allunique(seeds)
+	# assert that two seeds are the same iff everything but the prior is equal the prior
+	for i in eachindex(priors)
+		for j in 1:length(sim_opts_without_priors)
+			@assert collected_opts[j + (i-1) * length(sim_opts_without_priors)][2] == collected_opts[j][2]
+		end
+	end
+
+	# randomize order to balance the threads
+	Random.shuffle!(collected_opts)
+
+	@info "Starting simulation" runs=nsim length(priors) threads = Threads.nthreads()
+	Turing.setprogress!(false)
+	Logging.disable_logging(Logging.Warn)
+
+	Threads.@threads for ((obs_per_group, r, n_groups, hypothesis, offset, prior), seed) in collected_opts#collect(sim_opts_with_seed)
 	# for (iteration, (r, i, hypothesis)) in enumerate(sim_opts)
+
+		# seed = Base.hash((obs_per_group, r, n_groups, hypothesis, offset))
 
 		filename = make_filename(results_dir, (;obs_per_group, r, n_groups, hypothesis, offset, prior, seed))
 		if !isfile(filename)
+
 
 			rng = trngs[Threads.threadid()]
 			Random.seed!(rng, seed)
@@ -262,51 +308,55 @@ function run_simulation(n_obs_per_group::AbstractVecOrSingle{Int}, repeats::Abst
 			data_obj = Simulations.simulate_data_one_way_anova(rng, n_groups, obs_per_group, true_θ)
 			dat = data_obj.data
 
-			if prior === :Westfall
+			try
+				if prior === :Westfall
 
-				result = Simulations.westfall_test(dat)
-				post_probs = result.log_posterior_odds_mat
-				rhats_retry = zero(max_retries)
+					result = Simulations.westfall_test(dat)
+					post_probs = result.log_posterior_odds_mat
+					rhats_retry = zero(max_retries)
 
-			elseif prior === :Westfall_uncorrected
+				elseif prior === :Westfall_uncorrected
 
-				result = Simulations.westfall_test(dat)
-				post_probs = result.logbf_matrix
-				rhats_retry = zero(max_retries)
+					result = Simulations.westfall_test(dat)
+					post_probs = result.logbf_matrix
+					rhats_retry = zero(max_retries)
 
-			else
+				else
 
-				# otherwise these are scoped to the loop for retry in 1:max_retries
-				local post_probs, rhats_retry
+					# otherwise these are scoped to the loop for retry in 1:max_retries
+					local post_probs, rhats_retry
 
-				partition_prior = instantiate_prior(prior, n_groups)
-				for retry in 0:max_retries
+					partition_prior = instantiate_prior(prior, n_groups)
+					for retry in 0:max_retries
 
-					Random.seed!(rng, seed + retry)
-					chain = Simulations.anova_test(dat, partition_prior; mcmc_settings = mcmc_settings, rng = rng, spl = 0.05 * 0.8^retry)
-					# chain = Simulations.anova_test(dat, partition_prior; mcmc_settings = mcmc_settings, rng = rng, spl = Turing.SMC())
-					any_bad_rhats, mean_rhat_value = validate_r_hat(chain)
-					if any_bad_rhats && retry != max_retries
-						verbose && @error "This run had a bad r-hat:" settings = (;obs_per_group, r, n_groups, hypothesis, offset, prior, any_bad_rhats, mean_rhat_value, retry)
-					else
+						Random.seed!(rng, seed + retry)
+						chain = Simulations.anova_test(dat, partition_prior; mcmc_settings = mcmc_settings, rng = rng, modeltype = :reduced, spl = 0.05 * 0.8^retry)
+						# chain = Simulations.anova_test(dat, partition_prior; mcmc_settings = mcmc_settings, rng = rng, modeltype = :reduced, spl = iszero(retry) ? 0.0 : 0.05 * 0.8^(retry - 1))
+						# chain = Simulations.anova_test(dat, partition_prior; mcmc_settings = mcmc_settings, rng = rng, spl = Turing.SMC())
+						any_bad_rhats, mean_rhat_value = validate_r_hat(chain)
+						if any_bad_rhats && retry != max_retries
+							verbose && @error "This run had a bad r-hat:" settings = (;obs_per_group, r, n_groups, hypothesis, offset, prior, any_bad_rhats, mean_rhat_value, retry)
+						else
 
-						# partition_samples = Int.(Array(MCMCChains.group(chain, :partition)))
-						# post_probs = Simulations.compute_post_prob_eq(partition_samples)
-						partition_samples = MCMCChains.group(chain, :partition).value.data
-						post_probs = Simulations.compute_post_prob_eq(partition_samples)
+							# partition_samples = Int.(Array(MCMCChains.group(chain, :partition)))
+							# post_probs = Simulations.compute_post_prob_eq(partition_samples)
+							partition_samples = MCMCChains.group(chain, :partition).value.data
+							post_probs = Simulations.compute_post_prob_eq(partition_samples)
 
-						rhats_retry = retry
-						break
+							rhats_retry = retry
+							break
+						end
 					end
 				end
+
+				JLD2.jldsave(filename;
+					post_probs = post_probs, rhats_retry = rhats_retry, true_model = true_model,
+					run = (;obs_per_group, r, n_groups, hypothesis, offset, prior, seed)
+				)
+
+			catch e
+				@error "The run $((;obs_per_group, r, n_groups, hypothesis, offset, prior, seed)) failed with error $e"
 			end
-
-			JLD2.jldsave(filename;
-				post_probs = post_probs, rhats_retry = rhats_retry,
-				true_model = true_model,
-				run = (;obs_per_group, r, n_groups, hypothesis, offset, prior, seed)
-			)
-
 		end
 
 		ProgressMeter.next!(p)
@@ -326,13 +376,17 @@ function read_results(results_dir::String)
 		hypothesis		= Vector{Symbol}(undef, no_runs),
 		offset			= Vector{Float64}(undef, no_runs),
 		prior			= Vector{Symbol}(undef, no_runs),
-		seed			= Vector{Int}(undef, no_runs),
+		seed			= Vector{UInt}(undef, no_runs),
 		true_model		= Vector{Vector{Int}}(undef, no_runs),
 		rhats_retry		= Vector{Int}(undef, no_runs),
 		post_probs		= Vector{Matrix{Float64}}(undef, no_runs), # could also be some triangular structure
 		any_incorrect	= BitArray(undef, no_runs),
 		prop_incorrect	= Vector{Float64}(undef, no_runs),
 		prop_correct	= Vector{Float64}(undef, no_runs),
+		α_error_prop	= Vector{Float64}(undef, no_runs),
+		β_error_prop	= Vector{Float64}(undef, no_runs),
+		α_error_count	= Vector{Int}(undef, no_runs),
+		β_error_count	= Vector{Int}(undef, no_runs)
 	)
 
 	p = ProgressMeter.Progress(no_runs)
@@ -357,11 +411,18 @@ function read_results(results_dir::String)
 			df[i, :true_model]		= true_model
 			df[i, :rhats_retry]		= rhats_retry
 
+			# TODO: not necessary to do all of these, just do prop_incorrect_αβ + prop_incorrect
 			post_probs = temp["post_probs"]
 			df[i, :post_probs]     = post_probs
 			df[i, :any_incorrect]  = any_incorrect( post_probs, true_model, prior === :Westfall || prior === :Westfall_uncorrected)
 			df[i, :prop_incorrect] = prop_incorrect(post_probs, true_model, prior === :Westfall || prior === :Westfall_uncorrected)
 			df[i, :prop_correct]   =   prop_correct(post_probs, true_model, prior === :Westfall || prior === :Westfall_uncorrected)
+
+			α_error_prop, β_error_prop, α_error_count, β_error_count, α_count, β_count, total_count = prop_incorrect_αβ(post_probs, true_model, prior === :Westfall || prior === :Westfall_uncorrected)
+			df[i, :α_error_prop]  = α_error_prop
+			df[i, :β_error_prop]  = β_error_prop
+			df[i, :α_error_count] = α_error_count
+			df[i, :β_error_count] = β_error_count
 
 		catch e
 			@warn "file $filename failed with error $e"

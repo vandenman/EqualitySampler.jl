@@ -26,7 +26,7 @@ function get_sampler(model, discrete_sampler::Symbol = :custom, ϵ::Float64 = 0.
 	if :partition in parameters
 
 		continuous_parameters = filter(!=(:partition), parameters)
-		if discrete_sampler == :custom
+		if discrete_sampler === :custom
 			return Turing.Gibbs(
 				Turing.HMC(ϵ, n_leapfrog, continuous_parameters...),
 				Turing.GibbsConditional(:partition, PartitionSampler(length(model.args.partition_prior), get_logπ(model)))
