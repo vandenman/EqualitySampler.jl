@@ -14,8 +14,10 @@ else
 end
 
 priors_to_remove = Set((:BetaBinomialk1, #=:DirichletProcessGP,=# :DirichletProcess2_0))
+obs_per_group_to_keep = Set((50, 100, 250, 500))
 reduced_results_df_ungrouped = @chain results_df begin
 	filter(:prior => x -> x ∉ priors_to_remove, _)
+	# filter(:obs_per_group => x-> x in obs_per_group_to_keep, _)
 	groupby(Cols(:obs_per_group, :prior, :groups, :hypothesis))
 	# combine(:any_incorrect => mean, :prop_incorrect => mean)
 	combine([:any_incorrect, :prop_incorrect, :α_error_prop, :β_error_prop] .=> mean, :α_error_prop => (x->mean(>(0.0), x)) => :any_α_error_prop)
@@ -23,25 +25,10 @@ reduced_results_df_ungrouped = @chain results_df begin
 end
 reduced_results_df = groupby(reduced_results_df_ungrouped, Cols(:hypothesis, :groups))
 
-# @chain results_df begin
-# 	filter(:prior => x -> x ∉ priors_to_remove, _)
-# 	groupby(Cols(:obs_per_group, :prior, :groups, :hypothesis))
-# 	# combine(:any_incorrect => mean, :prop_incorrect => mean)
-# 	combine([:any_incorrect, :prop_incorrect, :α_error_prop, :β_error_prop] .=> mean, :α_error_prop => (x->mean(>(0.0), x)) => :any_α_error_prop)
-# 	sort([order(:hypothesis, by=x->parse(Int, string(x)[2:end]), rev=true), order(:obs_per_group)])
-# 	groupby(reduced_results_df_ungrouped, Cols(:hypothesis, :groups))
-# end
-
-# lambda_results_df = @chain results_df begin
-# 	filter(:prior => x -> x ∉ priors_to_remove, _)
-# 	unstack([:obs_per_group, :repeat, :groups, :prior], :hypothesis, [:α_error_prop, :β_error_prop])
-# 	# transform(
-# 	# 	[:null, :full] => ((n, f) -> 0.50 * n + 0.50 * f) => :lambda_0_50,
-# 	# 	[:null, :full] => ((n, f) -> 0.95 * n + 0.05 * f) => :lambda_0_95
-# 	# )
-# 	groupby(Cols(:obs_per_group, :prior, :groups))
-# 	combine([:p00, :p25, :p50, :p75, :p100] .=> mean)
-# end
+reduced_results_df2 = @chain reduced_results_df_ungrouped begin
+	filter(:obs_per_group => x-> x in obs_per_group_to_keep, _)
+	groupby(Cols(:hypothesis, :groups))
+end
 
 function get_labels(priors)
 	lookup = Dict(
@@ -98,7 +85,7 @@ function get_shapes(priors)
 	return [lookup[prior] for prior in priors]
 end
 
-function make_figure(df, y_symbol; kwargs...)
+function make_figure(df, y_symbol; xticks = [50, 100, 250, 500, 750, 1000], xlim = (0, 1050), kwargs...)
 	# colors1 = get_colors(df[!, :prior], .8)
 	colors2 = get_colors(df[!, :prior], .5)
 	shapes = get_shapes(df[!, :prior])
@@ -126,8 +113,8 @@ function make_figure(df, y_symbol; kwargs...)
 
 		# ylim   = (0, 1.05),
 		# yticks = 0:.2:1,
-		xticks = [50, 100, 250, 500, 750, 1000],
-		xlim   = (0, 1050),
+		xticks = xticks,
+		xlim   = xlim,
 		# xlim   = (1, 11),
 
 		background_color_legend = nothing,
@@ -143,7 +130,7 @@ end
 keys_ordered = sort(keys(reduced_results_df), by = x-> 1000*x[2] + parse(Int, string(x[1])[2:end]))
 keys_α  = filter(x->x.hypothesis != :p100, keys_ordered)
 keys_β  = filter(x->x.hypothesis != :p00,  keys_ordered)
-key_to_title(x) = "Inequalities=$(hypothesis_to_inequalities(x[1], x[2])), K=$(x[2])"
+key_to_title(x) = "Inequalities = $(hypothesis_to_inequalities(x[1], x[2])), K = $(x[2])"
 
 plts_α = [
 	make_figure(
@@ -257,3 +244,42 @@ savefig(plt_k_5_fam, joinpath("figures", "bigsimulation", "r100_groupedby_k_5_al
 savefig(plt_k_9_fam, joinpath("figures", "bigsimulation", "r100_groupedby_k_9_alpha_familywise.pdf"))
 
 # subset of plots for manuscript
+keys_α_subset = keys_α[[1, 2, 3]]
+keys_β_subset = keys_β[[4, 1, 2]]
+
+key_to_title2(x) = "Inequalities = $(hypothesis_to_inequalities(x[1], x[2]))"
+
+plts_α_fam_subset = [
+	make_figure(
+		reduced_results_df[key],
+		:any_α_error_prop;
+		xlabel = "",
+		ylabel = key[1] === :p00 ? "Probability of at least one error" : "",
+		title  = key_to_title2(key),
+		legend = key[1] === :p50 ? :topright : false,
+		ylim   = (0, 0.5),
+		xticks = [50, 100, 250, 500],
+		xlim   = (0, 550)
+	)
+	for key in keys_α_subset
+]
+
+plts_β_subset = [
+	make_figure(
+		reduced_results_df[key],
+		:β_error_prop_mean;
+		xlabel = "no. observations",
+		ylabel = key[1] === :p100 ? "Proportion of errors (β)" : "",
+		title  = key_to_title2(key),
+		legend = false,
+		ylim   = (0, 0.75),
+		xticks = [50, 100, 250, 500],
+		xlim   = (0, 550)
+	)
+	for key in keys_β_subset
+]
+
+layout = (2, 3)
+plt_k_5_subset = plot([plts_α_fam_subset; plts_β_subset]..., layout = layout, size = 400 .* reverse(layout), bottom_margin = 8mm, left_margin = 12mm);
+
+savefig(plt_k_5_subset, joinpath("figures", "bigsimulation", "r100_groupedby_k_5_subset_2x3.pdf"))

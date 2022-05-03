@@ -230,14 +230,15 @@ function sample_true_model(rng::Random.AbstractRNG, hypothesis::Symbol, n_groups
 	end
 end
 
-function hypothesis_to_inequalities(hypothesis, n_groups)
+function hypothesis_to_inequalities(hypothesis::Symbol, n_groups::Integer)
 	if hypothesis === :null || hypothesis === :p00
 		return 0
 	elseif hypothesis === :full || hypothesis === :p100
-		return n_groups
+		return n_groups - 1
 	else
-	percentage = parse.(Int, view(string(hypothesis), 2:3))
-	return (n_groups-1) * percentage ÷ 100 + 1
+		percentage = parse.(Int, view(string(hypothesis), 2:3))
+		return (n_groups - 1) * percentage ÷ 100# + 1
+	end
 end
 
 function validate_r_hat(chn, tolerance = 1.2)
