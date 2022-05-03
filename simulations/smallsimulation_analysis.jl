@@ -155,7 +155,7 @@ joined_plot_lambda = plot(
 savefig(plot(joined_plot_lambda, size = (3*450, 450)), joinpath("figures", "smallsimulation", "3_panel_alpha.pdf"))
 
 p_null_any_error = make_figure_small(reduced_results_df[(hypothesis=:p00,)],  :groups, :any_incorrect_mean;  xlabel = "No. groups", ylabel = "Probability of at least one error", title = "Null model",  legend = :topleft)
-p_full_any_error = make_figure_small(reduced_results_df[(hypothesis=:p100,)], :groups, :prop_incorrect_mean; xlabel = "No. groups", ylabel = "Proportion of errors (β)",          title = "Null model",  legend = false)
+p_full_any_error = make_figure_small(reduced_results_df[(hypothesis=:p100,)], :groups, :prop_incorrect_mean; xlabel = "No. groups", ylabel = "Proportion of errors (β)",          title = "Full model",  legend = false)
 
 joined_plot_familywise_error = plot(
 	p_null_any_error,
