@@ -13,7 +13,7 @@ function unbounded_to_bounded(y::AbstractVector{T}) where T
 	result = LinearAlgebra.UpperTriangular(zeros(T, (k, k)))
 	l = 1
 	result[1, 1] = one(T)
-	for j in 2:k
+	@inbounds for j in 2:k
 
 		result[1, j] = z[l]
 		l += 1
@@ -37,7 +37,7 @@ function logabsdet_lkj_cholesky(y::AbstractVector{T}, R_chol) where T
 	n = size(R_chol, 1)
 	tmp0 = -2 * sum(x -> log(cosh(x)), y)
 	tmp1 = zero(T)
-	for j in 1:n-1
+	@inbounds for j in 1:n-1
 		for i in j+1:n
 			tmp2 = zero(T)
 			for jp in 1:j-1
@@ -52,7 +52,7 @@ end
 function logpdf_lkj_cholesky(R_chol, η = 1.0)
 	d = size(R_chol, 1)
 	tmp = d + 2η - 2
-	sum((tmp - i) * log(R_chol[i, i]) for i in 2:d) + Distributions.lkj_logc0(d, η)
+	sum((tmp - i) * log(@inbounds R_chol[i, i]) for i in 2:d) + Distributions.lkj_logc0(d, η)
 end
 
 Turing.@model function manual_lkj2(K, η, ::Type{T} = Float64) where T

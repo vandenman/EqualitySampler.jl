@@ -2,12 +2,15 @@ using Plots, Plots.PlotMeasures, DataFrames, Chain, Colors, ColorSchemes, Printf
 using Statistics
 
 include("simulation_helpers.jl")
-
-results_dir = joinpath("simulations", "small_simulation_runs")
-results_df = read_results(results_dir)
-
-# import TableView, Blink
-# TableView.showtable(results_df)
+results_joined_path = joinpath("simulations", "small_simulation_runs_joined", "small_simulation_runs_joined.jld2")
+if !isfile(results_joined_path)
+	results_dir = joinpath("simulations", "small_simulation_runs")
+	results_df = read_results(results_dir)
+	JLD2.jldsave(results_joined_path; results_df = results_df)
+else
+	tmp = JLD2.jldopen(results_joined_path)
+	results_df = tmp["results_df"]
+end
 
 priors_to_remove = Set((:BetaBinomialk1, #=:DirichletProcessGP,=# :DirichletProcess2_0))
 function recode_hypothesis(x)
@@ -55,7 +58,7 @@ function get_labels(priors)
 		# :DirichletProcessGP		=> "DPP α=Gopalan & Berry",
 		:DirichletProcessGP		=> "DPP α=G&B",
 		:Westfall				=> "Westfall",
-		:Westfall_uncorrected	=> "Westfall_U",
+		:Westfall_uncorrected	=> "Pairwise BFs",
 	)
 	priors_set = sort!(unique(priors))
 	return reshape([lookup[prior] for prior in priors_set], 1, length(priors_set))
@@ -96,7 +99,7 @@ function get_shapes(priors)
 	return [lookup[prior] for prior in priors]
 end
 
-function make_figure(df, x_symbol, y_symbol; kwargs...)
+function make_figure_small(df, x_symbol, y_symbol; kwargs...)
 	# colors1 = get_colors(df[!, :prior], .8)
 	colors2 = get_colors(df[!, :prior], .5)
 	shapes = get_shapes(df[!, :prior])
@@ -136,9 +139,9 @@ function make_figure(df, x_symbol, y_symbol; kwargs...)
 end
 
 make_title(λ) = @sprintf "%.2f * (errors | null model) +\n%.2f * (errors | full model)    " λ 1 - λ
-p_null_prop2  = make_figure(reduced_results_df[(hypothesis=:p00,)],  :groups, :prop_incorrect_mean; xlabel = "",           ylabel = "Proportion of errors", title = "Null model",     legend = :topleft);
-p_full_prop2  = make_figure(reduced_results_df[(hypothesis=:p100,)], :groups, :prop_incorrect_mean; xlabel = "",           ylabel = "",                     title = "Full model",     legend = false);
-p_lambda_0_50 = make_figure(lambda_results_df,                       :groups, :lambda_0_50_mean;    xlabel = "No. groups", ylabel = "",                     title = make_title(0.50), legend = false,   ylim = (0, 0.6), yticks = 0:0.1:0.6);
+p_null_prop2  = make_figure_small(reduced_results_df[(hypothesis=:p00,)],  :groups, :prop_incorrect_mean; xlabel = "",           ylabel = "Proportion of errors", title = "Null model",     legend = :topleft);
+p_full_prop2  = make_figure_small(reduced_results_df[(hypothesis=:p100,)], :groups, :prop_incorrect_mean; xlabel = "",           ylabel = "",                     title = "Full model",     legend = false);
+p_lambda_0_50 = make_figure_small(lambda_results_df,                       :groups, :lambda_0_50_mean;    xlabel = "No. groups", ylabel = "",                     title = make_title(0.50), legend = false,   ylim = (0, 0.6), yticks = 0:0.1:0.6);
 
 joined_plot_lambda = plot(
 	p_null_prop2,
@@ -149,4 +152,16 @@ joined_plot_lambda = plot(
 	bottom_margin = 7mm
 );
 
-savefig(plot(joined_plot_lambda, size = (3*450, 450)), joinpath("figures", "smallsimulation_rep_20_partial.pdf"))
+savefig(plot(joined_plot_lambda, size = (3*450, 450)), joinpath("figures", "smallsimulation", "3_panel_alpha.pdf"))
+
+p_null_any_error = make_figure_small(reduced_results_df[(hypothesis=:p00,)],  :groups, :any_incorrect_mean;  xlabel = "No. groups", ylabel = "Probability of at least one error", title = "Null model",  legend = :topleft)
+p_full_any_error = make_figure_small(reduced_results_df[(hypothesis=:p100,)], :groups, :prop_incorrect_mean; xlabel = "No. groups", ylabel = "Proportion of errors (β)",          title = "Null model",  legend = false)
+
+joined_plot_familywise_error = plot(
+	p_null_any_error,
+	p_full_any_error,
+	layout = (1, 2),
+	left_margin = 7mm,
+	bottom_margin = 7mm
+);
+savefig(plot(joined_plot_familywise_error, size = (2*500, 500)), joinpath("figures", "smallsimulation", "2_panel_alpha_familywise.pdf"))

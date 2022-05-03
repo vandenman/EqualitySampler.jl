@@ -160,12 +160,37 @@ average_equality_constraints(ρ::AbstractVector{<:Real}, partition::AbstractVect
 function get_equalizer_matrix_from_partition(partition::AbstractVector{<:Integer})
 	k = length(partition)
 	mmm = Matrix{Float64}(undef, k, k)
+	get_equalizer_matrix_from_partition!(mmm, partition)
+	return mmm
+end
+
+function get_equalizer_matrix_from_partition!(mmm, partition::AbstractVector{<:Integer})
 	@inbounds for i in axes(mmm, 2)
 		v = count(==(partition[i]), partition)
 		mmm[:, i] .= (1.0 / v) .* (partition .== partition[i])
 	end
-	mmm
 end
+
+function get_equalizer_eigenvectors_from_partition(partition)
+	cm = EqualitySampler.fast_countmap_partition_incl_zero(partition)
+	cm0 = filter(!iszero, cm)
+	mat = zeros(length(partition), length(cm0))
+	# @show partition
+	column = 1
+	for i in eachindex(cm)
+		if !iszero(cm[i])
+			value = sqrt(cm[i]) / cm[i]
+			for j in eachindex(partition)
+				if partition[j] == i
+					mat[j, column] = value
+				end
+			end
+			column += 1
+		end
+	end
+	mat
+end
+
 
 function build_get_equalizer_matrix_from_partition_with_cache()
 	local _cache = Dict{Vector{Int}, Matrix{Float64}}()
@@ -408,30 +433,69 @@ function precompute_integrated_log_lik(dat)
 end
 
 
+# function integrated_log_lik(ỹTỹ, ỹTX̃, X̃TX̃, gamma_a, N, g)
+
+# 	invG = LinearAlgebra.Diagonal(fill(1 / g, length(ỹTX̃)))
+# 	Vg = X̃TX̃ + invG
+
+# 	a = (N - 1) / 2
+# 	b = ỹTỹ - @inbounds (ỹTX̃ / Vg * ỹTX̃')[1]
+
+# 	return @inbounds gamma_a - (
+# 		a * log(2*pi) + (log(N) - LinearAlgebra.logabsdet(invG)[1] + LinearAlgebra.logabsdet(Vg)[1]) / 2 + a * log(b)
+# 	)
+
+# end
+
+# function integrated_log_lik(ỹTỹ, ỹTX̃, X̃TX̃, gamma_a, N, g, Q, partition)
+
+# 	Ρ = EqualitySampler.Simulations.get_equalizer_matrix_from_partition(partition)
+# 	B = Q'Ρ*Q
+# 	ỹTX̃ = ỹTX̃ * B
+# 	X̃TX̃ = B * X̃TX̃ * B
+
+# 	return integrated_log_lik(ỹTỹ, ỹTX̃, X̃TX̃, gamma_a, N, g)
+# end
+
 function integrated_log_lik(ỹTỹ, ỹTX̃, X̃TX̃, gamma_a, N, g)
 
-	# G = LinearAlgebra.Diagonal(fill(g, length(ỹTX̃)))
-	# Vg = X̃TX̃ + inv(G)
 	invG = LinearAlgebra.Diagonal(fill(1 / g, length(ỹTX̃)))
 	Vg = X̃TX̃ + invG
 
+	Vg_chol = LinearAlgebra.cholesky(LinearAlgebra.Symmetric(Vg))
+
+	# based on https://github.com/JuliaStats/PDMats.jl/blob/87277241153cde10fa6ec82086e2af2f050240f4/src/pdmat.jl#L108-L112
+	z = ỹTX̃ / Vg_chol.U
+	b = ỹTỹ - LinearAlgebra.dot(z, z) # does dot work with AD?
+
 	a = (N - 1) / 2
-	b = ỹTỹ - ỹTX̃ / Vg * ỹTX̃'
+	logabsdet_g = length(ỹTX̃) * log(g)
 
 	return @inbounds gamma_a - (
-		a * log(2*pi) + (log(N) - LinearAlgebra.logabsdet(invG)[1] + LinearAlgebra.logabsdet(Vg)[1]) / 2 + a * log(b)
+		a * log(2*pi) + (log(N) + logabsdet_g + 2*LinearAlgebra.logabsdet(Vg_chol.U)[1]) / 2 + a * log(b)
 	)
 
 end
 
-function integrated_log_lik(ỹTỹ, ỹTX̃, X̃TX̃, gamma_a, N, g, Q, partition)
+function integrated_log_lik(ỹTỹ, ỹTX̃, X̃TX̃, gamma_a, N, g, Q, partition)#, ỹTX̃_B_s, X̃TX̃_B_s)
 
-	Ρ = EqualitySampler.Simulations.get_equalizer_matrix_from_partition(partition)
-	B = Q'Ρ*Q
-	ỹTX̃ = ỹTX̃ * B
-	X̃TX̃ = B * X̃TX̃ * B
+	no_distinct = EqualitySampler.no_distinct_groups_in_partition(partition)
+	if isone(no_distinct)
+		return integrated_log_lik(ỹTỹ, zero(ỹTX̃), zero(X̃TX̃), gamma_a, N, g)
+	elseif no_distinct == length(partition)
+		return integrated_log_lik(ỹTỹ, ỹTX̃, X̃TX̃, gamma_a, N, g)
+	end
 
-	return integrated_log_lik(ỹTỹ, ỹTX̃, X̃TX̃, gamma_a, N, g)
+	Ρeigvec = get_equalizer_eigenvectors_from_partition(partition)
+	B = Q' * Ρeigvec
+	B = B * B'
+
+	# X̃TX̃ = B * X̃TX̃ * B
+	# simplifies to
+	# B * X̃TX̃
+	# since B (and Ρ) is idempotent we have
+	# B * X̃TX̃ * B = B * B * X̃TX̃ = B * X̃TX̃
+	return integrated_log_lik(ỹTỹ, ỹTX̃ * B, X̃TX̃ * B, gamma_a, N, g)
 end
 
 

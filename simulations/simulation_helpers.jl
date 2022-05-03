@@ -195,7 +195,7 @@ function get_hyperparams_small()
 end
 
 function get_hyperparams_big()
-	n_obs_per_group = (250, 500, 750, 1_000)
+	n_obs_per_group = (50, 100, 250, 500, 750, 1_000)
 	repeats			= 1:100
 	groups			= (5, 9)
 	hypothesis		= (:p00, :p25, :p50, :p75, :p100)
@@ -228,6 +228,16 @@ function sample_true_model(rng::Random.AbstractRNG, hypothesis::Symbol, n_groups
 		return rand(rng, EqualitySampler.CustomInclusionMvUrnDistribution(n_groups, logpdf))
 
 	end
+end
+
+function hypothesis_to_inequalities(hypothesis, n_groups)
+	if hypothesis === :null || hypothesis === :p00
+		return 0
+	elseif hypothesis === :full || hypothesis === :p100
+		return n_groups
+	else
+	percentage = parse.(Int, view(string(hypothesis), 2:3))
+	return (n_groups-1) * percentage ÷ 100 + 1
 end
 
 function validate_r_hat(chn, tolerance = 1.2)
@@ -330,21 +340,25 @@ function run_simulation(n_obs_per_group::AbstractVecOrSingle{Int}, repeats::Abst
 					for retry in 0:max_retries
 
 						Random.seed!(rng, seed + retry)
-						chain = Simulations.anova_test(dat, partition_prior; mcmc_settings = mcmc_settings, rng = rng, modeltype = :reduced, spl = 0.05 * 0.8^retry)
-						# chain = Simulations.anova_test(dat, partition_prior; mcmc_settings = mcmc_settings, rng = rng, modeltype = :reduced, spl = iszero(retry) ? 0.0 : 0.05 * 0.8^(retry - 1))
-						# chain = Simulations.anova_test(dat, partition_prior; mcmc_settings = mcmc_settings, rng = rng, spl = Turing.SMC())
-						any_bad_rhats, mean_rhat_value = validate_r_hat(chain)
-						if any_bad_rhats && retry != max_retries
-							verbose && @error "This run had a bad r-hat:" settings = (;obs_per_group, r, n_groups, hypothesis, offset, prior, any_bad_rhats, mean_rhat_value, retry)
-						else
+						try
+							chain = Simulations.anova_test(dat, partition_prior; mcmc_settings = mcmc_settings, rng = rng, modeltype = :reduced, spl = 0.05 * 0.8^retry)
+							# chain = Simulations.anova_test(dat, partition_prior; mcmc_settings = mcmc_settings, rng = rng, modeltype = :reduced, spl = iszero(retry) ? 0.0 : 0.05 * 0.8^(retry - 1))
+							# chain = Simulations.anova_test(dat, partition_prior; mcmc_settings = mcmc_settings, rng = rng, spl = Turing.SMC())
+							any_bad_rhats, mean_rhat_value = validate_r_hat(chain)
+							if any_bad_rhats && retry != max_retries
+								verbose && @error "This run had a bad r-hat:" settings = (;obs_per_group, r, n_groups, hypothesis, offset, prior, any_bad_rhats, mean_rhat_value, retry)
+							else
 
-							# partition_samples = Int.(Array(MCMCChains.group(chain, :partition)))
-							# post_probs = Simulations.compute_post_prob_eq(partition_samples)
-							partition_samples = MCMCChains.group(chain, :partition).value.data
-							post_probs = Simulations.compute_post_prob_eq(partition_samples)
+								# partition_samples = Int.(Array(MCMCChains.group(chain, :partition)))
+								# post_probs = Simulations.compute_post_prob_eq(partition_samples)
+								partition_samples = MCMCChains.group(chain, :partition).value.data
+								post_probs = Simulations.compute_post_prob_eq(partition_samples)
 
-							rhats_retry = retry
-							break
+								rhats_retry = retry
+								break
+							end
+						catch e
+							@error "The run $((;obs_per_group, r, n_groups, hypothesis, offset, prior, seed, retry)) failed with error $e"
 						end
 					end
 				end

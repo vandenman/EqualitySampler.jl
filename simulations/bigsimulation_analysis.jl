@@ -3,19 +3,34 @@ using Statistics
 
 include("simulation_helpers.jl")
 
-results_dir = joinpath("simulations", "big_simulation_runs")
-results_df = read_results(results_dir)
-
+results_joined_path = joinpath("simulations", "big_simulation_runs_joined", "big_simulation_runs_joined.jld2")
+if !isfile(results_joined_path)
+	results_dir = joinpath("simulations", "big_simulation_runs")
+	results_df = read_results(results_dir)
+	JLD2.jldsave(results_joined_path; results_df = results_df)
+else
+	tmp = JLD2.jldopen(results_joined_path)
+	results_df = tmp["results_df"]
+end
 
 priors_to_remove = Set((:BetaBinomialk1, #=:DirichletProcessGP,=# :DirichletProcess2_0))
-reduced_results_df = @chain results_df begin
+reduced_results_df_ungrouped = @chain results_df begin
 	filter(:prior => x -> x ∉ priors_to_remove, _)
 	groupby(Cols(:obs_per_group, :prior, :groups, :hypothesis))
 	# combine(:any_incorrect => mean, :prop_incorrect => mean)
-	combine([:any_incorrect, :prop_incorrect, :α_error_prop, :β_error_prop] .=> mean)
+	combine([:any_incorrect, :prop_incorrect, :α_error_prop, :β_error_prop] .=> mean, :α_error_prop => (x->mean(>(0.0), x)) => :any_α_error_prop)
 	sort([order(:hypothesis, by=x->parse(Int, string(x)[2:end]), rev=true), order(:obs_per_group)])
-	groupby(Cols(:hypothesis, :groups))
 end
+reduced_results_df = groupby(reduced_results_df_ungrouped, Cols(:hypothesis, :groups))
+
+# @chain results_df begin
+# 	filter(:prior => x -> x ∉ priors_to_remove, _)
+# 	groupby(Cols(:obs_per_group, :prior, :groups, :hypothesis))
+# 	# combine(:any_incorrect => mean, :prop_incorrect => mean)
+# 	combine([:any_incorrect, :prop_incorrect, :α_error_prop, :β_error_prop] .=> mean, :α_error_prop => (x->mean(>(0.0), x)) => :any_α_error_prop)
+# 	sort([order(:hypothesis, by=x->parse(Int, string(x)[2:end]), rev=true), order(:obs_per_group)])
+# 	groupby(reduced_results_df_ungrouped, Cols(:hypothesis, :groups))
+# end
 
 # lambda_results_df = @chain results_df begin
 # 	filter(:prior => x -> x ∉ priors_to_remove, _)
@@ -42,7 +57,7 @@ function get_labels(priors)
 		# :DirichletProcessGP		=> "DPP α=Gopalan & Berry",
 		:DirichletProcessGP		=> "DPP α=G&B",
 		:Westfall				=> "Westfall",
-		:Westfall_uncorrected	=> "Westfall_U",
+		:Westfall_uncorrected	=> "Pairwise BFs",
 	)
 	priors_set = sort!(unique(priors))
 	return reshape([lookup[prior] for prior in priors_set], 1, length(priors_set))
@@ -111,8 +126,8 @@ function make_figure(df, y_symbol; kwargs...)
 
 		# ylim   = (0, 1.05),
 		# yticks = 0:.2:1,
-		xticks = [250, 500, 750, 1000],
-		xlim   = (200, 1050),
+		xticks = [50, 100, 250, 500, 750, 1000],
+		xlim   = (0, 1050),
 		# xlim   = (1, 11),
 
 		background_color_legend = nothing,
@@ -126,18 +141,32 @@ end
 # keys_ordered = keys(reduced_results_df)[[1, 3, 4, 5, 2]]
 # keys_ordered = keys(reduced_results_df)[[1, 3, 4, 5, 2, 6, 8, 9, 10, 7]]
 keys_ordered = sort(keys(reduced_results_df), by = x-> 1000*x[2] + parse(Int, string(x[1])[2:end]))
-keys_α = filter(x->x.hypothesis != :p100, keys_ordered)
-keys_β = filter(x->x.hypothesis != :p00,  keys_ordered)
+keys_α  = filter(x->x.hypothesis != :p100, keys_ordered)
+keys_β  = filter(x->x.hypothesis != :p00,  keys_ordered)
+key_to_title(x) = "Inequalities=$(hypothesis_to_inequalities(x[1], x[2])), K=$(x[2])"
+
 plts_α = [
 	make_figure(
 		reduced_results_df[key],
 		:α_error_prop_mean;
-		# xlabel = "no. observations",
 		xlabel = key[2] == 9 ? "no. observations" : "",
 		ylabel = key[1] === :p00 ? "Proportion of errors" : "",
-		title = join(key, "-"),
-		legend = key[1] === :p75 && key[2] == 5 ? :topright : false,
-		ylim = (0, key[2] == 5 ? 0.4 : 1.05)
+		title  = key_to_title(key),
+		legend = key[1] === :p00 && key[2] == 5 ? :topright : false,
+		ylim   = (0, key[2] == 5 ? 0.4 : 1.05)
+	)
+	for key in keys_α
+]
+
+plts_α_familywise = [
+	make_figure(
+		reduced_results_df[key],
+		:any_α_error_prop;
+		xlabel = key[2] == 9 ? "no. observations" : "",
+		ylabel = key[1] === :p00 ? "Probability of at least one error" : "",
+		title  = key_to_title(key),
+		legend = key[1] === :p00 && key[2] == 5 ? :topright : false,
+		ylim   = (0, 1.05)
 	)
 	for key in keys_α
 ]
@@ -146,12 +175,11 @@ plts_β = [
 	make_figure(
 		reduced_results_df[key],
 		:β_error_prop_mean;
-		# xlabel = "no. observations",
 		xlabel = key[2] == 9 ? "no. observations" : "",
-		ylabel = key[1] === :p00 ? "Proportion of errors" : "",
-		title = join(key, "-"),
-		legend = key[1] === :p100 && key[2] == 5 ? :topright : false,
-		ylim   = (0, 0.4),
+		ylabel = key[1] === :p25 ? "Proportion of errors (β)" : "",
+		title  = key_to_title(key),
+		legend = key[1] === :p25 && key[2] == 5 ? :topright : false,
+		ylim   = (0, 1.05),
 	)
 	for key in keys_β
 ]
@@ -163,16 +191,69 @@ plt_α_joined = plot(
 	bottom_margin = 8mm,
 	left_margin = 12mm
 )
+layout = (2, 4)
+plt_α_familywise_joined = plot(
+	plts_α_familywise..., layout = layout, size = 400 .* reverse(layout),
+	bottom_margin = 8mm,
+	left_margin = 12mm
+)
 plt_β_joined = plot(
 	plts_β..., layout = layout, size = 400 .* reverse(layout),
 	bottom_margin = 8mm,
 	left_margin = 12mm
 )
 
-savefig(plt_α_joined, joinpath("figures", "bigsimulation_rep_40_partial_alpha_initialplot.pdf"))
-savefig(plt_β_joined, joinpath("figures", "bigsimulation_rep_40_partial_beta_initialplot.pdf"))
+# plots grouped by α, α-familywise, and β
+savefig(plt_α_joined,            joinpath("figures", "bigsimulation", "r100_alpha.pdf"))
+savefig(plt_α_familywise_joined, joinpath("figures", "bigsimulation", "r100_alpha_familywise.pdf"))
+savefig(plt_β_joined,            joinpath("figures", "bigsimulation", "r100_beta.pdf"))
+
+# plots grouped by k
+plts_k_5     = vcat(plts_α[1:4],            plts_β[1:4]);
+plts_k_5_fam = vcat(plts_α_familywise[1:4], plts_β[1:4]);
+plts_k_9     = vcat(plts_α[5:8],            plts_β[5:8]);
+plts_k_9_fam = vcat(plts_α_familywise[5:8], plts_β[5:8]);
+
+function update_titles!(plts, newtitles)
+	for (plt, newtitle) in zip(plts, newtitles)
+		plot!(plt; title = newtitle)
+	end
+end
+
+plot!(plts_k_5[1], ylab = "α");
+plot!(plts_k_5[5], legend = false);
+plot!(plts_k_9[1], ylab = "α");
+plot!(plts_k_9[5], legend = false);
+
+plot!(plts_k_5_fam[5], legend = false);
+plot!(plts_k_9_fam[5], legend = false);
+
+newtitles_5 = ["Inequalities=" .* string.([0, 2, 3, 4]); "Inequalities=" .* string.([2, 3, 4, 5])]
+newtitles_9 = ["Inequalities=" .* string.([0, 3, 5, 7]); "Inequalities=" .* string.([3, 5, 7, 9])]
+update_titles!(plts_k_5,     newtitles_5)
+update_titles!(plts_k_5_fam, newtitles_5)
+update_titles!(plts_k_9,     newtitles_9)
+update_titles!(plts_k_9_fam, newtitles_9)
+
+neworder = [8, 5, 6, 7]
+plts_k_5[5:8]     = plts_k_5[neworder]
+plts_k_5_fam[5:8] = plts_k_5_fam[neworder]
+plts_k_9[5:8]     = plts_k_9[neworder]
+plts_k_9_fam[5:8] = plts_k_9_fam[neworder]
+plot!(plts_k_5[5]    , ylab = "Proportion of errors (β)");
+plot!(plts_k_5_fam[5], ylab = "Proportion of errors (β)");
+plot!(plts_k_9[5]    , ylab = "Proportion of errors (β)");
+plot!(plts_k_9_fam[5], ylab = "Proportion of errors (β)");
 
 
-prop_incorrect_αβ(results_df[1, :post_probs], results_df[1, :true_model])
-prop_incorrect_αβ(results_df[3592, :post_probs], results_df[3592, :true_model])
+plt_k_5     = plot(plts_k_5...,     layout = layout, size = 400 .* reverse(layout), bottom_margin = 8mm, left_margin = 12mm);
+plt_k_9     = plot(plts_k_9...,     layout = layout, size = 400 .* reverse(layout),	bottom_margin = 8mm, left_margin = 12mm);
+plt_k_5_fam = plot(plts_k_5_fam..., layout = layout, size = 400 .* reverse(layout), bottom_margin = 8mm, left_margin = 12mm);
+plt_k_9_fam = plot(plts_k_9_fam..., layout = layout, size = 400 .* reverse(layout),	bottom_margin = 8mm, left_margin = 12mm);
 
+savefig(plt_k_5, joinpath("figures", "bigsimulation", "r100_groupedby_k_5.pdf"))
+savefig(plt_k_9, joinpath("figures", "bigsimulation", "r100_groupedby_k_9.pdf"))
+savefig(plt_k_5_fam, joinpath("figures", "bigsimulation", "r100_groupedby_k_5_alpha_familywise.pdf"))
+savefig(plt_k_9_fam, joinpath("figures", "bigsimulation", "r100_groupedby_k_9_alpha_familywise.pdf"))
+
+# subset of plots for manuscript

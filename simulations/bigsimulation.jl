@@ -11,9 +11,7 @@ results_dir = joinpath("simulations", "big_simulation_runs")
 
 run_simulation(
 	n_obs_per_group,
-	# 1:10,
-	#1:30,
-	31:40,
+	repeats,
 	groups,
 	hypotheses,
 	offset,
