@@ -1,6 +1,8 @@
-using EqualitySampler, Plots, Colors, LazySets, Measures
+using EqualitySampler, Plots#, LazySets#, Measures
 import StatsBase: countmap
 import OrderedCollections
+import Colors
+import LazySets
 
 """
 	adjacency_mat_from_model(model::AbstractVector{T}) where T<:Integer
@@ -14,16 +16,6 @@ function adjacency_mat_from_model(model::AbstractVector{T}) where T<:Integer
 	for i in 1:k
 		A[i, i] = 1
 	end
-	return A
-
-	A = Matrix{T}(undef, k, k)
-	for i in 1:k-1
-		A[i, i] = 1
-		for j in i+1:k
-			A[i, j] = A[j, i] = model[i] == model[j] ? 1 : 0
-		end
-	end
-	A[k ,k] = 1
 	return A
 
 end
@@ -50,7 +42,7 @@ plot adjacency matrix as a network
 # end
 # plot_adjacency(A) = plot_adjacency(A, get_xy(size(A)[1])...)
 
-get_colors(k::Int) = distinguishable_colors(k, [RGB(128/255,128/255,128/255)])
+get_adj_colors(k::Int) = Colors.distinguishable_colors(k, [RGB(128/255,128/255,128/255)])
 
 function plot_model_data(model::AbstractVector{T}) where T<:Integer
 
@@ -75,20 +67,15 @@ end
 
 plot_model_data(x::Int) = plot_model_data(reverse(digits(x)))
 function plot_model(model::AbstractVector{T}; kwargs...) where T<:Integer
-	plt = plot(background_color_inside = plot_color(:lightgrey, 0.15), margin = 0.01mm; kwargs...)
+	plt = plot(background_color_inside = plot_color(:lightgrey, 0.15), margin = 0.01Plots.PlotMeasures.mm; kwargs...)
 	return plot_model!(plt, model; kwargs...)
 end
 
 function plot_model!(plt, model::AbstractVector{T}; markersize = 3, markerstroke = 3, kwargs...) where T<:Integer
 
 	k = length(model)
-	# A = zeros(T, k, k)
-	# for i in 1:k
-	# 	A[i, i] = 1
-	# end
 
-	# TODO: this should take the model as an argument!
-	colors = get_colors(k)
+	colors = get_adj_colors(k)
 
 	x, y = get_xy(k)
 	# TODO: not sure wheter all this OrderedDict is necessary
@@ -135,8 +122,8 @@ function make_shape(model, k, x, y, no_points = 32, pointscale = .15)
 		end
 	end
 
-	hull = convex_hull(points)
-	return VPolygon(hull)
+	hull = LazySets.convex_hull(points)
+	return LazySets.VPolygon(hull)
 end
 
 
@@ -188,6 +175,30 @@ function make_grid(k, vertical::Bool = true; max_per_row = 5)
 
 		max_no_cols = maximum(no_cols)
 		return g, max_no_cols, total_no_rows
+	end
+end
+
+function make_grid_5(k, vertical::Bool = true; max_per_row::Integer = 5)
+	incl = reverse!(EqualitySampler.expected_inclusion_counts(k))
+	total_no_rows = sum(ceil.(Int, incl ./ max_per_row))
+
+	l = Matrix{NamedTuple{(:label, :blank), Tuple{Symbol, Bool}}}(undef, total_no_rows, max_per_row)
+	# only works for k = 5
+	for i in (1, 12), j in (1, 2, 4, 5)
+		l[i, j] = (label = :_, blank = true)
+	end
+	for i in (1, 12), j in 3
+		l[i, j] = (label = Symbol(1), blank = false)
+	end
+
+	for j in 1:5, i in 2:11
+		l[i, j] = (label = :a, blank = false)
+	end
+
+	if vertical
+		return l
+	else
+		return permutedims(l)
 	end
 end
 
@@ -251,32 +262,17 @@ function ordering2(x)
 	return res
 end
 
-#=
-eqs = count_equalities.(eachcol(models))
-ueqs = unique(eqs)
-idx_unique = [findfirst(==(u), eqs) for u in ueqs]
-tbs = countmap.(eachcol(models[:, [1, 2, 5, 7, 15, 52]]))
+# k = 5
+# vertical = false
+# models = generate_distinct_models(k)
+# order = sortperm(ordering.(eachcol(models)), lt = !isless)
+# layout, max_rows, max_cols = make_grid(k, vertical)
+# w = 100
 
+# plots = [plot_model(view(models, :, i); legend=false, border=:none, axis=nothing) for i in order]
+# plt = plot(plots..., layout = layout, size = (max_cols*w, max_rows*w))
 
-
-
-
-x1 = models[:, 1]
-x2 = models[:, 2]
-x3 = models[:, 7]
-
-k = 5
-vertical = true
-models = generate_distinct_models(k)
-order = sortperm(ordering.(eachcol(models)), lt = !isless)
-layout, max_rows, max_cols = make_grid(k, vertical)
-w = 100
-
-plots = [plot_model(view(models, :, i); legend=false, border=:none, axis=nothing) for i in order]
-plt = plot(plots..., layout = layout, size = (max_cols*w, max_rows*w))
-
-order2 = sortperm(ordering2.(eachcol(models)), lt = !isless)
-plots2 = [plot_model(view(models, :, i); legend=false, border=:none, axis=nothing) for i in order2]
-plt = plot(plots2..., layout = layout, size = (max_cols*w, max_rows*w))
-
-=#
+# l2 = make_grid_5(5)
+# plot(plots..., layout = l2, size = reverse(size(l2)) .* w)
+# l3 = make_grid_5(5, false)
+# plot(plots..., layout = l3, size = reverse(size(l3)) .* w)

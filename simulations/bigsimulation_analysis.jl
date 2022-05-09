@@ -1,6 +1,7 @@
 using Plots, Plots.PlotMeasures, DataFrames, Chain, Colors, ColorSchemes, Printf
 using Statistics
 
+include("priors_plot_colors_shapes_labels.jl")
 include("simulation_helpers.jl")
 
 results_joined_path = joinpath("simulations", "big_simulation_runs_joined", "big_simulation_runs_joined.jld2")
@@ -16,76 +17,50 @@ end
 priors_to_remove = Set((:BetaBinomialk1, #=:DirichletProcessGP,=# :DirichletProcess2_0))
 obs_per_group_to_keep = Set((50, 100, 250, 500))
 reduced_results_df_ungrouped = @chain results_df begin
+	subset(:obs_per_group => (x -> x .<= 500))
 	filter(:prior => x -> x ∉ priors_to_remove, _)
 	# filter(:obs_per_group => x-> x in obs_per_group_to_keep, _)
 	groupby(Cols(:obs_per_group, :prior, :groups, :hypothesis))
-	# combine(:any_incorrect => mean, :prop_incorrect => mean)
 	combine([:any_incorrect, :prop_incorrect, :α_error_prop, :β_error_prop] .=> mean, :α_error_prop => (x->mean(>(0.0), x)) => :any_α_error_prop)
 	sort([order(:hypothesis, by=x->parse(Int, string(x)[2:end]), rev=true), order(:obs_per_group)])
 end
 reduced_results_df = groupby(reduced_results_df_ungrouped, Cols(:hypothesis, :groups))
+
+reduced_results_averaged_df = @chain reduced_results_df_ungrouped begin
+	groupby(Cols(:obs_per_group, :prior, :groups))
+	combine([:any_α_error_prop, :β_error_prop_mean] .=> mean)
+	groupby(:groups)
+end
+
+
+# tempdf = @chain results_df begin
+# 	filter(:hypothesis => x-> x in (:p00, :p25, :p50), _)
+# 	filter(:groups => x -> x == 5, _)
+# 	# filter(:prior => x -> x === :BetaBinomial1binomk2, _)
+# 	filter(:prior => x -> x === :Westfall, _)
+# 	transform(:α_error_prop => (x->x .> 0.0) => :any_α_error_prop)
+# 	sort([order(:hypothesis, by=x->parse(Int, string(x)[2:end]), rev=true), order(:obs_per_group)])
+# 	# groupby(Cols(:prior, :hypothesis, :groups, :obs_per_group))
+# 	# combine(:any_α_error_prop => mean)
+# end
+# tempdf[!, [1, 2, 4, 6, 8, 9, 10, 12, 18]]
+# tempdf[4, :true_model]
+# tempdf[4, :post_probs]
+# show(stdout, "text/plain", tempdf[!, [1, 2, 4, 6, 8, 10, 12, 18]])
+# prop_incorrect_αβ(results_df[6, :post_probs], results_df[6, :true_model], results_df[6, :prior] === :Westfall || results_df[6, :prior] === :Westfall_uncorrected)
+
 
 reduced_results_df2 = @chain reduced_results_df_ungrouped begin
 	filter(:obs_per_group => x-> x in obs_per_group_to_keep, _)
 	groupby(Cols(:hypothesis, :groups))
 end
 
-function get_labels(priors)
-	lookup = Dict(
-		:uniform				=> "Uniform",
-		:BetaBinomial11			=> "BB α=1, β=1",
-		:BetaBinomialk1			=> "BB α=K, β=1",
-		:BetaBinomial1k			=> "BB α=1, β=K",
-		:BetaBinomial1binomk2	=> "BB α=1, β=binom(K,2)",
-		# :BetaBinomial1binomk2	=> L"\mathrm{BB}\,\,\alpha=K, \beta=\binom{K}{2}",
-		:DirichletProcess0_5	=> "DPP α=0.5",
-		:DirichletProcess1_0	=> "DPP α=1",
-		:DirichletProcess2_0	=> "DPP α=2",
-		# :DirichletProcessGP		=> "DPP α=Gopalan & Berry",
-		:DirichletProcessGP		=> "DPP α=G&B",
-		:Westfall				=> "Westfall",
-		:Westfall_uncorrected	=> "Pairwise BFs",
-	)
-	priors_set = sort!(unique(priors))
-	return reshape([lookup[prior] for prior in priors_set], 1, length(priors_set))
-end
-
-function get_colors(priors, alpha = 0.75)
-	colors = alphacolor.(ColorSchemes.seaborn_colorblind[1:10], alpha)
-	lookup = Dict(
-		:uniform              => colors[1],
-		:BetaBinomial11       => colors[2],
-		:BetaBinomialk1       => colors[3],
-		:BetaBinomial1k       => colors[4],
-		:BetaBinomial1binomk2 => colors[5],
-		:DirichletProcess0_5  => colors[6],
-		:DirichletProcess1_0  => colors[7],
-		:DirichletProcess2_0  => colors[8],
-		:DirichletProcessGP   => colors[9],
-		:Westfall             => colors[10],
-		:Westfall_uncorrected => colors[3]
-	)
-	return [lookup[prior] for prior in priors]
-end
-
-function get_shapes(priors)
-	lookup = Dict(
-		:uniform              => :rect,
-		:BetaBinomial11       => :utriangle,
-		:BetaBinomialk1       => :rtriangle,
-		:BetaBinomial1k       => :ltriangle,
-		:BetaBinomial1binomk2 => :dtriangle,
-		:DirichletProcess0_5  => :star4,
-		:DirichletProcess1_0  => :star5,
-		:DirichletProcess2_0  => :star6,
-		:DirichletProcessGP   => :star8,
-		:Westfall             => :circle,
-		:Westfall_uncorrected => :circle
-	)
-	return [lookup[prior] for prior in priors]
-end
-
-function make_figure(df, y_symbol; xticks = [50, 100, 250, 500, 750, 1000], xlim = (0, 1050), kwargs...)
+function make_figure(df, y_symbol;
+	# xticks = [50, 100, 250, 500, 750, 1000],
+	# xlim = (0, 1050),
+	xticks = [50, 100, 250, 500],
+	xlim = (0, 550),
+	kwargs...)
 	# colors1 = get_colors(df[!, :prior], .8)
 	colors2 = get_colors(df[!, :prior], .5)
 	shapes = get_shapes(df[!, :prior])
@@ -128,16 +103,21 @@ end
 # keys_ordered = keys(reduced_results_df)[[1, 3, 4, 5, 2]]
 # keys_ordered = keys(reduced_results_df)[[1, 3, 4, 5, 2, 6, 8, 9, 10, 7]]
 keys_ordered = sort(keys(reduced_results_df), by = x-> 1000*x[2] + parse(Int, string(x[1])[2:end]))
-keys_α  = filter(x->x.hypothesis != :p100, keys_ordered)
-keys_β  = filter(x->x.hypothesis != :p00,  keys_ordered)
+keys_α = filter(x->x.hypothesis != :p100, keys_ordered)
+keys_β = filter(x->x.hypothesis != :p00,  keys_ordered)
 key_to_title(x) = "Inequalities = $(hypothesis_to_inequalities(x[1], x[2])), K = $(x[2])"
+
+xlab              = "No. observations"
+ylab_α            = "Proportion of errors"
+ylab_α_familywise = "Probability of at least one error"
+ylab_β            = "Proportion of errors (β)"
 
 plts_α = [
 	make_figure(
 		reduced_results_df[key],
 		:α_error_prop_mean;
-		xlabel = key[2] == 9 ? "no. observations" : "",
-		ylabel = key[1] === :p00 ? "Proportion of errors" : "",
+		xlabel = key[2] == 9 ? xlab : "",
+		ylabel = key[1] === :p00 ? ylab_α : "",
 		title  = key_to_title(key),
 		legend = key[1] === :p00 && key[2] == 5 ? :topright : false,
 		ylim   = (0, key[2] == 5 ? 0.4 : 1.05)
@@ -149,8 +129,8 @@ plts_α_familywise = [
 	make_figure(
 		reduced_results_df[key],
 		:any_α_error_prop;
-		xlabel = key[2] == 9 ? "no. observations" : "",
-		ylabel = key[1] === :p00 ? "Probability of at least one error" : "",
+		xlabel = key[2] == 9 ? xlab : "",
+		ylabel = key[1] === :p00 ? ylab_α_familywise : "",
 		title  = key_to_title(key),
 		legend = key[1] === :p00 && key[2] == 5 ? :topright : false,
 		ylim   = (0, 1.05)
@@ -162,8 +142,8 @@ plts_β = [
 	make_figure(
 		reduced_results_df[key],
 		:β_error_prop_mean;
-		xlabel = key[2] == 9 ? "no. observations" : "",
-		ylabel = key[1] === :p25 ? "Proportion of errors (β)" : "",
+		xlabel = key[2] == 9 ? xlab : "",
+		ylabel = key[1] === :p25 ? ylab_β : "",
 		title  = key_to_title(key),
 		legend = key[1] === :p25 && key[2] == 5 ? :topright : false,
 		ylim   = (0, 1.05),
@@ -171,7 +151,32 @@ plts_β = [
 	for key in keys_β
 ]
 
-# layout = (1, 5)
+plts_α_familywise_averaged = [make_figure(
+	reduced_results_averaged_df[key],
+	:any_α_error_prop_mean,
+	xlabel = xlab,
+	ylabel = ylab_α_familywise,
+	legend = false,
+	title  = "Averaged",
+	xlim   = (0, 550),
+	xticks = [50, 100, 250, 500],
+	yticks = key[1] == 5 ? (0:.1:.5) : :auto,
+	ylim   = key[1] == 5 ? (0, .5) : :auto
+) for key in keys(reduced_results_averaged_df)]
+
+plts_β_averaged = [make_figure(
+	reduced_results_averaged_df[key],
+	:β_error_prop_mean_mean,
+	xlabel = xlab,
+	ylabel = ylab_β,
+	legend = false,
+	title  = "Averaged",
+	xlim   = (0, 550),
+	xticks = [50, 100, 250, 500],
+	ylim   = (0, .6),
+	yticks = 0:.2:.6
+) for key in keys(reduced_results_averaged_df)]
+
 layout = (2, 4)
 plt_α_joined = plot(
 	plts_α..., layout = layout, size = 400 .* reverse(layout),
@@ -184,6 +189,7 @@ plt_α_familywise_joined = plot(
 	bottom_margin = 8mm,
 	left_margin = 12mm
 )
+layout = (2, 4)
 plt_β_joined = plot(
 	plts_β..., layout = layout, size = 400 .* reverse(layout),
 	bottom_margin = 8mm,
@@ -227,10 +233,10 @@ plts_k_5[5:8]     = plts_k_5[neworder]
 plts_k_5_fam[5:8] = plts_k_5_fam[neworder]
 plts_k_9[5:8]     = plts_k_9[neworder]
 plts_k_9_fam[5:8] = plts_k_9_fam[neworder]
-plot!(plts_k_5[5]    , ylab = "Proportion of errors (β)");
-plot!(plts_k_5_fam[5], ylab = "Proportion of errors (β)");
-plot!(plts_k_9[5]    , ylab = "Proportion of errors (β)");
-plot!(plts_k_9_fam[5], ylab = "Proportion of errors (β)");
+plot!(plts_k_5[5]    , ylab = ylab_β);
+plot!(plts_k_5_fam[5], ylab = ylab_β);
+plot!(plts_k_9[5]    , ylab = ylab_β);
+plot!(plts_k_9_fam[5], ylab = ylab_β);
 
 
 plt_k_5     = plot(plts_k_5...,     layout = layout, size = 400 .* reverse(layout), bottom_margin = 8mm, left_margin = 12mm);
@@ -238,10 +244,49 @@ plt_k_9     = plot(plts_k_9...,     layout = layout, size = 400 .* reverse(layou
 plt_k_5_fam = plot(plts_k_5_fam..., layout = layout, size = 400 .* reverse(layout), bottom_margin = 8mm, left_margin = 12mm);
 plt_k_9_fam = plot(plts_k_9_fam..., layout = layout, size = 400 .* reverse(layout),	bottom_margin = 8mm, left_margin = 12mm);
 
-savefig(plt_k_5, joinpath("figures", "bigsimulation", "r100_groupedby_k_5.pdf"))
-savefig(plt_k_9, joinpath("figures", "bigsimulation", "r100_groupedby_k_9.pdf"))
+savefig(plt_k_5,     joinpath("figures", "bigsimulation", "r100_groupedby_k_5.pdf"))
+savefig(plt_k_9,     joinpath("figures", "bigsimulation", "r100_groupedby_k_9.pdf"))
 savefig(plt_k_5_fam, joinpath("figures", "bigsimulation", "r100_groupedby_k_5_alpha_familywise.pdf"))
 savefig(plt_k_9_fam, joinpath("figures", "bigsimulation", "r100_groupedby_k_9_alpha_familywise.pdf"))
+
+# new subset of plots
+layout = @layout [
+	[
+		a; b
+	] [
+		c; d
+	] [
+		_; f{0.5h}; _
+	]
+]
+# plts = collect(plot(randn(10)) for i in 1:5)
+# plot(plts..., layout = layout)
+
+plts_α_familywise_5_averaged = [plts_α_familywise[1:4]; plts_α_familywise_averaged[1]]
+plts_α_familywise_9_averaged = [plts_α_familywise[5:8]; plts_α_familywise_averaged[2]]
+plts_β_5_averaged = [plts_β[1:4]; plts_β_averaged[1]]
+plts_β_9_averaged = [plts_β[5:8]; plts_β_averaged[2]]
+plot!(plts_α_familywise_5_averaged[2], xlab = xlab, ylab = ylab_α_familywise)
+plot!(plts_α_familywise_5_averaged[4], xlab = xlab)
+plot!(plts_α_familywise_9_averaged[2], legend = true)
+plot!(plts_β_5_averaged[1], legend = true)
+plot!(plts_β_9_averaged[1], legend = true)
+
+update_titles!(view(plts_α_familywise_5_averaged, 1:4), newtitles_5)
+update_titles!(view(plts_α_familywise_9_averaged, 1:4), newtitles_9)
+update_titles!(view(plts_β_5_averaged,            1:4), newtitles_5)
+update_titles!(view(plts_β_9_averaged,            1:4), newtitles_9)
+
+plt_α_familywise_5_joined = plot(plts_α_familywise_5_averaged..., layout = layout, size = 400 .* (3, 2), bottom_margin = 4mm, left_margin = 8mm)
+plt_α_familywise_9_joined = plot(plts_α_familywise_9_averaged..., layout = layout, size = 400 .* (3, 2), bottom_margin = 4mm, left_margin = 8mm)
+plt_β_5_joined            = plot(plts_β_5_averaged...,            layout = layout, size = 400 .* (3, 2), bottom_margin = 4mm, left_margin = 8mm)
+plt_β_9_joined            = plot(plts_β_9_averaged...,            layout = layout, size = 400 .* (3, 2), bottom_margin = 4mm, left_margin = 8mm)
+
+savefig(plt_α_familywise_5_joined,     joinpath("figures", "bigsimulation", "subset_k_5_alpha_familywise.pdf"))
+savefig(plt_α_familywise_9_joined,     joinpath("figures", "bigsimulation", "subset_k_9_alpha_familywise.pdf"))
+savefig(plt_β_5_joined,                joinpath("figures", "bigsimulation", "subset_k_5_beta.pdf"))
+savefig(plt_β_9_joined,                joinpath("figures", "bigsimulation", "subset_k_9_beta.pdf"))
+
 
 # subset of plots for manuscript
 keys_α_subset = keys_α[[1, 2, 3]]
