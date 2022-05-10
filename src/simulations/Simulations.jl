@@ -23,7 +23,6 @@ import
 	DynamicPPL,
 	FillArrays,
 	GLM,
-	HypergeometricFunctions,
 	IOCapture,
 	MCMCChains,
 	OrderedCollections,

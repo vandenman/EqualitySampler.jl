@@ -53,27 +53,29 @@ function meta_t_like(delta, t, N, df, rscale = 1.0, log_const = 0.0, shift = 0.0
 end
 
 
-"""
-identical to meta_t_like up to floating point accuracy, but does not use Rmath.
-"""
-function meta_t_like_2(delta, t, N, df, rscale = 1.0, log_const = 0.0, shift = 0.0, scale = 1.0; return_log::Bool = false)
+# Not accurate enough
+# """
+# identical to meta_t_like up to floating point accuracy, but does not use Rmath.
+# """
+# function meta_t_like_2(delta, t, N, df, rscale = 1.0, log_const = 0.0, shift = 0.0, scale = 1.0; return_log::Bool = false)
 
-	logval =
-		# Distributions.logpdf(Distributions.NoncentralT(df, (scale * delta + shift) * sqrt(N)), t) +
-		logpdf_noncental_t(t, df, (scale * delta + shift) * sqrt(N)) +
-		Distributions.logpdf(Distributions.Cauchy(0.0, rscale), scale * delta + shift) +
-		-log_const
+# 	logval =
+# 		# Distributions.logpdf(Distributions.NoncentralT(df, (scale * delta + shift) * sqrt(N)), t) +
+# 		logpdf_noncental_t(t, df, (scale * delta + shift) * sqrt(N)) +
+# 		Distributions.logpdf(Distributions.Cauchy(0.0, rscale), scale * delta + shift) +
+# 		-log_const
 
-	if isnan(logval)
-		@show delta, t, N, df, rscale, log_const, shift, scale
-	end
+# 	if isnan(logval)
+# 		@show delta, t, N, df, rscale, log_const, shift, scale
+# 	end
 
-	return return_log ? logval : exp(logval)
+# 	return return_log ? logval : exp(logval)
 
-end
+# end
 
-# TODO: see if this also works instead of meta_t_like, so we can skip IOCapture.capture() which crashes in parallel.
+# see if this also works instead of meta_t_like, so we can skip IOCapture.capture() which crashes in parallel.
 # for HermiteH try out SpecialPolynomials.basis(SpecialPolynomials.Hermite, degree)(value)
+# Tried it, but it's not accurate enough
 # function foo(delta, t, N, df, rscale = 1.0, log_const = 0.0, shift = 0.0, scale = 1.0; log::Bool = false)
  	# log(1 / (pi * rscale * (1 + (0.0 + delta * scale + shift)^2 / rscale^2))) +
 	# 	log((2^df * df^(1 + df / 2.0) * (df + t^2)^((-1 - df)/2.0) * Gamma((1 + df)/2.0) *

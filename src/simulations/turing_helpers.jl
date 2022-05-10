@@ -67,8 +67,6 @@ function compute_post_prob_eq(partition_samples::AbstractMatrix)
 					probs[i, j] += 1.0
 				end
 			end
-			# idx = j .+ findall(==(row[j]), row[j+1:end])
-			# probs[idx, j] .+= 1.0
 		end
 	end
 	return probs ./ n_samps

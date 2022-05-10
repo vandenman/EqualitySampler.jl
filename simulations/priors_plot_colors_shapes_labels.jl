@@ -49,6 +49,7 @@ function get_labels(priors)
 	priors_set = sort!(unique(priors))
 	return reshape([lookup[prior] for prior in priors_set], 1, length(priors_set))
 end
+get_labels(priors::Symbol) = get_labels((priors, ))
 
 function get_colors(priors, alpha = 0.75)
 	colors = ColorSchemes.alphacolor.(ColorSchemes.seaborn_colorblind[1:10], alpha)
@@ -67,6 +68,7 @@ function get_colors(priors, alpha = 0.75)
 	)
 	return [lookup[prior] for prior in priors]
 end
+get_colors(priors::Symbol, alpha = 0.75) = get_colors((priors, ), alpha)
 
 function get_shapes(priors)
 	lookup = Dict(
@@ -84,3 +86,4 @@ function get_shapes(priors)
 	)
 	return [lookup[prior] for prior in priors]
 end
+get_shapes(priors::Symbol) = get_shapes((priors, ))
