@@ -112,15 +112,6 @@ function make_figure(df, y_symbol;
 	)
 end
 
-make_figure(
-	reduced_results_df[keys_α[1]],
-	:α_error_prop_mean;
-	xlabel = "",
-	ylabel = "",
-	legend = :topright,
-	ylim   = (0, 0.4)
-)
-
 # ensure :p100 comes last
 # keys_ordered = keys(reduced_results_df)[[1, 3, 4, 5, 2]]
 # keys_ordered = keys(reduced_results_df)[[1, 3, 4, 5, 2, 6, 8, 9, 10, 7]]
@@ -327,6 +318,7 @@ update_titles!(view(plts_β_5_averaged,            1:4), newtitles_β_5)
 update_titles!(view(plts_β_9_averaged,            1:4), newtitles_β_9)
 
 [plot!(plt, ylim = (0, .75), yticks = 0:.25:.75) for plt in view(plts_β_5_averaged, 1:4)]
+[plot!(plt, ylim = (0, .5), yticks = 0:.1:.5) for plt in plts_β_9_averaged]
 
 plt_α_familywise_5_joined = plot(plts_α_familywise_5_averaged..., layout = layout, size = 400 .* (3, 2), bottom_margin = 4mm, left_margin = 8mm)
 plt_α_familywise_9_joined = plot(plts_α_familywise_9_averaged..., layout = layout, size = 400 .* (3, 2), bottom_margin = 4mm, left_margin = 8mm)
