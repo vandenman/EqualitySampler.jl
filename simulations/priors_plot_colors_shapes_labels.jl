@@ -48,11 +48,11 @@ function get_labels(priors)
 	)
 	priors_set = sort!(unique(priors))
 	# flip order of BB per request Fabian
-	i1 = findfirst(x -> x === :BetaBinomial1k, priors_set)
-	i2 = findfirst(x -> x === :BetaBinomial1binomk2, priors_set)
-	if !isnothing(i1) && !isnothing(i2)
-		priors_set[i1], priors_set[i2] = priors_set[i2], priors_set[i1]
-	end
+	# i1 = findfirst(x -> x === :BetaBinomial1k, priors_set)
+	# i2 = findfirst(x -> x === :BetaBinomial1binomk2, priors_set)
+	# if !isnothing(i1) && !isnothing(i2)
+	# 	priors_set[i1], priors_set[i2] = priors_set[i2], priors_set[i1]
+	# end
 
 	return reshape([lookup[prior] for prior in priors_set], 1, length(priors_set))
 end

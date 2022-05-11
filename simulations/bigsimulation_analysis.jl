@@ -61,9 +61,22 @@ function make_figure(df, y_symbol;
 	xticks = [50, 100, 250, 500],
 	xlim = (0, 550),
 	kwargs...)
-	# colors1 = get_colors(df[!, :prior], .8)
-	colors2 = get_colors(df[!, :prior], .5)
-	shapes = get_shapes(df[!, :prior])
+
+	idx_bb1k   = findall(x->x===:BetaBinomial1k, df[!, :prior])
+	idx_bb1bk2 = findall(x->x===:BetaBinomial1binomk2, df[!, :prior])
+
+	oo = collect(axes(df, 1))
+	oo[idx_bb1k], oo[idx_bb1bk2] = oo[idx_bb1bk2], oo[idx_bb1k]
+	prior = df[!, :prior]
+
+	colors2 = get_colors(prior, .5)
+	shapes  = get_shapes(prior)
+	labels  = get_labels(prior)
+
+	colors2[idx_bb1k], colors2[idx_bb1bk2] = colors2[idx_bb1bk2], colors2[idx_bb1k]
+	shapes[idx_bb1k], shapes[idx_bb1bk2] = shapes[idx_bb1bk2], shapes[idx_bb1k]
+	labels[2], labels[3] = labels[3], labels[2]
+
 	offset_size = 0.1
 	offset_lookup = Dict(
 		((:BetaBinomial11, :BetaBinomialk1, :BetaBinomial1k, :BetaBinomial1binomk2) .=> -offset_size)...,
@@ -72,8 +85,8 @@ function make_figure(df, y_symbol;
 	)
 	offset = [offset_lookup[prior] for prior in df[!, :prior]]
 	Plots.plot(
-		df[!, :obs_per_group] .+ offset,
-		df[!, y_symbol],
+		df[oo, :obs_per_group] .+ offset,
+		df[oo, y_symbol],
 		group = df[!, :prior],
 
 		linecolor			= colors2,
@@ -82,7 +95,7 @@ function make_figure(df, y_symbol;
 		# markerstrokealpha	= 0.0,
 		markerstrokewidth	= 0,
 		# markerstrokecolor	= colors1,
-		labels				= get_labels(df[!, :prior]),
+		labels				= labels,
 		markersize			= 7,
 		markeralpha			= 0.75,
 
@@ -98,6 +111,15 @@ function make_figure(df, y_symbol;
 		kwargs...
 	)
 end
+
+make_figure(
+	reduced_results_df[keys_α[1]],
+	:α_error_prop_mean;
+	xlabel = "",
+	ylabel = "",
+	legend = :topright,
+	ylim   = (0, 0.4)
+)
 
 # ensure :p100 comes last
 # keys_ordered = keys(reduced_results_df)[[1, 3, 4, 5, 2]]
