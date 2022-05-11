@@ -268,13 +268,23 @@ plts_α_familywise_9_averaged = [plts_α_familywise[ord2]; plts_α_familywise_av
 plts_β_5_averaged = [plts_β[ordβ];      plts_β_averaged[1]]
 plts_β_9_averaged = [plts_β[ordβ .+ 4]; plts_β_averaged[2]]
 plot!(plts_α_familywise_5_averaged[2], xlab = xlab, ylab = ylab_α_familywise)
+plot!(plts_α_familywise_9_averaged[1], xlab = "")
+plot!(plts_α_familywise_9_averaged[3], xlab = "")
 plot!(plts_α_familywise_5_averaged[4], xlab = xlab)
-plot!(plts_α_familywise_9_averaged[2], legend = true)
-plot!(plts_β_5_averaged[1], legend = true)
-plot!(plts_β_9_averaged[1], legend = true)
+plot!(plts_α_familywise_9_averaged[2], xlab = xlab, ylab = ylab_α_familywise, legend = true)
 
 plot!(plts_α_familywise_5_averaged[2], ylim = (0, .5), ytick = collect(0:.1:.5));
 plot!(plts_α_familywise_5_averaged[4], ylim = (0, .5), ytick = collect(0:.1:.5));
+
+plot!(plts_β_5_averaged[1], ylab = ylab_β, legend = true)
+plot!(plts_β_5_averaged[2], ylab = ylab_β, legend = true, xlab = xlab)
+plot!(plts_β_5_averaged[4], ylab = "",     legend = true, xlab = xlab)
+
+plot!(plts_β_9_averaged[1], xlab = "",   ylab = ylab_β, legend = true)
+plot!(plts_β_9_averaged[2], xlab = xlab, ylab = ylab_β)
+plot!(plts_β_9_averaged[3], xlab = "",   ylab = "")
+plot!(plts_β_9_averaged[4], xlab = xlab, ylab = "")
+
 
 # update_titles!(view(plts_α_familywise_5_averaged, 1:4), newtitles_5)
 # update_titles!(view(plts_α_familywise_9_averaged, 1:4), newtitles_9)
