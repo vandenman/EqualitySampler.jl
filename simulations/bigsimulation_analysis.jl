@@ -197,9 +197,9 @@ plt_β_joined = plot(
 )
 
 # plots grouped by α, α-familywise, and β
-savefig(plt_α_joined,            joinpath("figures", "bigsimulation", "r100_alpha.pdf"))
-savefig(plt_α_familywise_joined, joinpath("figures", "bigsimulation", "r100_alpha_familywise.pdf"))
-savefig(plt_β_joined,            joinpath("figures", "bigsimulation", "r100_beta.pdf"))
+# savefig(plt_α_joined,            joinpath("figures", "bigsimulation", "r100_alpha.pdf"))
+# savefig(plt_α_familywise_joined, joinpath("figures", "bigsimulation", "r100_alpha_familywise.pdf"))
+# savefig(plt_β_joined,            joinpath("figures", "bigsimulation", "r100_beta.pdf"))
 
 # plots grouped by k
 plts_k_5     = vcat(plts_α[1:4],            plts_β[1:4]);
@@ -221,8 +221,8 @@ plot!(plts_k_9[5], legend = false);
 plot!(plts_k_5_fam[5], legend = false);
 plot!(plts_k_9_fam[5], legend = false);
 
-newtitles_5 = ["Inequalities=" .* string.([0, 2, 3, 4]); "Inequalities=" .* string.([2, 3, 4, 5])]
-newtitles_9 = ["Inequalities=" .* string.([0, 3, 5, 7]); "Inequalities=" .* string.([3, 5, 7, 9])]
+newtitles_5 = ["Inequalities=" .* string.([0, 1, 2, 3]); "Inequalities=" .* string.([1, 2, 3, 4])]
+newtitles_9 = ["Inequalities=" .* string.([0, 3, 5, 7]); "Inequalities=" .* string.([3, 5, 7, 8])]
 update_titles!(plts_k_5,     newtitles_5)
 update_titles!(plts_k_5_fam, newtitles_5)
 update_titles!(plts_k_9,     newtitles_9)
@@ -238,16 +238,16 @@ plot!(plts_k_5_fam[5], ylab = ylab_β);
 plot!(plts_k_9[5]    , ylab = ylab_β);
 plot!(plts_k_9_fam[5], ylab = ylab_β);
 
-
+layout = (2, 4)
 plt_k_5     = plot(plts_k_5...,     layout = layout, size = 400 .* reverse(layout), bottom_margin = 8mm, left_margin = 12mm);
 plt_k_9     = plot(plts_k_9...,     layout = layout, size = 400 .* reverse(layout),	bottom_margin = 8mm, left_margin = 12mm);
 plt_k_5_fam = plot(plts_k_5_fam..., layout = layout, size = 400 .* reverse(layout), bottom_margin = 8mm, left_margin = 12mm);
 plt_k_9_fam = plot(plts_k_9_fam..., layout = layout, size = 400 .* reverse(layout),	bottom_margin = 8mm, left_margin = 12mm);
 
-savefig(plt_k_5,     joinpath("figures", "bigsimulation", "r100_groupedby_k_5.pdf"))
-savefig(plt_k_9,     joinpath("figures", "bigsimulation", "r100_groupedby_k_9.pdf"))
-savefig(plt_k_5_fam, joinpath("figures", "bigsimulation", "r100_groupedby_k_5_alpha_familywise.pdf"))
-savefig(plt_k_9_fam, joinpath("figures", "bigsimulation", "r100_groupedby_k_9_alpha_familywise.pdf"))
+# savefig(plt_k_5,     joinpath("figures", "bigsimulation", "r100_groupedby_k_5.pdf"))
+# savefig(plt_k_9,     joinpath("figures", "bigsimulation", "r100_groupedby_k_9.pdf"))
+# savefig(plt_k_5_fam, joinpath("figures", "bigsimulation", "r100_groupedby_k_5_alpha_familywise.pdf"))
+# savefig(plt_k_9_fam, joinpath("figures", "bigsimulation", "r100_groupedby_k_9_alpha_familywise.pdf"))
 
 # new subset of plots
 layout = @layout [
@@ -261,31 +261,35 @@ layout = @layout [
 ]
 # plts = collect(plot(randn(10)) for i in 1:5)
 # plot(plts..., layout = layout)
-
-plts_α_familywise_5_averaged = [plts_α_familywise[1:4]; plts_α_familywise_averaged[1]]
-plts_α_familywise_9_averaged = [plts_α_familywise[5:8]; plts_α_familywise_averaged[2]]
-plts_β_5_averaged = [plts_β[1:4]; plts_β_averaged[1]]
-plts_β_9_averaged = [plts_β[5:8]; plts_β_averaged[2]]
+ord  = [1, 3, 2, 4]
+ordβ = [4, 2, 3, 1]
+plts_α_familywise_5_averaged = [plts_α_familywise[ord];      plts_α_familywise_averaged[1]]
+plts_α_familywise_9_averaged = [plts_α_familywise[ord2]; plts_α_familywise_averaged[2]]
+plts_β_5_averaged = [plts_β[ordβ];      plts_β_averaged[1]]
+plts_β_9_averaged = [plts_β[ordβ .+ 4]; plts_β_averaged[2]]
 plot!(plts_α_familywise_5_averaged[2], xlab = xlab, ylab = ylab_α_familywise)
 plot!(plts_α_familywise_5_averaged[4], xlab = xlab)
 plot!(plts_α_familywise_9_averaged[2], legend = true)
 plot!(plts_β_5_averaged[1], legend = true)
 plot!(plts_β_9_averaged[1], legend = true)
 
-update_titles!(view(plts_α_familywise_5_averaged, 1:4), newtitles_5)
-update_titles!(view(plts_α_familywise_9_averaged, 1:4), newtitles_9)
-update_titles!(view(plts_β_5_averaged,            1:4), newtitles_5)
-update_titles!(view(plts_β_9_averaged,            1:4), newtitles_9)
+plot!(plts_α_familywise_5_averaged[2], ylim = (0, .5), ytick = collect(0:.1:.5));
+plot!(plts_α_familywise_5_averaged[4], ylim = (0, .5), ytick = collect(0:.1:.5));
+
+# update_titles!(view(plts_α_familywise_5_averaged, 1:4), newtitles_5)
+# update_titles!(view(plts_α_familywise_9_averaged, 1:4), newtitles_9)
+# update_titles!(view(plts_β_5_averaged,            1:4), newtitles_5)
+# update_titles!(view(plts_β_9_averaged,            1:4), newtitles_9)
 
 plt_α_familywise_5_joined = plot(plts_α_familywise_5_averaged..., layout = layout, size = 400 .* (3, 2), bottom_margin = 4mm, left_margin = 8mm)
 plt_α_familywise_9_joined = plot(plts_α_familywise_9_averaged..., layout = layout, size = 400 .* (3, 2), bottom_margin = 4mm, left_margin = 8mm)
 plt_β_5_joined            = plot(plts_β_5_averaged...,            layout = layout, size = 400 .* (3, 2), bottom_margin = 4mm, left_margin = 8mm)
 plt_β_9_joined            = plot(plts_β_9_averaged...,            layout = layout, size = 400 .* (3, 2), bottom_margin = 4mm, left_margin = 8mm)
 
-savefig(plt_α_familywise_5_joined,     joinpath("figures", "bigsimulation", "subset_k_5_alpha_familywise.pdf"))
-savefig(plt_α_familywise_9_joined,     joinpath("figures", "bigsimulation", "subset_k_9_alpha_familywise.pdf"))
-savefig(plt_β_5_joined,                joinpath("figures", "bigsimulation", "subset_k_5_beta.pdf"))
-savefig(plt_β_9_joined,                joinpath("figures", "bigsimulation", "subset_k_9_beta.pdf"))
+# savefig(plt_α_familywise_5_joined,     joinpath("figures", "bigsimulation", "subset_k_5_alpha_familywise.pdf"))
+# savefig(plt_α_familywise_9_joined,     joinpath("figures", "bigsimulation", "subset_k_9_alpha_familywise.pdf"))
+# savefig(plt_β_5_joined,                joinpath("figures", "bigsimulation", "subset_k_5_beta.pdf"))
+# savefig(plt_β_9_joined,                joinpath("figures", "bigsimulation", "subset_k_9_beta.pdf"))
 
 
 # subset of plots for manuscript

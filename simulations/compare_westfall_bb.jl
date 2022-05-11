@@ -1,6 +1,6 @@
 using EqualitySampler, EqualitySampler.Simulations, DataFrames
 import ProgressMeter, Random, AbstractMCMC
-
+using Statistics
 include("simulation_helpers.jl")
 
 obs_per_group = 50
@@ -114,28 +114,48 @@ function check_consistency_model_pairwise_differences(model, obs_mean, tol = .3)
 
 	obs_mean_diff_mat_v = view(obs_mean_diff_mat, :, [i1, i2])
 
-	_, idx = findmin(obs_mean_diff_mat_v)
-	idx12 = CartesianIndex(i1, i2)
-	if idx[2] == 1
-		idxd1 = CartesianIndex(i1, idx[1])
-		idxd2 = CartesianIndex(i2, idx[1])
-	else
-		idxd1 = CartesianIndex(i1, idx[2])
-		idxd2 = CartesianIndex(i2, idx[2])
+	target = obs_mean_diff_mat[i1, i2]
+	idx = findall(<(target), obs_mean_diff_mat_v)
+	if isnothing(idx)
+		return true
 	end
-	return obs_mean_diff_mat[idxd2] <= tol
+
+	for i in idx
+		idx_d = i[2] == 1 ? (i[1], i2) : (i[1], i1)tol
+		if obs_mean_diff_mat[idx_d[1], idx_d[2]] >= tol
+			return false
+		end
+	end
+	return true
 end
 
+df_results.post_probs_bb[1]
+df_results.post_probs_bb[9]
+compute_obs_mean_abs_diff(df_results.data_means[1])
 model, obs_mean = df_sub.model[1], df_sub.data_means[1]
 model, obs_mean = df_results.model[1], df_results.data_means[1]
 model, obs_mean = df_results.model[51], df_results.data_means[51]
-check_consistency_model_pairwise_differences(df_sub.model[1], df_sub.data_means[1])
-check_consistency_model_pairwise_differences(df_results.model[1], df_results.data_means[1])
+check_consistency_model_pairwise_differences(df_sub.model[1], df_sub.data_means[1], .4)
+check_consistency_model_pairwise_differences(df_results.model[1], df_results.data_means[1], .4)
 
 check_consistency_model_pairwise_differences.(df_sub.model, df_sub.data_means)
 
+qb = Simulations.normalize_θ(offset, df_sub.model[1])
+qb .- qb[2]
+qg = Simulations.normalize_θ(offset, df_results.model[1])
+qg .- qg[1]
+function get_max_diff_theta(m)
+	idx = findfirst(>(1), EqualitySampler.fast_countmap_partition_incl_zero(m))
+	true_theta = Simulations.normalize_θ(.2, m)
+	maximum(true_theta .- true_theta[idx])
+end
+get_max_diff_theta.(df_sub.model)
+get_max_diff_theta.(df_results.model)
 
-df_results2 = transform(df_results, 
+var(qb)
+var(qg)
+
+df_results2 = transform(df_results,
 	[:model, :data_means] => ((m, d) -> check_consistency_model_pairwise_differences.(m, d, .2)) => :consistent
 )
 df_results2[!, :i] = axes(df_results2, 1)
