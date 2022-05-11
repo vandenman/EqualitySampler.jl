@@ -109,7 +109,7 @@ key_to_title(x) = "Inequalities = $(hypothesis_to_inequalities(x[1], x[2])), K =
 
 xlab              = "No. observations"
 ylab_α            = "Proportion of errors"
-ylab_α_familywise = "Probability of at least one error"
+ylab_α_familywise = "Familywise error rate"
 ylab_β            = "Proportion of errors (β)"
 
 plts_α = [
@@ -155,7 +155,7 @@ plts_α_familywise_averaged = [make_figure(
 	reduced_results_averaged_df[key],
 	:any_α_error_prop_mean,
 	xlabel = xlab,
-	ylabel = ylab_α_familywise,
+	ylabel = "",#ylab_α_familywise,
 	legend = false,
 	title  = "Averaged",
 	xlim   = (0, 550),
@@ -168,13 +168,13 @@ plts_β_averaged = [make_figure(
 	reduced_results_averaged_df[key],
 	:β_error_prop_mean_mean,
 	xlabel = xlab,
-	ylabel = ylab_β,
+	ylabel = "",#ylab_β,
 	legend = false,
 	title  = "Averaged",
 	xlim   = (0, 550),
 	xticks = [50, 100, 250, 500],
 	ylim   = (0, .6),
-	yticks = 0:.2:.6
+	yticks = 0:.1:.6
 ) for key in keys(reduced_results_averaged_df)]
 
 layout = (2, 4)
@@ -221,8 +221,8 @@ plot!(plts_k_9[5], legend = false);
 plot!(plts_k_5_fam[5], legend = false);
 plot!(plts_k_9_fam[5], legend = false);
 
-newtitles_5 = ["Inequalities=" .* string.([0, 1, 2, 3]); "Inequalities=" .* string.([1, 2, 3, 4])]
-newtitles_9 = ["Inequalities=" .* string.([0, 3, 5, 7]); "Inequalities=" .* string.([3, 5, 7, 8])]
+newtitles_5 = ["Inequalities = " .* string.([0, 1, 2, 3]); "Inequalities = " .* string.([1, 2, 3, 4])]
+newtitles_9 = ["Inequalities = " .* string.([0, 3, 5, 7]); "Inequalities = " .* string.([3, 5, 7, 8])]
 update_titles!(plts_k_5,     newtitles_5)
 update_titles!(plts_k_5_fam, newtitles_5)
 update_titles!(plts_k_9,     newtitles_9)
@@ -264,7 +264,7 @@ layout = @layout [
 ord  = [1, 3, 2, 4]
 ordβ = [4, 2, 3, 1]
 plts_α_familywise_5_averaged = [plts_α_familywise[ord];      plts_α_familywise_averaged[1]]
-plts_α_familywise_9_averaged = [plts_α_familywise[ord2]; plts_α_familywise_averaged[2]]
+plts_α_familywise_9_averaged = [plts_α_familywise[ord .+ 4]; plts_α_familywise_averaged[2]]
 plts_β_5_averaged = [plts_β[ordβ];      plts_β_averaged[1]]
 plts_β_9_averaged = [plts_β[ordβ .+ 4]; plts_β_averaged[2]]
 plot!(plts_α_familywise_5_averaged[2], xlab = xlab, ylab = ylab_α_familywise)
@@ -272,6 +272,11 @@ plot!(plts_α_familywise_9_averaged[1], xlab = "")
 plot!(plts_α_familywise_9_averaged[3], xlab = "")
 plot!(plts_α_familywise_5_averaged[4], xlab = xlab)
 plot!(plts_α_familywise_9_averaged[2], xlab = xlab, ylab = ylab_α_familywise, legend = true)
+
+# these two cut the uniform
+plot!(plts_α_familywise_5_averaged[1], ylim = (0, .5), ytick = collect(0:.1:.5), legend = false);
+plot!(plts_α_familywise_5_averaged[3], ylim = (0, .5), ytick = collect(0:.1:.5));
+plot!(plts_α_familywise_5_averaged[2], legend = true);
 
 plot!(plts_α_familywise_5_averaged[2], ylim = (0, .5), ytick = collect(0:.1:.5));
 plot!(plts_α_familywise_5_averaged[4], ylim = (0, .5), ytick = collect(0:.1:.5));
@@ -285,11 +290,11 @@ plot!(plts_β_9_averaged[2], xlab = xlab, ylab = ylab_β)
 plot!(plts_β_9_averaged[3], xlab = "",   ylab = "")
 plot!(plts_β_9_averaged[4], xlab = xlab, ylab = "")
 
+newtitles_β_5 = "Equalities = " .* string.([0, 2, 1, 3])
+newtitles_β_9 = "Equalities = " .* string.([0, 5, 3, 7])
 
-# update_titles!(view(plts_α_familywise_5_averaged, 1:4), newtitles_5)
-# update_titles!(view(plts_α_familywise_9_averaged, 1:4), newtitles_9)
-# update_titles!(view(plts_β_5_averaged,            1:4), newtitles_5)
-# update_titles!(view(plts_β_9_averaged,            1:4), newtitles_9)
+update_titles!(view(plts_β_5_averaged,            1:4), newtitles_β_5)
+update_titles!(view(plts_β_9_averaged,            1:4), newtitles_β_9)
 
 plt_α_familywise_5_joined = plot(plts_α_familywise_5_averaged..., layout = layout, size = 400 .* (3, 2), bottom_margin = 4mm, left_margin = 8mm)
 plt_α_familywise_9_joined = plot(plts_α_familywise_9_averaged..., layout = layout, size = 400 .* (3, 2), bottom_margin = 4mm, left_margin = 8mm)

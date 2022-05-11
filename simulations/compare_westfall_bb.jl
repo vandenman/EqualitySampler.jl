@@ -76,13 +76,24 @@ idx_bad = findall(>=(1), df_results.perf_bb)
 df_sub = df_results[idx_bad, :]
 
 function compute_obs_mean_abs_diff(obs_mean)
-	obs_mean_diff_mat = zeros(5, 5)
-	for i in 1:4, j in i+1:5
+	k = size(obs_mean, 1)
+	obs_mean_diff_mat = zeros(k, k)
+	for i in 1:k-1, j in i+1:k
 		obs_mean_diff_mat[j, i] = abs(obs_mean[i] - obs_mean[j])
 		obs_mean_diff_mat[i, j] = obs_mean_diff_mat[j, i]
 	end
 	obs_mean_diff_mat
 end
+function compute_obs_mean_diff(obs_mean)
+	k = size(obs_mean, 1)
+	obs_mean_diff_mat = zeros(k, k)
+	for i in 1:k-1, j in i+1:k
+		obs_mean_diff_mat[j, i] = obs_mean[i] - obs_mean[j]
+		obs_mean_diff_mat[i, j] = obs_mean_diff_mat[j, i]
+	end
+	obs_mean_diff_mat
+end
+
 
 # function check_consistency_model_pairwise_differences(model, obs_mean)
 # 	obs_mean_diff_mat = compute_obs_mean_abs_diff(obs_mean)
@@ -154,6 +165,28 @@ get_max_diff_theta.(df_results.model)
 
 var(qb)
 var(qg)
+
+ms = [
+	[1, 2, 3, 4],
+	[1, 2, 3, 3],
+	[1, 2, 2, 2],
+	[1, 1, 1, 1]
+]
+for m in ms
+	θ = Simulations.normalize_θ(.2, m)
+	θ_diff = LinearAlgebra.LowerTriangular(compute_obs_mean_diff(θ))
+	mean_θ_diff = mean(θ_diff[j, i] for i in 1:size(θ_diff, 1)-1 for j in i+1:size(θ_diff, 1))
+	println("model = $m")
+	println("θ = $θ")
+	println("θ_diff")
+	display(θ_diff)
+	println("mean_θ_diff = $mean_θ_diff")
+end
+
+compute_obs_mean_diff(qb)
+compute_obs_mean_diff(qg)
+mean([qb[i] - qb[j] for i in 1:4 for j in i+1:5])
+mean([qg[i] - qg[j] for i in 1:4 for j in i+1:5])
 
 df_results2 = transform(df_results,
 	[:model, :data_means] => ((m, d) -> check_consistency_model_pairwise_differences.(m, d, .2)) => :consistent
