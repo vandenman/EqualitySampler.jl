@@ -212,6 +212,11 @@ function update_titles!(plts, newtitles)
 		plot!(plt; title = newtitle)
 	end
 end
+function update_kwargs!(plts, newtitles)
+	for (plt, newtitle) in zip(plts, newtitles)
+		plot!(plt; title = newtitle)
+	end
+end
 
 plot!(plts_k_5[1], ylab = "α");
 plot!(plts_k_5[5], legend = false);
@@ -271,30 +276,35 @@ plot!(plts_α_familywise_5_averaged[2], xlab = xlab, ylab = ylab_α_familywise)
 plot!(plts_α_familywise_9_averaged[1], xlab = "")
 plot!(plts_α_familywise_9_averaged[3], xlab = "")
 plot!(plts_α_familywise_5_averaged[4], xlab = xlab)
-plot!(plts_α_familywise_9_averaged[2], xlab = xlab, ylab = ylab_α_familywise, legend = true)
+plot!(plts_α_familywise_9_averaged[2], xlab = xlab, ylab = ylab_α_familywise, legend = false)
+plot!(plts_α_familywise_9_averaged[5], legend = true)
 
 # these two cut the uniform
 plot!(plts_α_familywise_5_averaged[1], ylim = (0, .5), ytick = collect(0:.1:.5), legend = false);
 plot!(plts_α_familywise_5_averaged[3], ylim = (0, .5), ytick = collect(0:.1:.5));
-plot!(plts_α_familywise_5_averaged[2], legend = true);
+plot!(plts_α_familywise_5_averaged[5], legend = true);
 
 plot!(plts_α_familywise_5_averaged[2], ylim = (0, .5), ytick = collect(0:.1:.5));
 plot!(plts_α_familywise_5_averaged[4], ylim = (0, .5), ytick = collect(0:.1:.5));
 
-plot!(plts_β_5_averaged[1], ylab = ylab_β, legend = true)
-plot!(plts_β_5_averaged[2], ylab = ylab_β, legend = true, xlab = xlab)
-plot!(plts_β_5_averaged[4], ylab = "",     legend = true, xlab = xlab)
+plot!(plts_β_5_averaged[1], ylab = ylab_β, legend = false)
+plot!(plts_β_5_averaged[2], ylab = ylab_β, legend = false, xlab = xlab)
+plot!(plts_β_5_averaged[4], ylab = "",     legend = false, xlab = xlab)
+plot!(plts_β_5_averaged[5], legend = true)
 
-plot!(plts_β_9_averaged[1], xlab = "",   ylab = ylab_β, legend = true)
+plot!(plts_β_9_averaged[1], xlab = "",   ylab = ylab_β, legend = false)
 plot!(plts_β_9_averaged[2], xlab = xlab, ylab = ylab_β)
 plot!(plts_β_9_averaged[3], xlab = "",   ylab = "")
 plot!(plts_β_9_averaged[4], xlab = xlab, ylab = "")
+plot!(plts_β_9_averaged[5], legend = true)
 
 newtitles_β_5 = "Equalities = " .* string.([0, 2, 1, 3])
 newtitles_β_9 = "Equalities = " .* string.([0, 5, 3, 7])
 
 update_titles!(view(plts_β_5_averaged,            1:4), newtitles_β_5)
 update_titles!(view(plts_β_9_averaged,            1:4), newtitles_β_9)
+
+[plot!(plt, ylim = (0, .75), yticks = 0:.25:.75) for plt in view(plts_β_5_averaged, 1:4)]
 
 plt_α_familywise_5_joined = plot(plts_α_familywise_5_averaged..., layout = layout, size = 400 .* (3, 2), bottom_margin = 4mm, left_margin = 8mm)
 plt_α_familywise_9_joined = plot(plts_α_familywise_9_averaged..., layout = layout, size = 400 .* (3, 2), bottom_margin = 4mm, left_margin = 8mm)
