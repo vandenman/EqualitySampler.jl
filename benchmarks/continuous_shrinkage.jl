@@ -1,4 +1,4 @@
-using Distributions
+using Distributions, Turing
 
 #=
 	TODO:
@@ -26,3 +26,20 @@ sum(pp, dims = 2)
 
 θ = randn(p); θ .-= mean(θ)
 pp * θ
+
+DynamicPPL.@model function factor_shrinkage(y, X, g_design, no_g, ::Type{T} = Float64) where {T}
+
+	α 		~ Turing.Flat()
+	σ² 		~ EqualitySampler.JeffreysPriorVariance()
+
+	g ~ filldist(Distributions.InverseGamma(0.5, 0.5; check_args = false), no_g)
+
+	G = (g .* g) * g_design
+
+	B ~ prior
+	β ~ Distributions.MvNormal(σ² .* G * B)
+
+	μ = α .+ X * β
+	y ~ MvNormal(μ, sqrt(σ₂))
+
+end
