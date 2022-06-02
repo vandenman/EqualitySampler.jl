@@ -215,11 +215,13 @@ function make_all_plots(dfg, dfg_incl;
 
 
 		if subdf[1, :distribution]<: UniformMvUrnDistribution
-			legendpos = :none
+			legend_position = :none
 		else
-			legendpos = :topright
+			legend_position = (0.6, 0.96)#:topright
+			# legend_position = :top#right
 			if subdf[1, :distribution]<: BetaBinomialMvUrnDistribution
 				start = 4
+				labels = labels[:, [1, 3, 2]]
 			else
 				start = 5
 			end
@@ -229,6 +231,7 @@ function make_all_plots(dfg, dfg_incl;
 		end
 
 		if subdf[1, :distribution] <: RandomProcessMvUrnDistribution{DirichletProcess{Float64}, Int64}
+			legend_position = (0.8, 0.96)#:top#right
 			y = y[:, [2, 1, 3]]
 			labels = labels[:, [2, 1, 3]]
 		end
@@ -237,7 +240,7 @@ function make_all_plots(dfg, dfg_incl;
 			markershapes = repeat(shapes, inner = length(x_idx)),
 			color = repeat(colors, inner = length(x_idx)),
 			title = make_title(subdf[1, :distribution]),
-			legend = legendpos, labels = labels,
+			legend_position = legend_position, labels = labels,
 			markersize = markersize,
 			markerstrokewidth = markerstrokewidth,
 			ylims = ylims, yticks = yticks, xlims = (0, 8), xticks = (1:7, fill("", 7)))
