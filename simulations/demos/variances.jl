@@ -11,94 +11,15 @@ import Distributions
 import KernelDensity
 import Printf
 
-#region functions
 include("../simulation_helpers.jl")
 include("lkj_prior.jl")
+include("variance_demo_functions.jl")
 
-round_2_decimals(x::Number) = Printf.@sprintf "%.2f" x
-round_2_decimals(x) = x
-
-# # see https://github.com/TuringLang/Turing.jl/issues/1629
-# quad_form_diag(M, v) = LA.Symmetric((v .* v') .* (M .+ M') ./ 2)
-
-# get_suff_stats(x) = begin
-# 	n = size(x, 2)
-# 	obs_mean = vec(mean(x, dims = 2))
-# 	obs_cov  = cov(x') .* ((n - 1) / n)
-# 	return obs_mean, obs_cov, n
-# end
-
-function triangular_to_vec(x::LA.UpperTriangular{T, Matrix{T}}) where T
-	# essentially vec(x) but without the zeros
-	p = size(x, 1)
-	result = Vector{T}(undef, p * (p + 1) ÷ 2)
-	idx = 1
-	@inbounds for i in 1:p
-		for j in 1:i
-			result[idx] = x[j, i]
-			idx += 1
-		end
-	end
-	result
-end
-
-function extract_means_continuous_params(model, chn)
-
-	gen = generated_quantities(model, Turing.MCMCChains.get_sections(chn, :parameters))
-
-	all_keys = keys(VarInfo(model).metadata)
-	# handles submodels
-	key_μ_m = all_keys[findfirst(x->occursin("μ_m", string(x)), all_keys)]
-	key_μ_w = all_keys[findfirst(x->occursin("μ_w", string(x)), all_keys)]
-
-	return (
-		μ_1 = vec(mean(group(chn, key_μ_m).value.data, dims = 1)),
-		μ_2 = vec(mean(group(chn, key_μ_w).value.data, dims = 1)),
-		σ_1 = mean(x[1] for x in gen),
-		σ_2 = mean(x[2] for x in gen),
-		Σ_1 = mean(triangular_to_vec(x[3]) for x in gen),
-		Σ_2 = mean(triangular_to_vec(x[4]) for x in gen)
-	)
-end
-
-function plot_retrieval(obs, estimate, nms)
-	@assert length(obs) == length(estimate) == length(nms)
-	plts = Vector{Plots.Plot}(undef, length(obs))
-	for (i, (o, e, nm)) in enumerate(zip(obs, estimate, nms))
-		plt = scatter(o, e, title = nm, legend = false)
-		Plots.abline!(plt, 1, 0)
-		plts[i] = plt
-	end
-	nr = isqrt(length(obs))
-	nc = ceil(Int, length(obs) / nr)
-	plot(plts..., layout = (nr, nc))
-end
-
-function extract_partition_samples(model, chn)
-
-	gen = generated_quantities(model, Turing.MCMCChains.get_sections(chn, :parameters))
-	partition_samples = Matrix{Int}(undef, length(gen), length(gen[1][end]))
-	for i in eachindex(gen)
-		partition_samples[i, :] .= reduce_model(gen[i][end])
-	end
-	return partition_samples
-end
-
-function extract_σ_samples(model, chn)
-
-	gen = generated_quantities(model, Turing.MCMCChains.get_sections(chn, :parameters))
-	k = length(gen[1][1])
-	σ_samples = Matrix{Float64}(undef, length(gen), 2k)
-	@inbounds for i in eachindex(gen)
-		σ_samples[i, 1:k]    .= gen[i][1]
-		σ_samples[i, k+1:2k] .= gen[i][2]
-	end
-	return σ_samples
-end
-
-#endregion
 
 #region Turing models
+function validate_cholesky(L, ::Type{T} = Float64)
+	return LA.det(Σ_chol_m) < eps(T)
+end
 
 @model function varianceMANOVA_suffstat(obs_mean_m, obs_cov_chol_m, n_m, obs_mean_w, obs_cov_chol_w, n_w,
 					partition = nothing, η = 1.0, ::Type{T} = Float64) where T
@@ -109,18 +30,19 @@ end
 	μ_w ~ filldist(Flat(), p)
 
 	ρ ~ Dirichlet(Ones(2p))
-	τ ~ JeffreysPriorVariance()
+	τ ~ JeffreysPriorStandardDeviation()
 
 	ρ_constrained = isnothing(partition) ? ρ : EqualitySampler.Simulations.average_equality_constraints(ρ, partition)
 
 	σ_m = τ .* view(ρ_constrained,   1: p)
 	σ_w = τ .* view(ρ_constrained, p+1:2p)
 
-	DynamicPPL.@submodel prefix="manual_lkj_m" R_chol_m = manual_lkj2(p, η, T)
-	DynamicPPL.@submodel prefix="manual_lkj_w" R_chol_w = manual_lkj2(p, η, T)
+	DynamicPPL.@submodel prefix="manual_lkj_m" R_chol_m = manual_lkj3(p, η, T)
+	DynamicPPL.@submodel prefix="manual_lkj_w" R_chol_w = manual_lkj3(p, η, T)
 
 	Σ_chol_m = LA.UpperTriangular(R_chol_m * LA.Diagonal(σ_m))
 	Σ_chol_w = LA.UpperTriangular(R_chol_w * LA.Diagonal(σ_w))
+
 	if LA.det(Σ_chol_m) < eps(T) || LA.det(Σ_chol_w) < eps(T) || any(i->Σ_chol_m[i, i] < 0, 1:p) || any(i->Σ_chol_w[i, i] < 0, 1:p)
 		if T === Float64 && (any(i->Σ_chol_m[i, i] < zero(T), 1:p) || any(i->Σ_chol_w[i, i] < zero(T), 1:p))
 			@show τ, ρ_constrained, σ_m, σ_w, ρ, partition
@@ -149,30 +71,13 @@ end
 
 #endregion
 
-#region plot functions
-
-function compute_density_estimate(mat, npoints = 2^12)
-	no_groups = size(mat, 2)
-	x = Matrix{Float64}(undef, npoints, no_groups)
-	y = Matrix{Float64}(undef, npoints, no_groups)
-
-	for (i, col) in enumerate(eachcol(mat))
-		k = KernelDensity.kde(col; npoints = npoints)#, boundary = (0, Inf))
-		x[:, i] .= k.x
-		y[:, i] .= k.density
-	end
-
-	return (x = x, y = y)
-end
-#endregion
-
 #region simulated data
 # let's test the model on simulated data
-n, p = 1_000, 5
+n, p = 1_000, 3
 
 μ_1 = randn(p)
 μ_2 = randn(p)
-τ   = 5.0 # with 1.0 everything is too small
+τ   = 10.0 # with 1.0 everything is too small
 partition = rand(UniformMvUrnDistribution(2p))
 ρ_constrained = EqualitySampler.Simulations.average_equality_constraints(rand(Dirichlet(ones(2p))), partition)
 σ_1, σ_2 = τ .* view(ρ_constrained,   1: p), τ .* view(ρ_constrained, p+1:2p)
@@ -190,6 +95,9 @@ obs_cov_1 = obs_cov_chol_1'obs_cov_chol_1
 obs_cov_2 = obs_cov_chol_2'obs_cov_chol_2
 obs_sd_1 = sqrt.(LA.diag(obs_cov_1))
 obs_sd_2 = sqrt.(LA.diag(obs_cov_2))
+[abs(i - j) for i in [obs_sd_1; obs_sd_2], j in [obs_sd_1; obs_sd_2]]
+[i - j for i in [obs_sd_1; obs_sd_2], j in [obs_sd_1; obs_sd_2]]
+[i == j for i in partition, j in partition]
 
 observed_values = (obs_mean_1, obs_mean_2, obs_sd_1, obs_sd_2, triangular_to_vec(obs_cov_chol_1), triangular_to_vec(obs_cov_chol_2))
 true_values     = (μ_1, μ_2, σ_1, σ_2, triangular_to_vec(Σ_chol_1), triangular_to_vec(Σ_chol_2))
@@ -198,23 +106,35 @@ mod_var_ss_full = varianceMANOVA_suffstat(obs_mean_1, obs_cov_chol_1, n_1, obs_m
 chn_full = sample(mod_var_ss_full, NUTS(), 15_000)
 gen = generated_quantities(mod_var_ss_full, Turing.MCMCChains.get_sections(chn_full, :parameters))
 
-post_means_eq = extract_means_continuous_params(mod_var_ss_full, chn_full)
-plot_retrieval(observed_values, post_means_eq, string.(keys(post_means_eq)))
-plot_retrieval(true_values, post_means_eq, string.(keys(post_means_eq)))
-# TODO: sometimes the plots above look like the chains didn't converge
+post_means_full = extract_means_continuous_params(mod_var_ss_full, chn_full)
+plot_retrieval(observed_values, post_means_full, string.(keys(post_means_full)))
+plot_retrieval(true_values,     post_means_full, string.(keys(post_means_full)))
 
 partition_prior = BetaBinomialMvUrnDistribution(2p, 1, 1)
 mod_var_ss_eq = varianceMANOVA_suffstat_equality_selector(obs_mean_1, obs_cov_chol_1, n_1, obs_mean_2, obs_cov_chol_2, n_2, partition_prior)
-spl = EqualitySampler.Simulations.get_sampler(mod_var_ss_eq, :custom, 0.001)
-chn_eq = sample(mod_var_ss_eq, spl, 10000)
+spl = EqualitySampler.Simulations.get_sampler(mod_var_ss_eq, :custom, 0.0)
+chn_eq = sample(mod_var_ss_eq, spl, 10_000; discard_initial=5000)
+
+# params = DynamicPPL.syms(DynamicPPL.VarInfo(mod_var_ss_eq))
+# spl2 = Gibbs(
+# 	HMC(0.0, 20, filter(!=(:partition), params)...),
+# 	MH(:partition)
+# )
+# chn_eq = sample(mod_var_ss_eq, spl2, 10_000; discard_initial=5000)
+run(`beep_finished.sh 0`)
+
+# @profview sample(mod_var_ss_eq, spl, 500)
+# view_profile()
 
 post_means_eq = extract_means_continuous_params(mod_var_ss_eq, chn_eq)
 plot_retrieval(observed_values, post_means_eq, string.(keys(post_means_eq)))
-# these do not look good!
+plot_retrieval(true_values,     post_means_eq, string.(keys(post_means_eq)))
+# these do not look good for p = 5!
 
 partition_samples = extract_partition_samples(mod_var_ss_eq, chn_eq)
 post_probs_eq = compute_post_prob_eq(partition_samples)
 prop_incorrect_αβ(post_probs_eq, partition, false) # <- not good!
+plot(partition_samples)
 
 var_samples_full = extract_σ_samples(mod_var_ss_full, chn_full)
 var_samples_eq   = extract_σ_samples(mod_var_ss_eq,   chn_eq)
@@ -222,12 +142,11 @@ var_samples_eq   = extract_σ_samples(mod_var_ss_eq,   chn_eq)
 plot(var_samples_full[:, 1])
 plot(var_samples_eq[2000:end, 1]) # <- does NOT look good!
 
-
 density_est_full = compute_density_estimate(var_samples_full)
 density_est_eq   = compute_density_estimate(var_samples_eq)
 
-plot(density_est_full.x, density_est_full.y, legend = true)
-plot(density_est_eq.x,   density_est_eq.y, legend = true)
+plot(density_est_full.x, density_est_full.y, legend = true, xticks = 0:.25:1.5, xlim = (0, 1.5))
+plot(density_est_eq.x,   density_est_eq.y, legend = true, xticks = 0:.25:1.5, xlim = (0, 1.5))
 
 # heatmap
 # x_nms = journal_data[!, :journal]# names(eq_table)[1]

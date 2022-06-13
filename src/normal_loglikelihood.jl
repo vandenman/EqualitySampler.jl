@@ -121,7 +121,7 @@ function logpdf_mv_normal_chol_suffstat(x̄, S_chol::LinearAlgebra.UpperTriangul
 	return (
 		-n / 2 * (
 			d * log(2pi) +
-			2 * sum(i->log(Σ_chol[i, i]), axes(Σ_chol, 1)) +
+			2 * sum(i->log(@inbounds Σ_chol[i, i]), axes(Σ_chol, 1)) +
 			# 2LinearAlgebra.logdet(Σ_chol) +
 			sum(x->x^2, (x̄ .- μ)' / Σ_chol) +
 			sum(x->x^2, S_chol / Σ_chol)

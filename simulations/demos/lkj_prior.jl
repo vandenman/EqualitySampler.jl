@@ -5,14 +5,36 @@ function unbounded_to_bounded(y::AbstractVector{T}) where T
 	n = length(y)
 	k = (1 + isqrt(1 + 8n)) ÷ 2
 
-	# aa = binomial.(2:10, 2)
-	# bb = @. (1 + isqrt(1 + 8aa)) ÷ 2
-	# bb == 2:10
-
 	z = tanh.(y)
 	result = LinearAlgebra.UpperTriangular(zeros(T, (k, k)))
 	l = 1
 	result[1, 1] = one(T)
+	@inbounds for j in 2:k
+
+		result[1, j] = z[l]
+		l += 1
+		tmp = result[1, j]^2
+
+		for i in 2:j-1
+			# result[i, j] = z[l] * sqrt(1 - sum(x->x^2, view(result, 1:i-1, j), init = 0))
+			result[i, j] = z[l] * sqrt(one(T) - tmp)
+			tmp += result[i, j]^2
+			l += 1
+		end
+		result[j, j] = sqrt(one(T) - tmp)
+		# result[j, j] = sqrt(1 - sum(x->x^2, view(result, 1:j-1, j), init = 0))
+	end
+
+	return result
+end
+
+
+function unbounded_to_bounded!(result, y::AbstractVector{T}) where T
+
+	k = size(result, 1)
+	z = tanh.(y)
+	l = 1
+	@inbounds result[1, 1] = one(T)
 	@inbounds for j in 2:k
 
 		result[1, j] = z[l]
@@ -49,6 +71,20 @@ function logabsdet_lkj_cholesky(y::AbstractVector{T}, R_chol) where T
 	return tmp0 + tmp1 / (one(T) + one(T))
 end
 
+function logabsdet_lkj_cholesky2(y::AbstractVector{T}, R_chol) where T
+
+	n = size(R_chol, 1)
+	tmp0 = -2 * sum(x -> log(cosh(x)), y)
+	tmp1 = zero(T)
+	@inbounds for j in 2:n-1
+		for i in j+1:n
+			tmp1 += log1p(-sum(x->x^2, view(R_chol, 1:j-1, i)))
+		end
+	end
+	return tmp0 + tmp1 / (one(T) + one(T))
+end
+
+
 function logpdf_lkj_cholesky(R_chol, η = 1.0)
 	d = size(R_chol, 1)
 	tmp = d + 2η - 2
@@ -66,6 +102,19 @@ Turing.@model function manual_lkj2(K, η, ::Type{T} = Float64) where T
 
 	return R_chol
 end
+
+Turing.@model function manual_lkj3(K, η, ::Type{T} = Float64) where T
+
+	# uses the logpdf to sample from the LKJ prior
+
+	y ~ Turing.filldist(Turing.Flat(), binomial(K, 2))
+	R_chol = unbounded_to_bounded(y)
+	Turing.@addlogprob! logpdf_lkj_cholesky(R_chol, η)
+	Turing.@addlogprob! logabsdet_lkj_cholesky2(y, R_chol)
+
+	return R_chol
+end
+
 
 @model function manual_lkj(K, eta, ::Type{T} = Float64) where T
 

@@ -21,7 +21,7 @@ struct JeffreysPriorVariance <: AbstractJeffreysPrior end
 Distributions.logpdf(d::JeffreysPriorVariance, x::Real) = Distributions.insupport(d, x) ? -2log(x) : -Inf
 
 """
-	following, https://en.wikipedia.org/wiki/Jeffreys_prior#Gaussian_distribution_with_standard_deviation_parameter
+	Following, https://en.wikipedia.org/wiki/Jeffreys_prior#Gaussian_distribution_with_standard_deviation_parameter
 	we have that:
 
 	Equivalently, the Jeffreys prior for log(σ) = ∫ dσ / σ is the unnormalized uniform distribution

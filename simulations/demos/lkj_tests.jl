@@ -38,8 +38,13 @@ end
 no_samples = 10_000
 chn1 = sample(manual_lkj(10, 1.0),  NUTS(), no_samples)
 chn2 = sample(manual_lkj2(10, 1.0), NUTS(), no_samples)
-[MCMCChains.wall_duration(chn1), MCMCChains.wall_duration(chn2)]
-[mean(MCMCChains.summarystats(chn1).nt.ess_per_sec), mean(MCMCChains.summarystats(chn2).nt.ess_per_sec)]
+chn3 = sample(manual_lkj3(10, 1.0), NUTS(), no_samples)
+chns_tp = (chn1, chn2, chn3)
+map(MCMCChains.wall_duration, chns_tp)
+map(x->mean(MCMCChains.summarystats(x).nt.ess_per_sec), chns_tp)
+
+@profview sample(manual_lkj3(10, 1.0), NUTS(), no_samples ÷ 10)
+profile_view()
 
 
 Ks = (3, 4, 5)
