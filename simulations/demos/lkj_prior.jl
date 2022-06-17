@@ -1,5 +1,26 @@
 import Turing, LinearAlgebra, Distributions, FillArrays
 
+function bounded_to_unbounded(Rchol)
+	k = size(Rchol, 1)
+	n = k * (k - 1) ÷ 2
+
+	y = Vector{eltype(Rchol)}(undef, n)
+	l = 1
+	@inbounds for j in 2:k
+
+		tmp = Rchol[1, j]^2
+		y[l] = Rchol[1, j]
+		l += 1
+		for i in 2:j-1
+			y[l] = Rchol[i, j] / sqrt(1 - tmp)
+			l += 1
+			tmp += Rchol[i, j]^2
+		end
+
+	end
+	return atanh.(y)
+end
+
 function unbounded_to_bounded(y::AbstractVector{T}) where T
 
 	n = length(y)

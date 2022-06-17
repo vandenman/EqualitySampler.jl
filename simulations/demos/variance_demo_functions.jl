@@ -73,6 +73,25 @@ function plot_retrieval(obs, estimate, nms, size = :default)
 	plot(plts..., layout = (nr, nc), size = size === :default ? 250 .* (nc, nr) : size)
 end
 
+function plot_retrieval2(obs, estimate, nms, size = :default)
+	@assert length(obs) == length(estimate) == length(nms)
+	plts = Vector{Plots.Plot}(undef, length(obs) ÷ 2)
+	for (i, idx) in enumerate(1:2:length(obs))
+		plt = plot()
+		Plots.abline!(plt, 1, 0, color = :grey, label = "")
+		# plt = scatter(obs[idx], estimate[idx], title = nms[idx], legend = isone(i) ? :topleft : false)
+		scatter!(plt, obs[idx], estimate[idx], title = nms[idx], legend = isone(i) ? :topleft : false, label = "m")
+		scatter!(plt, obs[idx+1], estimate[idx+1], label = "w")
+		plts[i] = plt
+	end
+	nplt = length(obs) ÷ 2
+	nc = isqrt(nplt)
+	nr = ceil(Int, nplt / nc)
+
+	plot(plts..., layout = (nr, nc), size = size === :default ? 250 .* (nc, nr) : size)
+end
+
+
 function compute_density_estimate(mat, npoints = 2^12)
 	no_groups = size(mat, 2)
 	x = Matrix{Float64}(undef, npoints, no_groups)
