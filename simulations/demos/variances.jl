@@ -321,7 +321,7 @@ post_mean_μ_m, post_mean_μ_w, post_mean_σ_m, post_mean_σ_w, post_mean_Σ_cho
 
 plot_retrieval2(observed_values, post_means_full, string.(keys(post_means_full)))
 
-partition_prior = BetaBinomialMvUrnDistribution(10, 1, 1)
+partition_prior = BetaBinomialMvUrnDistribution(10, 1, 10)
 mod_var_ss_eq = varianceMANOVA_suffstat_equality_selector(obs_mean_m, obs_cov_chol_m, n_m, obs_mean_w, obs_cov_chol_w, n_w, partition_prior)
 
 starting_values = get_starting_values(data_m, data_w; target_quantile = .3)
@@ -367,8 +367,11 @@ legend_labels = ["     Men - " .* labels_temp; "Women - " .* labels_temp]
 legend_labels_short = ["M-" .* first.(labels_temp); "W-" .* first.(labels_temp)]
 
 # use the same colors for the big 5 variables, and different line styles for men vs women
-linecolor = repeat(ColorSchemes.seaborn_colorblind[1:5], 2)
-linestyle = repeat([:solid, :dashdot], inner = 5)
+accent_color(x) = range(x, colorant"white", length = 20)[12]
+# vcat(ColorSchemes.seaborn_colorblind[1:5], accent_color.(ColorSchemes.seaborn_colorblind[1:5]))
+# linecolor = [ColorSchemes.seaborn_colorblind[1:5]; accent_color.(ColorSchemes.seaborn_colorblind[1:5])]
+linecolor = [accent_color.(ColorSchemes.seaborn_colorblind[1:5]); ColorSchemes.seaborn_colorblind[1:5]]
+linestyle = repeat([:solid, :dash], inner = 5)
 
 xr = extrema(vcat(extrema(density_est_full.x)..., extrema(density_est_eq.x)...))
 xr = floor(xr[1]), ceil(xr[2])
@@ -376,8 +379,8 @@ xticks = range(xr[1], xr[2], length = 5)
 xlim = extrema(xticks)
 xlim = (2.9, 5.5)
 xticks = 3:5
-p_top = plot(density_est_full.x, density_est_full.y, linecolor = permutedims(cols), linestyle = permutedims(linestyle),  legend = false, xticks = xticks, xlim = xlim, title = "Full model", labels = permutedims(legend_labels_short))
-p_bot = plot(density_est_eq.x,   density_est_eq.y,   linecolor = permutedims(cols), linestyle = permutedims(linestyle), legend = false, xticks = xticks, xlim = xlim, title = "Model averaged")
+p_top = plot(density_est_full.x, density_est_full.y, linecolor = permutedims(linecolor), linestyle = permutedims(linestyle),  legend = false, xticks = xticks, xlim = xlim, title = "Full model", labels = permutedims(legend_labels_short))
+p_bot = plot(density_est_eq.x,   density_est_eq.y,   linecolor = permutedims(linecolor), linestyle = permutedims(linestyle), legend = false, xticks = xticks, xlim = xlim, title = "Model averaged")
 plot(p_top, p_bot, layout = (2, 1))
 
 plt_legend = plot(zeros(1, 10); showaxis = false, grid = false, axis = nothing,
@@ -418,7 +421,7 @@ for i in 1:9, j in i+1:10
 			i - 0.5,
 			Plots.text(
 				round_2_decimals(z),
-				10, col, :center
+				8, col, :center
 			)
 		)
 	)
@@ -433,6 +436,5 @@ right_panel = heatmap(x_nms, reverse(x_nms), Matrix(eq_table)[10:-1:1, :],
 
 
 joined_plot = plot(left_panel, right_panel, layout = (1, 2), size = (2, 1) .* 500);
-savefig(joined_plot, "figures/demo_variances_2panel_plot2.pdf")
-
+savefig(joined_plot, "figures/demo_variances_2panel_plot.pdf")
 #endregion
