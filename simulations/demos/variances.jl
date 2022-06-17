@@ -2,6 +2,9 @@
 
 	TODO:
 
+	- increase line thickness of the density plots
+	- add x-axis label
+
 	- make 1 function for the density plot (individual plot)
 	- make 1 function for the density plot (combined plot)
 	- make 1 function for the heatmap plot
@@ -372,6 +375,7 @@ accent_color(x) = range(x, colorant"white", length = 20)[12]
 # linecolor = [ColorSchemes.seaborn_colorblind[1:5]; accent_color.(ColorSchemes.seaborn_colorblind[1:5])]
 linecolor = [accent_color.(ColorSchemes.seaborn_colorblind[1:5]); ColorSchemes.seaborn_colorblind[1:5]]
 linestyle = repeat([:solid, :dash], inner = 5)
+linewidth = 1.5
 
 xr = extrema(vcat(extrema(density_est_full.x)..., extrema(density_est_eq.x)...))
 xr = floor(xr[1]), ceil(xr[2])
@@ -379,8 +383,8 @@ xticks = range(xr[1], xr[2], length = 5)
 xlim = extrema(xticks)
 xlim = (2.9, 5.5)
 xticks = 3:5
-p_top = plot(density_est_full.x, density_est_full.y, linecolor = permutedims(linecolor), linestyle = permutedims(linestyle),  legend = false, xticks = xticks, xlim = xlim, title = "Full model", labels = permutedims(legend_labels_short))
-p_bot = plot(density_est_eq.x,   density_est_eq.y,   linecolor = permutedims(linecolor), linestyle = permutedims(linestyle), legend = false, xticks = xticks, xlim = xlim, title = "Model averaged")
+p_top = plot(density_est_full.x, density_est_full.y, linewidth = linewidth, linecolor = permutedims(linecolor), linestyle = permutedims(linestyle),  legend = false, xticks = xticks, xlim = xlim, title = "Full model", labels = permutedims(legend_labels_short))
+p_bot = plot(density_est_eq.x,   density_est_eq.y,   linewidth = linewidth, linecolor = permutedims(linecolor), linestyle = permutedims(linestyle), legend = false, xticks = xticks, xlim = xlim, title = "Model averaged", xlab = "σ")
 plot(p_top, p_bot, layout = (2, 1))
 
 plt_legend = plot(zeros(1, 10); showaxis = false, grid = false, axis = nothing,
