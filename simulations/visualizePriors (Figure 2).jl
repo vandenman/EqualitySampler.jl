@@ -8,7 +8,7 @@
 
 		UniformConditionalUrnDistribution
 		BetaBinomialConditionalUrnDistribution
-		DirichletProcessDistribution (Chinese restaurant)
+		DirichletProcessDistribution (Chinese restaurant process)
 
 =#
 
@@ -323,6 +323,10 @@ plot!(plts[1, 2]; foreground_color_legend = nothing, background_color_legend = n
 # plot!(plts[2, 2], bottom_margin = 10mm);
 # plot!(plts[1, 1], left_margin = 15mm);
 # plot!(plts[2, 1], left_margin = 15mm);
+
+plot!(plts[2, 1], xticks = (1:5, string.(0:4)));
+plot!(plts[2, 2], xticks = (1:5, string.(0:4)));
+plot!(plts[2, 3], xticks = (1:5, string.(0:4)));
 
 w = 600
 joint_plts = permutedims(plts)
