@@ -116,6 +116,7 @@ function compute_prior_performance(k::Integer, priors_sym, hypotheses)
 	τ = 0.5 ^ (1 / k)
 	z_westfallMvUrnDistribution = LogExpFunctions.logsumexp(_pairwiseMvUrnDistribution_helper(m, k, log(τ),  log1p(-τ))  for m in EqualitySampler.DistinctModelsIterator(k))
 
+	hypo_counts = zeros(Int, k)
 	@showprogress for true_ρ in EqualitySampler.DistinctModelsIterator(k)
 		j = EqualitySampler.count_parameters(true_ρ)
 		for ρ in EqualitySampler.DistinctModelsIterator(k)
@@ -129,10 +130,12 @@ function compute_prior_performance(k::Integer, priors_sym, hypotheses)
 				α_errors[l, j]     += α_prop_error * prob_ρ
 				β_errors[l, j]     += β_prop_error * prob_ρ
 
+				hypo_counts[j] += 1
+
 			end
 		end
 	end
-	return α_fam_errors, α_errors, β_errors
+	return α_fam_errors, α_errors, β_errors, hypo_counts
 end
 
 # @code_warntype compute_prior_performance(k, nsim, priors_sym, hypotheses)
@@ -143,7 +146,12 @@ priors_sym = priors_sym[[1:2; 4:7; 9:11]] # drop :BetaBinomialk1 and :DirichletP
 priors_sym = priors_sym[[2:9; 1]] # reorder
 hypotheses = (:p00, :p25, :p50, :p75, :p100)
 
-α_fam_errors, α_errors, β_errors = compute_prior_performance(k, priors_sym, hypotheses)
+α_fam_errors, α_errors, β_errors, hypo_counts = compute_prior_performance(k, priors_sym, hypotheses)
+for i in axes(α_fam_errors, 1)
+	α_fam_errors[i, :] = α_fam_errors[i, :] ./ hypo_counts
+	α_errors[i, :] = α_errors[i, :] ./ hypo_counts
+	β_errors[i, :] = β_errors[i, :] ./ hypo_counts
+end
 
 formatter(x) = @sprintf("%.7f", x)
 to_pretty_table(x) = NamedArray(x, (collect(string.(priors_sym)), collect(hypothesis_to_inequalities.(hypotheses, k))), ("Prior", "Inequalities"))
@@ -184,11 +192,11 @@ function do_plot(errors, ylab; kwargs...)
 	foreground_color_legend = nothing, background_color_legend = nothing,
 	ylab = ylab, xlab = "No. inequalities", xticks = xlabels; kwargs...)
 end
-plt_α_fam = do_plot(α_fam_errors2, "Familywise α error"; yticks = 0:5:25, ylim = (0, 25), legend = (.7, 1))
-plt_α_err = do_plot(α_errors2,     "α error"; yticks = 0:5:20, ylim = (0, 20), legend = false)
+plt_α_fam = do_plot(α_fam_errors2, "Familywise α error"; #=yticks = 0:5:25, ylim = (0, 25),=# legend = (.7, 1))
+plt_α_err = do_plot(α_errors2,     "α error"; #=yticks = 0:5:20, ylim = (0, 20),=# legend = false)
 plt_β_err = do_plot(β_errors2,     "β error", legend = false)
 
-plt_joined = plot(plt_α_fam, plt_α_err, plt_β_err, layout = (1, 3), size = (3, 1).* 400,
+plt_joined = plot(plt_α_fam, plt_α_err, plt_β_err, layout = (1, 3), size = (3, 1).* 800,
 	bottom_margin = 6mm, left_margin = 8mm)
 savefig(plt_joined, joinpath("figures", "prior_performance.pdf"))
 
