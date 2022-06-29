@@ -192,12 +192,12 @@ function do_plot(errors, ylab; kwargs...)
 	foreground_color_legend = nothing, background_color_legend = nothing,
 	ylab = ylab, xlab = "No. inequalities", xticks = xlabels; kwargs...)
 end
-plt_α_fam = do_plot(α_fam_errors2, "Familywise α error"; #=yticks = 0:5:25, ylim = (0, 25),=# legend = (.7, 1))
-plt_α_err = do_plot(α_errors2,     "α error"; #=yticks = 0:5:20, ylim = (0, 20),=# legend = false)
-plt_β_err = do_plot(β_errors2,     "β error", legend = false)
+plt_α_fam = do_plot(α_fam_errors2, "Familywise α error"; markersize = 8, #=yticks = 0:5:25, ylim = (0, 25),=# legend = (.7, 1))
+plt_α_err = do_plot(α_errors2,     "α error";  markersize = 8,#=yticks = 0:5:20, ylim = (0, 20),=# legend = false)
+plt_β_err = do_plot(β_errors2,     "β error",  markersize = 8,legend = false)
 
 plt_joined = plot(plt_α_fam, plt_α_err, plt_β_err, layout = (1, 3), size = (3, 1).* 800,
-	bottom_margin = 6mm, left_margin = 8mm)
+	bottom_margin = 14mm, left_margin = 16mm)
 savefig(plt_joined, joinpath("figures", "prior_performance.pdf"))
 
 
