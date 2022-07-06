@@ -44,6 +44,7 @@ export
 
 	bellnumr,
 	logbellnumr,
+	bellnum,
 
 	count_combinations,
 	count_distinct_models,

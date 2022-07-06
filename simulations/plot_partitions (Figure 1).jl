@@ -90,7 +90,8 @@ function plot_model!(plt, model::AbstractVector{T}; markersize = 3, markerstroke
 			count += 1
 		end
 	end
-	scatter!(plt, x, y; marker = (markersize, 1.0, :white, Plots.stroke(markerstroke, :gray)), kwargs...)
+	# scatter!(plt, x, y; marker = (markersize, 1.0, :white, Plots.stroke(markerstroke, :gray)), kwargs...)
+	scatter!(plt, x, y; markersize = markersize, markercolor = :white, markerstrokewidth = markerstroke, markerstrokecolor = :gray, kwargs...)
 	tmp0 = Iterators.flatten(zip(x, y)) |> extrema
 	tmp1 = 1.3 * maximum(abs, tmp0)
 	lims = (-tmp1, tmp1)

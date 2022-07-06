@@ -175,7 +175,7 @@ end
 function make_all_plots(dfg, dfg_incl;
 	inset_size = 0.125,
 	graph_markersize = 4,
-	partition_markersize = 4,
+	# partition_markersize = 4,
 	graph_markerstroke = 1,
 	ylims = (-9, 0),
 	yticks = 0:-2:-8,
@@ -193,10 +193,10 @@ function make_all_plots(dfg, dfg_incl;
 	x_models = collect(u)[ord]
 	x_idx = [findlast(==(model), first(dfg)[1, :models]) for model in x_models]
 
-	x_axis_plots = plot_model.(x_models)
-	for plt in x_axis_plots
-		plot!(plt, size = (200, 200), markersize = partition_markersize)
-	end
+	# x_axis_plots = plot_model.(x_models)
+	# for plt in x_axis_plots
+	# 	plot!(plt, size = (200, 200), markersize = partition_markersize)
+	# end
 
 	plts = Matrix{Plots.Plot}(undef, 2, length(dfg))
 	# (i, subdf) = first(enumerate(dfg))
@@ -223,6 +223,7 @@ function make_all_plots(dfg, dfg_incl;
 				start = 4
 				labels = labels[:, [1, 3, 2]]
 			else
+				labels = labels[:, [2, 1, 3]]
 				start = 5
 			end
 			for i in eachindex(labels)
@@ -232,7 +233,7 @@ function make_all_plots(dfg, dfg_incl;
 
 		if subdf[1, :distribution] <: RandomProcessMvUrnDistribution{DirichletProcess{Float64}, Int64}
 			legend_position = (0.8, 0.96)#:top#right
-			y = y[:, [2, 1, 3]]
+			# y = y[:, [2, 1, 3]]
 			labels = labels[:, [2, 1, 3]]
 		end
 
@@ -311,7 +312,7 @@ df_wide_model_probs, df_long_model_probs, df_wide_incl_probs, df_long_incl_probs
 dfg = DF.groupby(df_long_model_probs, :distribution);
 dfg_incl = DF.groupby(df_long_incl_probs, :distribution);
 
-plts = make_all_plots(dfg, dfg_incl; graph_markersize = 5, markersize = 9, markerstrokewidth = 0.5);
+plts = make_all_plots(dfg, dfg_incl; graph_markersize = 5, graph_markerstroke = 0.25, markersize = 9, markerstrokewidth = 0.5);
 plts = plts[:, [3, 2, 1]];
 ylabel!(plts[1, 1], "Log prior probabilty");
 ylabel!(plts[2, 1], "Log prior probabilty");
