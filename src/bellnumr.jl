@@ -59,3 +59,10 @@ function bellnumr_base_cases(n::T, r::T) where T <: Integer
 
 	return (false, zero(T))
 end
+
+"""
+	bellnum(n::T) where T <: Integer
+
+	Computes the Bell numbers.
+"""
+bellnum(n::T) where {T <: Integer} = bellnumr(n, zero(T))

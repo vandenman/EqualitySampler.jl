@@ -1,4 +1,4 @@
-using EqualitySampler, Plots, Statistics, NamedArrays, ProgressMeter, Plots.PlotMeasures
+using EqualitySampler, Plots, Statistics, NamedArrays, ProgressMeter, Plots.PlotMeasures, Chain
 using Printf
 import LogExpFunctions
 include("priors_plot_colors_shapes_labels.jl")
@@ -42,28 +42,32 @@ function westfallMvUrnDistribution(k::T, pH0::AbstractFloat = 0.5, logZ::Abstrac
 	isnan(logZ) ? PairwiseMvUrnDistribution(k, Float64(τ)) : PairwiseMvUrnDistribution(k, Float64(τ), logZ)
 end
 
-# pdf_model_distinct(westfallMvUrnDistribution(5, .5), [1, 1, 1, 1, 1]) ≈ .5
-@assert pdf_model_distinct(westfallMvUrnDistribution(5, .5, 0.0), [1, 1, 1, 1, 1]) ≈ .5
-@assert pdf_model_distinct(PairwiseMvUrnDistribution(5, .5, 0.0), [1, 1, 1, 1, 1]) ≈ .5^5
-@assert pdf_model_distinct(PairwiseMvUrnDistribution(5, .6, 0.0), [1, 1, 1, 2, 3]) ≈ .6^3 * .4^2
+# # pdf_model_distinct(westfallMvUrnDistribution(5, .5), [1, 1, 1, 1, 1]) ≈ .5
+# @assert pdf_model_distinct(westfallMvUrnDistribution(5, .5, 0.0), [1, 1, 1, 1, 1]) ≈ .5
+# @assert pdf_model_distinct(PairwiseMvUrnDistribution(5, .5, 0.0), [1, 1, 1, 1, 1]) ≈ .5^5
+# @assert pdf_model_distinct(PairwiseMvUrnDistribution(5, .6, 0.0), [1, 1, 1, 2, 3]) ≈ .6^3 * .4^2
 
-mmm = Matrix(EqualitySampler.DistinctModelsIterator(5))
-d = westfallMvUrnDistribution(5, .5, 0.0)
-ppp = pdf_model_distinct.(Ref(d), eachcol(mmm))
-d2 = PairwiseMvUrnDistribution(5, 0.8705505632961241)
-ppp2 = pdf_model_distinct.(Ref(d2), eachcol(mmm))
-d3 = PairwiseMvUrnDistribution(5, 0.5)
-ppp3 = pdf_model_distinct.(Ref(d3), eachcol(mmm))
-[sum(ppp); sum(ppp2); sum(ppp3)]
+# mmm = Matrix(EqualitySampler.DistinctModelsIterator(5))
+# d = westfallMvUrnDistribution(5, .5, 0.0)
+# ppp = pdf_model_distinct.(Ref(d), eachcol(mmm))
+# d2 = PairwiseMvUrnDistribution(5, 0.8705505632961241)
+# ppp2 = pdf_model_distinct.(Ref(d2), eachcol(mmm))
+# d3 = PairwiseMvUrnDistribution(5, 0.5)
+# ppp3 = pdf_model_distinct.(Ref(d3), eachcol(mmm))
+# [sum(ppp); sum(ppp2); sum(ppp3)]
 
-dp = PairwiseMvUrnDistribution(5, .5)
-dw = westfallMvUrnDistribution(5, .5)
-[pdf_model_distinct(d, [1, 1, 1, 1, 1]) for d in (dp, dw)]
-[pdf_model_distinct(d, [1, 1, 1, 1, 2]) for d in (dp, dw)]
-[pdf_model_distinct(d, [1, 1, 1, 2, 2]) for d in (dp, dw)]
-[pdf_model_distinct(d, [1, 1, 2, 2, 2]) for d in (dp, dw)]
-[pdf_model_distinct(d, [1, 1, 2, 2, 3]) for d in (dp, dw)]
+# dp = PairwiseMvUrnDistribution(5, .5)
+# dw = westfallMvUrnDistribution(5, .5)
+# [pdf_model_distinct(d, [1, 1, 1, 1, 1]) for d in (dp, dw)]
+# [pdf_model_distinct(d, [1, 1, 1, 1, 2]) for d in (dp, dw)]
+# [pdf_model_distinct(d, [1, 1, 1, 2, 2]) for d in (dp, dw)]
+# [pdf_model_distinct(d, [1, 1, 2, 2, 2]) for d in (dp, dw)]
+# [pdf_model_distinct(d, [1, 1, 2, 2, 3]) for d in (dp, dw)]
 
+
+# first(EqualitySampler.DistinctModelsIterator(3))
+# collect(EqualitySampler.DistinctModelsIterator(3))
+# Matrix(EqualitySampler.DistinctModelsIterator(3))
 
 function compute_model_errors(true_ρ, ρ)
 	α_error_count = 0
@@ -74,21 +78,21 @@ function compute_model_errors(true_ρ, ρ)
 		if true_ρ[i] == true_ρ[j]
 			α_errors_possible += 1
 			if ρ[i] != ρ[j]
-				# @show ρ[i], ρ[j], i, j
 				α_error_count += 1
 			end
 		elseif true_ρ[i] != true_ρ[j]
 			β_errors_possible += 1
 			if ρ[i] == ρ[j]
-				β_error_count +=1
+				β_error_count += 1
 			end
 		end
 	end
 	α_fam_error = α_error_count >= 1 ? 1 : 0
 	α_prop_error = iszero(α_errors_possible) ? 0.0 : α_error_count / α_errors_possible
 	β_prop_error = iszero(β_errors_possible) ? 0.0 : β_error_count / β_errors_possible
-	return (; α_fam_error, α_prop_error, β_prop_error)
+	return (; α_fam_error, α_prop_error, β_prop_error, α_errors_possible, β_errors_possible)
 end
+
 
 # function barrier
 function get_prob_ρ(s, ρ, z_PairwiseMvUrnDistribution, z_westfallMvUrnDistribution)
@@ -122,6 +126,7 @@ function compute_prior_performance(k::Integer, priors_sym, hypotheses)
 		for ρ in EqualitySampler.DistinctModelsIterator(k)
 
 			α_fam_error, α_prop_error, β_prop_error = compute_model_errors(true_ρ, ρ)
+			hypo_counts[j] += 1
 
 			for (l, s) in enumerate(priors_sym)
 
@@ -130,7 +135,6 @@ function compute_prior_performance(k::Integer, priors_sym, hypotheses)
 				α_errors[l, j]     += α_prop_error * prob_ρ
 				β_errors[l, j]     += β_prop_error * prob_ρ
 
-				hypo_counts[j] += 1
 
 			end
 		end
@@ -147,10 +151,11 @@ priors_sym = priors_sym[[2:9; 1]] # reorder
 hypotheses = (:p00, :p25, :p50, :p75, :p100)
 
 α_fam_errors, α_errors, β_errors, hypo_counts = compute_prior_performance(k, priors_sym, hypotheses)
+hypo_counts = stirlings2.(k, 1:k)
 for i in axes(α_fam_errors, 1)
 	α_fam_errors[i, :] = α_fam_errors[i, :] ./ hypo_counts
-	α_errors[i, :] = α_errors[i, :] ./ hypo_counts
-	β_errors[i, :] = β_errors[i, :] ./ hypo_counts
+	α_errors[i, :]     = α_errors[i, :]     ./ hypo_counts
+	β_errors[i, :]     = β_errors[i, :]     ./ hypo_counts
 end
 
 formatter(x) = @sprintf("%.7f", x)
@@ -200,6 +205,211 @@ plt_joined = plot(plt_α_fam, plt_α_err, plt_β_err, layout = (1, 3), size = (3
 	bottom_margin = 14mm, left_margin = 16mm)
 savefig(plt_joined, joinpath("figures", "prior_performance.pdf"))
 
+
+k = 3
+true_ρ = ones(Int, k)
+true_ρ = collect(1:k)
+true_ρ = ones(Int, k)
+
+α_fam_error_prop, α_prop_error_prop, β_prop_error_prop = zeros(k), zeros(k), zeros(k)
+for true_ρ in EqualitySampler.DistinctModelsIterator(k)
+	j = EqualitySampler.count_parameters(true_ρ)
+	for ρ in EqualitySampler.DistinctModelsIterator(k)
+		α_fam_error, α_prop_error, β_prop_error = compute_model_errors(true_ρ, ρ)
+		α_fam_error_prop[j] += α_fam_error
+		α_prop_error_prop[j] += α_prop_error
+		β_prop_error_prop[j] += β_prop_error
+	end
+end
+α_fam_error_prop  ./ stirlings2.(k, 1:k) # the number of models that make an alpha error
+
+counts, sizes = count_set_partitions_given_partition_size(k)
+α_prop_error_prop ./ stirlings2.(k, 1:k)
+β_prop_error_prop ./ stirlings2.(k, 1:k)
+sizes
+mmms = Matrix{Int}(undef, k, length(sizes))
+idx = 1
+for v in sizes
+	mmms[:, idx] .= reduce(vcat, fill(i, c) for (i, c) in enumerate(v))
+	idx += 1
+end
+
+using DataFrames
+k = 5
+
+function compute_sum_partition_eqs(k)
+	res = 0
+	for ρ in eachcol(generate_distinct_models(k)), i in 1:k-1, j in i+1:k
+		res += ρ[i] == ρ[j] ? 1 : 0
+	end
+	res
+end
+[compute_sum_partition_eqs(i) for i in 2:8] # https://oeis.org/A105488
+
+compute_sum_partition_eqs_oeis(k) = binomial(k, 2) * bellnumr(k-1, 0)
+[compute_sum_partition_eqs_oeis(i) for i in 2:8]
+
+function compute_hhh(k)
+	nnn = length(EqualitySampler.DistinctModelsIterator(k))^2
+	hhh = DataFrame(
+		:ρ_true => Vector{String}(undef, nnn),
+		:ρ      => Vector{String}(undef, nnn),
+		:α_c    => Vector{Int}(undef, nnn),
+		:α_t    => Vector{Int}(undef, nnn),
+		:β_c    => Vector{Int}(undef, nnn),
+		:β_t    => Vector{Int}(undef, nnn),
+	)
+	# mmm = collect(EqualitySampler.DistinctModelsIterator(k))
+	mmm = collect(eachcol(generate_distinct_models(k)))
+	idx = 1
+	for m in mmm
+		tmp = compute_model_errors.(Ref(m), mmm)
+		for j in eachindex(tmp)
+			hhh[idx, :ρ_true] = join(m)
+			hhh[idx, :ρ]      = join(mmm[j])
+			hhh[idx, :α_c]    = round(Int, tmp[j].α_prop_error * tmp[j].α_errors_possible)
+			hhh[idx, :α_t]    = tmp[j].α_errors_possible
+			hhh[idx, :β_c]    = round(Int, tmp[j].β_prop_error * tmp[j].β_errors_possible)
+			hhh[idx, :β_t]    = tmp[j].β_errors_possible
+			idx += 1
+		end
+	end
+	return hhh
+end
+hhh = compute_hhh(5)
+show(hhh, allrows=true)
+sum(hhh.α_c)
+sum(hhh.α_t)
+sum(ifelse.(iszero.(hhh.α_c), 0.0, hhh.α_c ./ hhh.α_t))
+sum(ifelse.(iszero.(hhh.β_c), 0.0, hhh.β_c ./ hhh.β_t))
+
+sum(hhh.β_c)
+sum(hhh.β_t)
+
+
+hhh = compute_hhh(3)
+@chain hhh begin
+
+end
+
+
+[sum(compute_hhh(k).α_c) for k in 2:6]
+[sum(compute_hhh(k).α_t) for k in 2:6] # https://oeis.org/A105488 * B(k)
+[sum(compute_hhh(k).β_c) for k in 2:6]
+[sum(compute_hhh(k).β_t) for k in 2:6]
+# α_c and β_c follow https://oeis.org/A193317
+fast_sum_α_c(k) = binomial(k, 2) * bellnum(k-1) * (bellnum(k) - bellnum(k-1))
+fast_sum_α_c.(2:6)
+
+ks = 2:8
+vs = zeros(Int, length(ks))
+for i in eachindex(ks)
+	hhh = compute_hhh(ks[i])
+	vs[i] = hhh.α_t[1] + hhh.β_t[1]
+end
+# https://oeis.org/A000217
+binomial.(ks, 2)
+
+ks = 2:7
+vs = zeros(Int, length(ks))
+for i in eachindex(ks)
+	hhh = compute_hhh(ks[i])
+	vs[i] = hhh.α_t[1]# + hhh.β_t[1]
+end
+
+function compute_sum_partition2(k)
+	# res = zeros(Int, k, k)
+	res = zeros(Int, binomial(k, 2))
+	mmm = eachcol(generate_distinct_models(k))
+	for m in mmm
+		idx = 1
+		for i in 1:k-1, j in i+1:k
+			if m[i] != m[j]
+				# res[i, j] += 1
+				res[idx] += 1
+			end
+			idx += 1
+		end
+	end
+	return res
+end
+rrr=[compute_sum_partition2(i) for i in 2:8] # https://oeis.org/A005493
+first.(rrr)
+show(compute_hhh(3), allrows=true)
+
+compute_sum_partition2_fast(k) = sum(i * stirlings2(k-1, i) for i in 1:k-1)
+[compute_sum_partition2_fast(i) for i in 2:8]
+
+function compute_sum_partition3(k)
+	# res = zeros(Int, k, k)
+	res = zeros(Int, binomial(k, 2))
+	mmm = eachcol(generate_distinct_models(k))
+	for m in mmm
+		idx = 1
+		for i in 1:k-1, j in i+1:k
+			if m[i] == m[j]
+				# res[i, j] += 1
+				res[idx] += 1
+			end
+			idx += 1
+		end
+	end
+	return res
+end
+rrr=[compute_sum_partition3(i) for i in 2:8] # https://oeis.org/A000110
+first.(rrr)
+bellnumr.(1:7, 0)
+
+
+ρ0 = [1, 1, 1]
+ρ1 = [1, 1, 2]
+[abs(a - b) for a in ρ0, b in ρ1]
+ρ1 * ρ1'
+ρ0 * ρ1'
+ρ0 * ρ1'
+
+sum(hhh.α_t)
+sum(hhh.β_c)
+show(hhh, allrows=true, allcols=true)
+sum(hhh.β_c)
+
+# NOTE: possible errors
+
+# shortcut!
+sum(getindex.(compute_model_errors.(Ref(ones(Int, k)), eachcol(mmms)), 2) .* counts)
+sum(getindex.(compute_model_errors.(Ref(ones(Int, k)), eachcol(mmms)), 2) .* counts)
+sum(getindex.(compute_model_errors.(Ref(collect(1:k)), eachcol(mmms)), 3) .* counts)
+# need all instances because mmms only contains 1
+mean([
+	sum(getindex.(compute_model_errors.(Ref([1, 1, 2]), eachcol(mmms)), 2) .* counts),
+	sum(getindex.(compute_model_errors.(Ref([1, 2, 1]), eachcol(mmms)), 2) .* counts),
+	sum(getindex.(compute_model_errors.(Ref([1, 2, 2]), eachcol(mmms)), 2) .* counts)
+])
+
+mean([
+	sum(getindex.(compute_model_errors.(Ref([1, 1, 2]), eachcol(mmms)), 3) .* counts),
+	sum(getindex.(compute_model_errors.(Ref([1, 2, 1]), eachcol(mmms)), 3) .* counts),
+	sum(getindex.(compute_model_errors.(Ref([2, 1, 1]), eachcol(mmms)), 3) .* counts)
+])
+
+
+# mean([
+# 	sum(getindex.(compute_model_errors.(Ref([1, 1, 1, 1, 2]), eachcol(mmms)), 2) .* counts),
+# 	sum(getindex.(compute_model_errors.(Ref([1, 1, 1, 2, 1]), eachcol(mmms)), 2) .* counts),
+# 	sum(getindex.(compute_model_errors.(Ref([1, 1, 2, 1, 1]), eachcol(mmms)), 2) .* counts),
+# 	sum(getindex.(compute_model_errors.(Ref([1, 2, 1, 1, 1]), eachcol(mmms)), 2) .* counts),
+# 	sum(getindex.(compute_model_errors.(Ref([2, 1, 1, 1, 1]), eachcol(mmms)), 2) .* counts)
+# ])
+
+# TODO: maybe work this out for k=3 or 4 where the space is easier to enumerate...
+
+mm = [fill(i, c) for v in sizes for (i, c) in enumerate(v)]
+
+β_prop_error_prop ./ stirlings2.(k, 1:k)
+
+# (α_fam_error_prop, α_prop_error_prop, β_prop_error_prop)
+(α_prop_error_prop, β_prop_error_prop)
+α_prop_error_prop .+ reverse(β_prop_error_prop)
 
 
 # α familywise error

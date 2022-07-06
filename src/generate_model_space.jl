@@ -35,7 +35,8 @@ end
 
 function Base.iterate(iter::DistinctModelsIterator{T}, state=1) where T<:Integer
 	state > iter.no_models && return nothing
-	isone(state) && return (iter.current_model, state + 1)
+	isone(state) && return (copy(iter.current_model), state + 1)
+	state == iter.no_models && return (collect(eachindex(iter.current_model)), state + 1)
 
 	k = T(length(iter.current_model))
 	current = iter.current_model
