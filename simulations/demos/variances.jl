@@ -110,12 +110,14 @@ end
 	σ_m = τ .* view(ρ_constrained,   1: p)
 	σ_w = τ .* view(ρ_constrained, p+1:2p)
 
+	# Until Turing properly supports sampling LKJCholesky this is unfortunately necessary
 	DynamicPPL.@submodel prefix="manual_lkj_m" R_chol_m = manual_lkj3(p, η, T)
 	DynamicPPL.@submodel prefix="manual_lkj_w" R_chol_w = manual_lkj3(p, η, T)
 
 	Σ_chol_m = LA.UpperTriangular(R_chol_m * LA.Diagonal(σ_m))
 	Σ_chol_w = LA.UpperTriangular(R_chol_w * LA.Diagonal(σ_w))
 
+	# Until Turing has something like a multi_normal_cholesky this is unfortunately necessary
 	if LA.det(Σ_chol_m) < eps(T) || LA.det(Σ_chol_w) < eps(T) || any(i->Σ_chol_m[i, i] < 0, 1:p) || any(i->Σ_chol_w[i, i] < 0, 1:p)
 		if T === Float64 && (any(i->Σ_chol_m[i, i] < zero(T), 1:p) || any(i->Σ_chol_w[i, i] < zero(T), 1:p))
 			@show τ, ρ_constrained, σ_m, σ_w, ρ, partition
@@ -334,10 +336,9 @@ init_params = starting_values_to_init_params(starting_values, mod_var_ss_eq)
 
 n_iter = 50_000
 n_burn = 5_000
-spl = EqualitySampler.Simulations.get_sampler(mod_var_ss_eq, :custom, 0.0)#0.0)
+spl = EqualitySampler.Simulations.get_sampler(mod_var_ss_eq, :custom, 0.0)
 chn_eq = sample(mod_var_ss_eq, spl, n_iter; init_params = init_params)
 run(`beep_finished.sh`)
-# perhaps 0.0 is not the right value, maybe do 1.1 times the value NUTS uses in the full model?
 
 # gen = generated_quantities(mod_var_ss_eq, Turing.MCMCChains.get_sections(chn_eq, :parameters))
 
@@ -370,10 +371,11 @@ legend_labels = ["     Men - " .* labels_temp; "Women - " .* labels_temp]
 legend_labels_short = ["M-" .* first.(labels_temp); "W-" .* first.(labels_temp)]
 
 # use the same colors for the big 5 variables, and different line styles for men vs women
-accent_color(x) = range(x, colorant"white", length = 20)[12]
+accent_color(x) = range(x, colorant"white", length = 20)[9]#[12]
 # vcat(ColorSchemes.seaborn_colorblind[1:5], accent_color.(ColorSchemes.seaborn_colorblind[1:5]))
 # linecolor = [ColorSchemes.seaborn_colorblind[1:5]; accent_color.(ColorSchemes.seaborn_colorblind[1:5])]
-linecolor = [accent_color.(ColorSchemes.seaborn_colorblind[1:5]); ColorSchemes.seaborn_colorblind[1:5]]
+basecolors = theme_palette(:auto)[1:5] # ColorSchemes.seaborn_colorblind[1:5]
+linecolor = [accent_color.(basecolors); basecolors]
 linestyle = repeat([:solid, :dash], inner = 5)
 linewidth = 1.5
 
@@ -440,5 +442,5 @@ right_panel = heatmap(x_nms, reverse(x_nms), Matrix(eq_table)[10:-1:1, :],
 
 
 joined_plot = plot(left_panel, right_panel, layout = (1, 2), size = (2, 1) .* 500);
-savefig(joined_plot, "figures/demo_variances_2panel_plot.pdf")
+savefig(joined_plot, "figures/demo_variances_2panel_plot_newcolors.pdf")
 #endregion
