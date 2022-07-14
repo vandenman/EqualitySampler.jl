@@ -442,5 +442,5 @@ right_panel = heatmap(x_nms, reverse(x_nms), Matrix(eq_table)[10:-1:1, :],
 
 
 joined_plot = plot(left_panel, right_panel, layout = (1, 2), size = (2, 1) .* 500);
-savefig(joined_plot, "figures/demo_variances_2panel_plot_newcolors.pdf")
+savefig(joined_plot, "figures/demo_variances_2panel_plot.pdf")
 #endregion

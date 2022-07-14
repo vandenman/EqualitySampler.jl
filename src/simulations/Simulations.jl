@@ -16,14 +16,12 @@ import
 # other dependencies
 import
 	AbstractMCMC,
-	CategoricalArrays,
 	DataFrames,
 	Distributions,
 	DistributionsAD,
 	DynamicPPL,
 	FillArrays,
 	GLM,
-	IOCapture,
 	MCMCChains,
 	OrderedCollections,
 	QuadGK,

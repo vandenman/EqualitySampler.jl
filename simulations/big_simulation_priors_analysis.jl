@@ -288,10 +288,15 @@ sum(hhh.β_t)
 
 
 hhh = compute_hhh(3)
-@chain hhh begin
-
+function foo(hhh)
+	@chain hhh begin
+		transform(:ρ_true => (x->count_equalities.(x)) => :no_equalities)
+		groupby(:no_equalities)
+		combine(:α_c=>sum, :β_c=>sum, :α_t=>sum, :β_t=>sum, :no_equalities=>first)
+		# combine(:α_c=>sum, :β_c=>sum, :α_t=>first, :β_t=>first, :no_equalities=>first)
+	end
 end
-
+[foo(compute_hhh(k)).α_c_sum ./ bellnum(k) for k in 2:5]
 
 [sum(compute_hhh(k).α_c) for k in 2:6]
 [sum(compute_hhh(k).α_t) for k in 2:6] # https://oeis.org/A105488 * B(k)
@@ -309,6 +314,8 @@ for i in eachindex(ks)
 end
 # https://oeis.org/A000217
 binomial.(ks, 2)
+
+
 
 ks = 2:7
 vs = zeros(Int, length(ks))
@@ -338,6 +345,14 @@ first.(rrr)
 show(compute_hhh(3), allrows=true)
 
 compute_sum_partition2_fast(k) = sum(i * stirlings2(k-1, i) for i in 1:k-1)
+
+compute_sum_partition2_fast(4)
+hhh = compute_hhh(4)
+@chain hhh begin
+	subset(:ρ_true => (x->x .==("1111")))
+	combine(:α_c=>sum)
+end
+
 [compute_sum_partition2_fast(i) for i in 2:8]
 
 function compute_sum_partition3(k)
@@ -360,6 +375,81 @@ rrr=[compute_sum_partition3(i) for i in 2:8] # https://oeis.org/A000110
 first.(rrr)
 bellnumr.(1:7, 0)
 
+function goo(k)
+	res = 0.0
+	for p in EqualitySampler.DistinctModelsIterator(k)
+		for q in EqualitySampler.DistinctModelsIterator(k)
+
+			num = 0
+			den = 0
+
+			for i in 1:k-1, j in i+1:k
+				num += (p[i] == p[j]) * (q[i] != q[j])
+				den += (p[i] == p[j])
+			end
+			if !iszero(den)
+				res += num / den
+			end
+		end
+	end
+	return res
+end
+function hoo(k)
+	# res = 0.0
+	length(EqualitySampler.DistinctModelsIterator(k)) * compute_sum_partition2_fast(k)
+
+	# for p in EqualitySampler.DistinctModelsIterator(k)
+	# 	for q in EqualitySampler.DistinctModelsIterator(k)
+
+	# 		num = 0
+	# 		den = 0
+
+	# 		for i in 1:k-1, j in i+1:k
+	# 			num += (p[i] == p[j]) * (q[i] != q[j])
+	# 			den += (p[i] == p[j])
+	# 		end
+	# 		if !iszero(den)
+	# 			res += num / den
+	# 		end
+	# 	end
+	# end
+	# return res
+end
+goo(2)
+hoo(2)
+goo.(2:5)
+(length.(EqualitySampler.DistinctModelsIterator.(2:5)) .- 1) .* compute_sum_partition2_fast.(2:5)
+
+function loo(p)
+	k = length(p)
+	res = 0.0
+	for q in EqualitySampler.DistinctModelsIterator(k)
+
+		num = 0
+		den = 0
+
+		for i in 1:k-1, j in i+1:k
+			num += (p[i] == p[j]) * (q[i] != q[j])
+			den += (p[i] == p[j])
+		end
+		if !iszero(den)
+			res += num / den
+		end
+	end
+	return res
+end
+for p in EqualitySampler.DistinctModelsIterator(3)
+	println(p)
+end
+[println(p) for p in EqualitySampler.DistinctModelsIterator(3)]
+[loo(p) for p in collect(EqualitySampler.DistinctModelsIterator(3))]
+[loo(p) for p in collect(EqualitySampler.DistinctModelsIterator(3))]
+
+loo([1, 1, 1])
+loo([1, 1, 2])
+loo([1, 2, 1])
+loo([1, 2, 2])
+loo([1, 1, 1])
 
 ρ0 = [1, 1, 1]
 ρ1 = [1, 1, 2]
@@ -410,6 +500,8 @@ mm = [fill(i, c) for v in sizes for (i, c) in enumerate(v)]
 # (α_fam_error_prop, α_prop_error_prop, β_prop_error_prop)
 (α_prop_error_prop, β_prop_error_prop)
 α_prop_error_prop .+ reverse(β_prop_error_prop)
+
+
 
 
 # α familywise error

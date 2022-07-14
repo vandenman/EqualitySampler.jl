@@ -1,8 +1,9 @@
 using Turing, MCMCChains, FillArrays, Distributions, LinearAlgebra
 using KernelDensity, Plots
 import DynamicPPL: @submodel
-import DistributionsAD
-import EqualitySampler
+import PDMats
+# import DistributionsAD
+# import EqualitySampler
 
 
 include("lkj_prior.jl")
@@ -19,7 +20,7 @@ end
 
 function sample_lkj(K, η, no_samples)
 
-	mod_manual_LKJ = manual_lkj2(K, η)
+	mod_manual_LKJ = manual_lkj3(K, η)
 	chn = sample(mod_manual_LKJ, NUTS(), no_samples)
 	gen = generated_quantities(mod_manual_LKJ, MCMCChains.get_sections(chn, :parameters))
 
@@ -42,9 +43,6 @@ chn3 = sample(manual_lkj3(10, 1.0), NUTS(), no_samples)
 chns_tp = (chn1, chn2, chn3)
 map(MCMCChains.wall_duration, chns_tp)
 map(x->mean(MCMCChains.summarystats(x).nt.ess_per_sec), chns_tp)
-
-@profview sample(manual_lkj3(10, 1.0), NUTS(), no_samples ÷ 10)
-profile_view()
 
 
 Ks = (3, 4, 5)
@@ -78,7 +76,7 @@ Plots.plot(plts..., legend, layout = @layout [grid(3,3) a{0.2w}])
 function perf_plot(model, chn, true_μ, true_σ, true_ρs)
 
 	est_μ = MCMCChains.summarystats(group(chn, :μ)).nt.mean
-	est_σ = MCMCChains.summarystats(group(chn, :sds)).nt.mean
+	est_σ = MCMCChains.summarystats(group(chn, :σ)).nt.mean
 
 	gen = generated_quantities(model, MCMCChains.get_sections(chn, :parameters))
 	Rs = map(x -> x'x, gen)
@@ -101,7 +99,7 @@ function perf_plot(model, chn, true_μ, true_σ, true_ρs)
 
 end
 
-n, p = 10_000, 4
+n, p = 1_000, 4
 
 true_means  = collect(1.0:p)
 true_R_chol = rand(LKJCholesky(p, 1.0, 'U'))
@@ -112,8 +110,9 @@ true_S      = true_S_chol'true_S_chol
 
 true_ρs = [true_R[m, n] for m in 2:size(true_R, 1) for n in 1:m-1]
 
-true_S_chol2 = Cholesky(true_S_chol, :U, 0)
-true_d = MvNormal(true_means, true_S)
+true_S_chol2 = Cholesky(Matrix(true_S_chol), :U, 0)
+true_S_pdm = PDMats.PDMat(true_S_chol2)
+true_d = MvNormal(true_means, true_S_pdm)
 
 x = rand(true_d, n)
 
@@ -122,48 +121,79 @@ x = rand(true_d, n)
 
 	p, n = size(x)
 	μ ~ MvNormal(Zeros(p), Ones(p))
-	sds ~ filldist(InverseGamma(5.0, 4.0), p)
-	DynamicPPL.@submodel prefix="manual_lkj" R_chol = manual_lkj2(p, η, T)
+	σ ~ filldist(InverseGamma(5.0, 4.0), p)
+	DynamicPPL.@submodel prefix="manual_lkj" R_chol = manual_lkj3(p, η, T)
 
-	# @show means sds R_chol
 	if LinearAlgebra.det(R_chol) < sqrt(eps(T))
+		if T === Float64
+			@show R_chol
+			@warn "bad real cholesky!"
+		else
+			@warn "bad dual cholesky!"
+		end
 		Turing.@addlogprob! -Inf
 	else
-		# prec_chol = Diagonal(1 ./ sds) * inv(R_chol)
-		# Sigma_chol = Cholesky(UpperTriangular(R_chol * Diagonal(sds)), :U, 0)
-		Sigma_chol = Cholesky(R_chol * Diagonal(sds), :U, 0)
-		# Sigma = Sigma_chol.U'Sigma_chol.U
+
+		Σ_pdm = PDMats.PDMat(Cholesky(Matrix(R_chol * Diagonal(σ)), :U, 0))
 		for i in 1:n
-			x[:, i] ~ DistributionsAD.TuringDenseMvNormal(μ, Sigma_chol)
-			# x[:, i] ~ MvNormal(means, Sigma)
+			x[:, i] ~ MvNormal(μ, Σ_pdm)
 		end
+
 	end
 
 	return (R_chol, )
 end
 
 mod_mvnormal0 = mvnormal_turing(x, 1.0)
-samps0 = sample(mod_mvnormal0, NUTS(), 1000)
+samps0 = sample(mod_mvnormal0, NUTS(), 1000) # slow
 perf_plot(mod_mvnormal0, samps0, true_means, true_sd, true_ρs)
 
-@model function mvnormal_suffstats(obs_mean, obs_cov_chol, n, η = 1.0, ::Type{T} = Float64) where T
+# arguably something that should live in Distributions.jl
+function manual_loglikelihood(d::Distributions.AbstractMvNormal, ss::Distributions.MvNormalStats)
+	μ, Σ = Distributions.params(d)
+	x̄, S, n = ss.m, ss.s2, ss.tw
+	# should check for length mismatches
+	p = length(x̄)
+	return (
+		-n / 2 * (
+			p * log(2pi) +
+			LinearAlgebra.logdet(Σ) +
+			PDMats.invquad(Σ, x̄ .- μ) +
+			# PDMats.X_invA_Xt(Σ, (x̄ .- μ)') +
+			# (x̄ .- μ)' / Matrix(Σ) * (x̄ .- μ) +
+			LinearAlgebra.tr(Σ \ (S ./ ss.tw))
+		)
+	)
+end
 
-	p = length(obs_mean)
+ss = Distributions.suffstats(MvNormal, x)
+@assert loglikelihood(true_d, x) ≈ manual_loglikelihood(true_d, ss)
+
+@model function mvnormal_suffstats(ss, η = 1.0, ::Type{T} = Float64) where T
+
+	p = length(ss.m)
 	μ ~ MvNormal(Zeros(p), Ones(p))
-	sds ~ filldist(InverseGamma(5.0, 4.0), p)
+	σ ~ filldist(InverseGamma(5.0, 4.0), p)
+	DynamicPPL.@submodel prefix="manual_lkj" R_chol = manual_lkj3(p, η, T)
 
-	DynamicPPL.@submodel prefix="manual_lkj" R_chol = manual_lkj2(p, η, T)
-
-	if LinearAlgebra.det(R_chol) < sqrt(eps(T))
+	check_zero = T !== Float64 && any(iszero, view(R_chol, diagind(R_chol)))
+	if check_zero
+		# check_zero && @warn "dual cholesky contains zero on diagonal!"
 		Turing.@addlogprob! -Inf
 	else
-		# Diagonal(1 ./ sds) / inv(R_chol) throws an error
-		prec_chol = Diagonal(1 ./ sds) * inv(R_chol)
-		Turing.@addlogprob! EqualitySampler.logpdf_mv_normal_precision_chol_suffstat(obs_mean, obs_cov_chol, n, μ, prec_chol)
+		Σ_pdm = PDMats.PDMat(Cholesky(Matrix(R_chol * Diagonal(σ)), :U, 0))
+		Turing.@addlogprob! manual_loglikelihood(MvNormal(μ, Σ_pdm), ss)
 	end
 
 	return R_chol
 end
+
+mod_mvnormal1 = mvnormal_suffstats(ss, 1.0)
+samps1 = sample(mod_mvnormal1, NUTS(), 1000)
+perf_plot(mod_mvnormal1, samps1, true_means, true_sd, true_ρs)
+
+
+samps1.wall_duration
 
 obs_mean, obs_cov_chol, n = get_normal_dense_chol_suff_stats(x)
 prec_chol = inv(true_S_chol)

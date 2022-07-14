@@ -29,3 +29,5 @@ tutorials/*
 simulations/simulation_results_*/*
 *.jld2
 simulations/old/*
+
+feedbackround/*
