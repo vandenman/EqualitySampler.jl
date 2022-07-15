@@ -36,14 +36,6 @@ count_combinations(x::AbstractVector) = count_combinations(length(x), no_distinc
 
 log_count_combinations(x::AbstractVector) = log_count_combinations(length(x), no_distinct_groups_in_partition(x))
 
-count_distinct_models_with_no_equalities(k::T, no_equalities::T)     where T<:Integer = stirlings2(k, k - no_equalities)
-count_models_with_no_equalities(k::T, no_equalities::T)              where T<:Integer = count_distinct_models_with_no_equalities(k, no_equalities) * count_combinations(k, k - no_equalities)
-log_count_distinct_models_with_no_equalities(k::T, no_equalities::T) where T<:Integer = logstirlings2(k, k - no_equalities)
-
-count_distinct_models_with_no_parameters(k::T, no_parameters::T)     where T<:Integer = stirlings2(k, no_parameters)
-count_models_with_no_parameters(k::T, no_parameters::T)              where T<:Integer = count_distinct_models_with_no_parameters(k, no_parameters) * count_combinations(k, no_parameters)
-log_count_distinct_models_with_no_parameters(k::T, no_parameters::T) where T<:Integer = logstirlings2(k, no_parameters)
-
 
 
 # abstract type PartitionCountingSorting end

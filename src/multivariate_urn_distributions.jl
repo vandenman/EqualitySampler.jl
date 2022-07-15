@@ -53,7 +53,7 @@ end
 function logpdf_incl(d::AbstractMvUrnDistribution, no_parameters::T) where T<:Integer
 	in_eqsupport(d, no_parameters) || return T === BigInt ? BigFloat(-Inf) : Float64(-Inf)
 	k = length(d)
-	logpdf_model_distinct(d, no_parameters) + log_count_distinct_models_with_no_parameters(k, no_parameters)
+	logpdf_model_distinct(d, no_parameters) + logstirlings2(k, no_parameters)
 end
 pdf_incl(d::AbstractMvUrnDistribution,  no_parameters) = exp(logpdf_incl(d,  no_parameters))
 

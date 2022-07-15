@@ -40,16 +40,8 @@ export
 	bellnumr,
 	logbellnumr,
 
-	# TODO: refactor all the count_xxx methods to a few sensible ones
-	count_models_with_no_equalities,
-	count_models_with_no_parameters,
-	count_distinct_models_with_no_parameters,
-	count_distinct_models_with_no_equalities,
 	count_equalities,
 	count_parameters,
-
-	log_count_distinct_models_with_no_equalities,
-	log_count_distinct_models_with_no_parameters,
 
 	# TODO: unify these two. if reduce_model_dpp is only required for testing only define it there
 	reduce_model,
