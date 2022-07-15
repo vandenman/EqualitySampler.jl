@@ -10,12 +10,12 @@ stirlings2ExplTerm(n::T, k::T, j::T) where T<:Integer = binomial(k, j) * j^n
 
 """
 	stirlings2(n::T, k::T) where T <: Integer
-	stirlings2(n::T, k::T, ::Type{ExplicitStrategy})  where T <: Integer
-	stirlings2(n::T, k::T, ::Type{RecursiveStrategy}) where T <: Integer
+	stirlings2(n::T, k::T, ::Type{EqualitySampler.ExplicitStrategy})  where T <: Integer
+	stirlings2(n::T, k::T, ::Type{EqualitySampler.RecursiveStrategy}) where T <: Integer
 
 Compute the Stirlings numbers of the second kind.
-The `ExplicitStrategy` (default) uses an explicit loop and is computationally more efficient but subject to overflow, so using BigInt is advised.
-The `RecursiveStrategy` uses recursion and is mathematically elegant yet inefficient for large values.
+The `EqualitySampler.ExplicitStrategy` (default) uses an explicit loop and is computationally more efficient but subject to overflow, so using BigInt is advised.
+The `EqualitySampler.RecursiveStrategy` uses recursion and is mathematically elegant yet inefficient for large values.
 """
 stirlings2(n::T, k::T) where T <: Integer = stirlings2(n, k, ExplicitStrategy)
 function stirlings2(n::T, k::T, ::Type{ExplicitStrategy}) where T <: Integer
