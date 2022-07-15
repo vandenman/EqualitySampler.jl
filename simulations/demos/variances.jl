@@ -117,6 +117,7 @@ end
 	Σ_chol_m = LA.UpperTriangular(R_chol_m * LA.Diagonal(σ_m))
 	Σ_chol_w = LA.UpperTriangular(R_chol_w * LA.Diagonal(σ_w))
 
+	# TODO: this can be simplified by only checking if the diagonal is zero during the diff steps!
 	# Until Turing has something like a multi_normal_cholesky this is unfortunately necessary
 	if LA.det(Σ_chol_m) < eps(T) || LA.det(Σ_chol_w) < eps(T) || any(i->Σ_chol_m[i, i] < 0, 1:p) || any(i->Σ_chol_w[i, i] < 0, 1:p)
 		if T === Float64 && (any(i->Σ_chol_m[i, i] < zero(T), 1:p) || any(i->Σ_chol_w[i, i] < zero(T), 1:p))
@@ -316,8 +317,6 @@ observed_values = (obs_mean_m, obs_mean_w, obs_sd_m, obs_sd_w, triangular_to_vec
 
 LA.isposdef(obs_cov_m)
 LA.isposdef(obs_cov_w)
-
-@assert logpdf_mv_normal_suffstat(obs_mean_m, obs_cov_m, n_m, obs_mean_m, obs_cov_m) ≈ loglikelihood(MvNormal(obs_mean_m, obs_cov_m), data_m)
 
 mod_var_ss_full = varianceMANOVA_suffstat(obs_mean_m, obs_cov_chol_m, n_m, obs_mean_w, obs_cov_chol_w, n_w)
 chn_full = sample(mod_var_ss_full, NUTS(), 5_000)

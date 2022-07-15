@@ -9,6 +9,7 @@ import
 	Combinatorics,
 	Distributions,
 	OrderedCollections,
+	PDMats,
 	StatsBase,
 	SpecialFunctions,
 	Turing,
@@ -23,15 +24,10 @@ export
 		perhaps skip/ remove logpdf_mv_normal_chol_suffstat and friends (constructing the full matrix is not super expensive)
 		also use PDMats.invquad and friends
 	=#
-	NormalSuffStat,
-	MvNormalSuffStat,
-	logpdf_mv_normal_suffstat,
-	MvNormalDenseSuffStat,
-	MvNormalCholDenseSuffStat,
-	get_normal_dense_suff_stats,
 	get_normal_dense_chol_suff_stats,
 	logpdf_mv_normal_chol_suffstat,
-	logpdf_mv_normal_precision_chol_suffstat,
+	loglikelihood_suffstats,
+
 
 	# TODO: do not export these.
 	AbstractConditionalUrnDistribution,

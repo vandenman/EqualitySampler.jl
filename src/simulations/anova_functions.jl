@@ -114,10 +114,7 @@ function fit_lm(df, formula = StatsModels.@formula(y ~ 1 + g))
 end
 
 function get_suff_stats(df::SimpleDataSet)
-	obs_mean = [mean(df.y[idx]) for idx in df.g]
-	obs_var  = [var(df.y[idx]) for idx in df.g]
-	obs_n    = length.(df.g)
-	return obs_mean, obs_var, obs_n
+	return [Distributions.suffstats(Normal, view(df.y[idx]) for idx in df.g)]
 end
 
 function get_suff_stats(df::DataFrames.DataFrame)
@@ -254,12 +251,6 @@ function get_θ_cs(model, chain)
 	return vec(mean(θ_cs, dims = 2)), θ_cs
 end
 
-# function plot_retrieval(true_values, estimated_values)
-# 	p = Plots.plot(legend=false, xlab = "True value", ylab = "Posterior mean")
-# 	Plots.abline!(p, 1, 0)
-# 	scatter!(p, true_values, estimated_values)
-# end
-
 function get_init_params(model, partition::Vector{Int}, θ_r::Vector{Float64}, μ = 0.0, σ² = 1.0, g = 1.0)
 	nt = (
 		partition									= partition,
@@ -285,9 +276,9 @@ function get_init_params(θ_r::Vector{Float64}, μ::Float64 = 0.0, σ² = 1.0, g
 	return vcat(μ, σ², g, θ_r)
 end
 
-DynamicPPL.@model function one_way_anova_mv_ss_submodel(obs_mean, obs_var, obs_n, Q, partition = nothing, ::Type{T} = Float64) where {T}
+DynamicPPL.@model function one_way_anova_mv_ss_submodel(suff_stats_vec, Q, partition = nothing, ::Type{T} = Float64) where {T}
 
-	n_groups = length(obs_mean)
+	n_groups = length(suff_stats_vec)
 
 	# improper priors on grand mean and variance
 	μ_grand 		~ Turing.Flat()
@@ -306,99 +297,18 @@ DynamicPPL.@model function one_way_anova_mv_ss_submodel(obs_mean, obs_var, obs_n
 	θ_cs = isnothing(partition) ? θ_s : average_equality_constraints(θ_s, partition)
 
 	# definition from Rouder et. al., (2012) eq 6.
-	for i in eachindex(obs_mean)
-		# Turing.@addlogprob! EqualitySampler._univariate_normal_likelihood(obs_mean[i], obs_var[i], obs_n[i], μ_grand + sqrt(σ²) * θ_cs[i], σ²)
-		obs_mean[i] ~ EqualitySampler.NormalSuffStat(obs_var[i], μ_grand + sqrt(σ²) * θ_cs[i], σ², obs_n[i])
+	@inbounds for i in eachindex(suff_stats_vec)
+		Turing.@addlogprob! loglikelihood_suffstats(Normal(μ_grand + sqrt(σ²) * θ_cs[i], sqrt(σ²)), suff_stats_vec[i])
 	end
 
 	return θ_cs
 
 end
 
-DynamicPPL.@model function one_way_anova_mv_ss_submodel_matrix(obs_mean, obs_var, obs_n, Q, partition = nothing, ::Type{T} = Float64) where {T}
-
-	n_groups = length(obs_mean)
-
-	# improper priors on grand mean and variance
-	μ_grand 		~ Turing.Flat()
-	σ² 				~ JeffreysPriorVariance()
-
-	# The setup for θ follows Rouder et al., 2012, p. 363
-	g   ~ Distributions.InverseGamma(0.5, 0.5; check_args = false)
-
-	θ_r ~ Distributions.MvNormal(LinearAlgebra.Diagonal(FillArrays.Fill(1.0, n_groups - 1)))
-
-	# get matrix that constrains θ according to the sampled equalities
-	if isnothing(partition)
-		# ensure the sum to zero constraint
-		θ_cs = Q * (sqrt(g) .* θ_r)
-	else
-		# ensure the sum to zero constraint + apply average accordin to partition
-		θ_cs = get_equalizer_matrix_from_partition(partition) * Q * (sqrt(g) .* θ_r)
-	end
-
-
-	# definition from Rouder et. al., (2012) eq 6.
-	for i in eachindex(obs_mean)
-		Turing.@addlogprob! EqualitySampler._univariate_normal_likelihood(obs_mean[i], obs_var[i], obs_n[i], μ_grand + sqrt(σ²) * θ_cs[i], σ²)
-	end
-
-	return θ_cs
-
-end
-
-DynamicPPL.@model function one_way_anova_mv_ss_submodel_matrix_memoization(obs_mean, obs_var, obs_n, Q, memoized_get_equalizer_matrix, partition = nothing, ::Type{T} = Float64) where {T}
-
-	n_groups = length(obs_mean)
-
-	# improper priors on grand mean and variance
-	μ_grand 		~ Turing.Flat()
-	σ² 				~ JeffreysPriorVariance()
-
-	# The setup for θ follows Rouder et al., 2012, p. 363
-	g   ~ Distributions.InverseGamma(0.5, 0.5; check_args = false)
-
-	θ_r ~ Distributions.MvNormal(LinearAlgebra.Diagonal(FillArrays.Fill(1.0, n_groups - 1)))
-
-	# get matrix that constrains θ according to the sampled equalities
-	if isnothing(partition)
-		# ensure the sum to zero constraint
-		θ_cs = Q * (sqrt(g) .* θ_r)
-	else
-		# ensure the sum to zero constraint + apply average accordin to partition
-		θ_cs = memoized_get_equalizer_matrix(partition) * Q * (sqrt(g) .* θ_r)
-	end
-
-
-	# definition from Rouder et. al., (2012) eq 6.
-	for i in eachindex(obs_mean)
-		Turing.@addlogprob! EqualitySampler._univariate_normal_likelihood(obs_mean[i], obs_var[i], obs_n[i], μ_grand + sqrt(σ²) * θ_cs[i], σ²)
-	end
-
-	return θ_cs
-
-end
-
-DynamicPPL.@model function one_way_anova_mv_ss_eq_submodel(obs_mean, obs_var, obs_n, Q, partition_prior::D, ::Type{T} = Float64) where {T, D<:AbstractMvUrnDistribution}
+DynamicPPL.@model function one_way_anova_mv_ss_eq_submodel(suff_stats_vec, Q, partition_prior::D, ::Type{T} = Float64) where {T, D<:AbstractMvUrnDistribution}
 
 	partition ~ partition_prior
-	DynamicPPL.@submodel prefix="one_way_anova_mv_ss_submodel" θ_cs = one_way_anova_mv_ss_submodel(obs_mean, obs_var, obs_n, Q, partition, T)
-	return θ_cs
-
-end
-
-DynamicPPL.@model function one_way_anova_mv_ss_eq_submodel_matrix(obs_mean, obs_var, obs_n, Q, partition_prior::D, ::Type{T} = Float64) where {T, D<:AbstractMvUrnDistribution}
-
-	partition ~ partition_prior
-	DynamicPPL.@submodel prefix="one_way_anova_mv_ss_submodel" θ_cs = one_way_anova_mv_ss_submodel_matrix(obs_mean, obs_var, obs_n, Q, partition, T)
-	return θ_cs
-
-end
-
-DynamicPPL.@model function one_way_anova_mv_ss_eq_submodel_matrix_memoized(obs_mean, obs_var, obs_n, Q, memoized_get_equalizer_matrix, partition_prior::D, ::Type{T} = Float64) where {T, D<:AbstractMvUrnDistribution}
-
-	partition ~ partition_prior
-	DynamicPPL.@submodel prefix="one_way_anova_mv_ss_submodel" θ_cs = one_way_anova_mv_ss_submodel_matrix_memoization(obs_mean, obs_var, obs_n, Q, memoized_get_equalizer_matrix, partition, T)
+	DynamicPPL.@submodel prefix="one_way_anova_mv_ss_submodel" θ_cs = one_way_anova_mv_ss_submodel(suff_stats_vec, Q, partition, T)
 	return θ_cs
 
 end
@@ -511,10 +421,10 @@ DynamicPPL.@model function integrated_partition_model(ỹTỹ, ỹTX̃, X̃TX̃,
 end
 
 function prep_model_arguments(df)
-	obs_mean, obs_var, obs_n = get_suff_stats(df)
-	n_groups = length(obs_mean)
+	suff_stats_vec = get_suff_stats(df)
+	n_groups = length(suff_stats_vec)
 	Q = getQ_Rouder(n_groups)
-	return obs_mean, obs_var, obs_n, Q
+	return suff_stats_vec, Q
 end
 
 # for full model
@@ -538,8 +448,8 @@ function fit_full_model(
 	)
 
 	if modeltype === :old
-		obs_mean, obs_var, obs_n, Q = prep_model_arguments(df)
-		model = one_way_anova_mv_ss_submodel(obs_mean, obs_var, obs_n, Q)
+		suff_stats_vec, Q = prep_model_arguments(df)
+		model = one_way_anova_mv_ss_submodel(suff_stats_vec, Q)
 
 		starting_values = get_starting_values(df, true)
 		init_params = get_init_params(Base.structdiff(starting_values, (partition=nothing, ))...)
@@ -580,15 +490,8 @@ function fit_eq_model(
 		starting_values = get_starting_values(df, false)
 		init_params = vcat(starting_values.g, starting_values.partition)
 	else
-		obs_mean, obs_var, obs_n, Q = prep_model_arguments(df)
-		if eq_model === :old
-			model = one_way_anova_mv_ss_eq_submodel(obs_mean, obs_var, obs_n, Q, partition_prior)
-		elseif eq_model === :matrix
-			model = one_way_anova_mv_ss_eq_submodel_matrix(obs_mean, obs_var, obs_n, Q, partition_prior)
-		elseif eq_model === :matrix_memoized
-			memoized_get_equality_matrix = build_get_equalizer_matrix_from_partition_with_cache()
-			model = one_way_anova_mv_ss_eq_submodel_matrix_memoized(obs_mean, obs_var, obs_n, Q, memoized_get_equality_matrix, partition_prior)
-		end
+		suff_stats_vec, Q = prep_model_arguments(df)
+		model = one_way_anova_mv_ss_eq_submodel(suff_stats_vec, Q, partition_prior)
 		starting_values = get_starting_values(df)
 		init_params = get_init_params(starting_values...)
 	end
