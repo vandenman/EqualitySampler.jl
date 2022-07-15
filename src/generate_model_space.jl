@@ -24,6 +24,15 @@ function generate_distinct_models(k::Int)
 	return result
 end
 
+"""
+	generate_distinct_models(k::Int)
+
+Returns an iterator that generates all models that represent equalities, including duplicates that represent the same unique model (e.g., [1, 1, 1] and [2, 2, 2]) .
+"""
+function generate_all_models(k::Int)
+	return Iterators.product(fill(1:k, k)...)
+end
+
 abstract type AbstractPartitionSpace end
 struct DistinctPartitionSpace <: AbstractPartitionSpace end
 struct DuplicatedPartitionSpace <: AbstractPartitionSpace end
@@ -57,6 +66,10 @@ function Base.iterate(iter::PartitionIterator{T, DistinctPartitionSpace}, state=
 	return (copy(current), state + 1)
 end
 
+# function Base.iterate(iter::PartitionIterator{T, DuplicatedPartitionSpace}, state=1) where T<:Integer
+	# TODO: implement this!
+# end
+
 
 Base.length(iter::PartitionIterator) = iter.no_models
 Base.eltype(::Type{PartitionIterator{T, P}}) where {T, P} = Vector{T}
@@ -67,13 +80,4 @@ function Base.Matrix(iter::PartitionIterator{T, P}) where {T, P}
 		res[:, i] .= m
 	end
 	return res
-end
-
-"""
-	generate_distinct_models(k::Int)
-
-Returns an iterator that generates all models that represent equalities, including duplicates that represent the same unique model (e.g., [1, 1, 1] and [2, 2, 2]) .
-"""
-function generate_all_models(k::Int)
-	return Iterators.product(fill(1:k, k)...)
 end
