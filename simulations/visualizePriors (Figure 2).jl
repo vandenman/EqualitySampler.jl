@@ -6,8 +6,8 @@
 
 	Distributions:
 
-		UniformConditionalUrnDistribution
-		BetaBinomialConditionalUrnDistribution
+		UniformMvUrnDistribution
+		BetaBinomialMvUrnDistribution
 		DirichletProcessDistribution (Chinese restaurant process)
 
 =#

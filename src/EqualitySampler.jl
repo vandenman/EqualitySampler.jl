@@ -28,12 +28,6 @@ export
 	logpdf_mv_normal_chol_suffstat,
 	loglikelihood_suffstats,
 
-
-	# TODO: do not export these.
-	AbstractConditionalUrnDistribution,
-	UniformConditionalUrnDistribution,
-	BetaBinomialConditionalUrnDistribution,
-
 	stirlings2,
 	stirlings2r,
 	logstirlings2,

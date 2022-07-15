@@ -154,21 +154,6 @@ end
 UniformConditionalUrnDistribution(k::T) where T <: Integer = UniformConditionalUrnDistribution(ones(T, k), k)
 
 
-# function _pdf(d::UniformConditionalUrnDistribution)
-
-# 	index, k = d.index, length(d.urns)
-# 	isone(index) && return fill(1 / k, k)
-# 	urns = view(d.urns, 1:index - 1)
-
-# 	count = get_conditional_counts(k, urns)
-# 	result = zeros(Float64, k)
-# 	idx_nonzero = findall(!iszero, view(count, 1:length(urns)))
-# 	result[view(urns, idx_nonzero)] .= count[idx_nonzero]
-# 	other = setdiff(1:k, urns)
-# 	result[other] .= count[length(urns) + 1] ./ length(other)
-# 	return result ./ sum(result)
-
-# end
 _pdf(d::UniformConditionalUrnDistribution) = _pdf_helper(d, d.index, d.urns)
 
 # _pdf_uniform_helper exists so that it can also be reused by the multivariate distribution without explicitly creating a UniformConditionalUrnDistribution
@@ -206,36 +191,7 @@ function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, ::Union{UniformCo
 	end
 	return
 
-	#old approach
-	# count = get_conditional_counts(k, urns)
-	# idx_nonzero = findall(!iszero, view(count, 1:length(urns)))
-	# result[view(urns, idx_nonzero)] .= count[idx_nonzero]
-	# other = setdiff(1:k, urns)
-	# result[other] .= count[length(urns) + 1] ./ length(other)
-	# result ./= sum(result)
-	# return
-
 end
-
-# function _pdf_helper!(result, d::Union{BetaBinomialConditionalUrnDistribution, BetaBinomialMvUrnDistribution}, index, complete_urns)
-
-# 	k = length(result)
-# 	if isone(index)
-# 		fill!(result, 1 / k)
-# 		return nothing
-# 	end
-
-# 	urns = view(complete_urns, 1:index - 1)
-
-# 	count = get_conditional_counts(k, urns)
-
-# 	idx_nonzero = findall(!iszero, view(count, 1:length(urns)))
-# 	result[view(urns, idx_nonzero)] .= count[idx_nonzero]
-# 	other = setdiff(1:k, urns)
-# 	result[other] .= count[length(urns) + 1] ./ length(other)
-# 	result ./= sum(result)
-# 	return nothing
-# end
 
 #endregion
 #region BetaBinomialConditionalUrnDistribution
@@ -262,7 +218,6 @@ end
 
 function BetaBinomialConditionalUrnDistribution(k::T, α::Real = 1.0, β::Real = 1.0) where T <: Integer
 	BetaBinomialConditionalUrnDistribution(ones(T, k), k, convert(Float64, α), convert(Float64, β))
-	# BetaBinomialConditionalUrnDistribution(T[one(T)], k, convert(Float64, α), convert(Float64, β))
 end
 
 _pdf(d::BetaBinomialConditionalUrnDistribution) = _pdf_helper(d, d.index, d.urns)

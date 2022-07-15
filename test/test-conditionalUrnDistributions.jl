@@ -1,9 +1,9 @@
-updateDistribution(::UniformConditionalUrnDistribution, urns, j) = UniformConditionalUrnDistribution(urns, j)
-updateDistribution(D::BetaBinomialConditionalUrnDistribution, urns, j) = BetaBinomialConditionalUrnDistribution(urns, j, D.α, D.β)
+updateDistribution(::EqualitySampler.UniformConditionalUrnDistribution, urns, j) = EqualitySampler.UniformConditionalUrnDistribution(urns, j)
+updateDistribution(D::EqualitySampler.BetaBinomialConditionalUrnDistribution, urns, j) = EqualitySampler.BetaBinomialConditionalUrnDistribution(urns, j, D.α, D.β)
 
 @testset "Simulated Properties Match Theoretical Ones" begin
 
-	Dset = [UniformConditionalUrnDistribution([1, 1], 1), BetaBinomialConditionalUrnDistribution([1, 1], 1, 1, 1)]
+	Dset = [EqualitySampler.UniformConditionalUrnDistribution([1, 1], 1), EqualitySampler.BetaBinomialConditionalUrnDistribution([1, 1], 1, 1, 1)]
 	ks = 2:5
 	noSamples = 10_000
 	for D in Dset
