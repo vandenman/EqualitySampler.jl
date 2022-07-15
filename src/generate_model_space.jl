@@ -24,16 +24,22 @@ function generate_distinct_models(k::Int)
 	return result
 end
 
-# TODO: document this, export it, and use it everywhere internally and externally
-struct DistinctModelsIterator{T<:Integer}
+abstract type AbstractPartitionSpace end
+struct DistinctPartitionSpace <: AbstractPartitionSpace end
+struct DuplicatedPartitionSpace <: AbstractPartitionSpace end
+
+struct PartitionIterator{T<:Integer, P<:AbstractPartitionSpace}
 	no_models::T
 	current_model::Vector{T}
-	function DistinctModelsIterator(k::T) where T<:Integer
-		new{T}(bellnum(k), ones(T, k))
+	function PartitionIterator(k::T, P::Type{U}) where {T<:Integer, U<:AbstractPartitionSpace}
+		new{T, U}(bellnum(k), ones(T, k))
 	end
 end
 
-function Base.iterate(iter::DistinctModelsIterator{T}, state=1) where T<:Integer
+partition_space(k::Integer; distinct::Bool = true) = PartitionIterator(k, distinct ? DistinctPartitionSpace : DuplicatedPartitionSpace)
+
+# TODO: shouldn't the iterator be stateless?
+function Base.iterate(iter::PartitionIterator{T, DistinctPartitionSpace}, state=1) where T<:Integer
 	state > iter.no_models && return nothing
 	isone(state) && return (copy(iter.current_model), state + 1)
 	state == iter.no_models && return (collect(eachindex(iter.current_model)), state + 1)
@@ -52,20 +58,16 @@ function Base.iterate(iter::DistinctModelsIterator{T}, state=1) where T<:Integer
 end
 
 
-Base.length(iter::DistinctModelsIterator) = iter.no_models
-Base.eltype(::Type{DistinctModelsIterator{T}}) where T<:Integer = Vector{T}
-Base.IteratorSize(::Type{DistinctModelsIterator{T}}) where T<:Integer = Base.HasLength()
-function Base.Matrix(iter::DistinctModelsIterator{T}) where T<:Integer
+Base.length(iter::PartitionIterator) = iter.no_models
+Base.eltype(::Type{PartitionIterator{T, P}}) where {T, P} = Vector{T}
+Base.IteratorSize(::Type{PartitionIterator{T, P}}) where {T, P} = Base.HasLength()
+function Base.Matrix(iter::PartitionIterator{T, P}) where {T, P}
 	res = Matrix{T}(undef, length(iter.current_model), iter.no_models)
 	for (i, m) in enumerate(iter)
 		res[:, i] .= m
 	end
 	return res
 end
-# doesn't work as intended, will make a Matrix{Vector{Int}}
-# Base.size(iter::DistinctModelsIterator{T}) where T<:Integer = (length(iter.current_model), iter.no_models)
-# Base.IteratorSize(::Type{DistinctModelsIterator{T}}) where T<:Integer = Base.HasShape{2}()
-
 
 """
 	generate_distinct_models(k::Int)

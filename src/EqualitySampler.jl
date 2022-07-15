@@ -60,6 +60,7 @@ export
 	# TODO: deprecate in favor of the iterator
 	generate_distinct_models,
 	generate_all_models,
+	partition_space,
 
 	AbstractMvUrnDistribution,
 	UniformMvUrnDistribution,

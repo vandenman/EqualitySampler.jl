@@ -174,8 +174,8 @@ DirichletProcessMvUrnDistribution(k::Integer, ::Symbol = :Gopalan_Berry)
 DirichletProcessMvUrnDistribution(k::Integer, α::Real)
 
 Wrapper function to create an object representing a Dirichlet process prior. These call RandomProcessMvUrnDistribution but are a bit more user friendly.
-Either set α directly by passing a float, or pass (any) symbol to use `dpp_find_α` to specify α, which uses the heuristic by
-Gopalan & Berry (1998) so that p(everything equal) == p(everything unequal).
+Either set α directly by passing a float, or pass (any) symbol to use `EqualitySampler.dpp_find_α` to specify α, which uses the heuristic by
+Gopalan & Berry (1998) so that P(everything equal) == P(everything unequal).
 """
 DirichletProcessMvUrnDistribution(k::Integer, α::Float64) = RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(α))
 DirichletProcessMvUrnDistribution(k::Integer, ::Symbol = :Gopalan_Berry) = DirichletProcessMvUrnDistribution(k, dpp_find_α(k))

@@ -23,9 +23,9 @@ end
 function PairwiseMvUrnDistribution(k::T, p::AbstractFloat = 0.5) where T<:Integer
 	# logZ = LogExpFunctions.sum(
 	# 	m->_pairwiseMvUrnDistribution_helper(m, k, log(p), log1p(-p)),
-	# 	EqualitySampler.DistinctModelsIterator(k)
+	# 	EqualitySampler.partition_space(k)
 	# )
-	logZ = LogExpFunctions.logsumexp(_pairwiseMvUrnDistribution_helper(m, k, log(p), log1p(-p)) for m in EqualitySampler.DistinctModelsIterator(k))
+	logZ = LogExpFunctions.logsumexp(_pairwiseMvUrnDistribution_helper(m, k, log(p), log1p(-p)) for m in EqualitySampler.partition_space(k))
 	PairwiseMvUrnDistribution(k, p, logZ)
 end
 
@@ -47,7 +47,7 @@ end
 # @assert pdf_model_distinct(PairwiseMvUrnDistribution(5, .5, 0.0), [1, 1, 1, 1, 1]) ≈ .5^5
 # @assert pdf_model_distinct(PairwiseMvUrnDistribution(5, .6, 0.0), [1, 1, 1, 2, 3]) ≈ .6^3 * .4^2
 
-# mmm = Matrix(EqualitySampler.DistinctModelsIterator(5))
+# mmm = Matrix(EqualitySampler.partition_space(5))
 # d = westfallMvUrnDistribution(5, .5, 0.0)
 # ppp = pdf_model_distinct.(Ref(d), eachcol(mmm))
 # d2 = PairwiseMvUrnDistribution(5, 0.8705505632961241)
@@ -65,9 +65,9 @@ end
 # [pdf_model_distinct(d, [1, 1, 2, 2, 3]) for d in (dp, dw)]
 
 
-# first(EqualitySampler.DistinctModelsIterator(3))
-# collect(EqualitySampler.DistinctModelsIterator(3))
-# Matrix(EqualitySampler.DistinctModelsIterator(3))
+# first(EqualitySampler.partition_space(3))
+# collect(EqualitySampler.partition_space(3))
+# Matrix(EqualitySampler.partition_space(3))
 
 function compute_model_errors(true_ρ, ρ)
 	α_error_count = 0
@@ -118,12 +118,12 @@ function compute_prior_performance(k::Integer, priors_sym, hypotheses)
 
 	z_PairwiseMvUrnDistribution = PairwiseMvUrnDistribution(k, .5)._logZ
 	τ = 0.5 ^ (1 / k)
-	z_westfallMvUrnDistribution = LogExpFunctions.logsumexp(_pairwiseMvUrnDistribution_helper(m, k, log(τ),  log1p(-τ))  for m in EqualitySampler.DistinctModelsIterator(k))
+	z_westfallMvUrnDistribution = LogExpFunctions.logsumexp(_pairwiseMvUrnDistribution_helper(m, k, log(τ),  log1p(-τ))  for m in EqualitySampler.partition_space(k))
 
 	hypo_counts = zeros(Int, k)
-	@showprogress for true_ρ in EqualitySampler.DistinctModelsIterator(k)
+	@showprogress for true_ρ in EqualitySampler.partition_space(k)
 		j = EqualitySampler.count_parameters(true_ρ)
-		for ρ in EqualitySampler.DistinctModelsIterator(k)
+		for ρ in EqualitySampler.partition_space(k)
 
 			α_fam_error, α_prop_error, β_prop_error = compute_model_errors(true_ρ, ρ)
 			hypo_counts[j] += 1
@@ -212,9 +212,9 @@ true_ρ = collect(1:k)
 true_ρ = ones(Int, k)
 
 α_fam_error_prop, α_prop_error_prop, β_prop_error_prop = zeros(k), zeros(k), zeros(k)
-for true_ρ in EqualitySampler.DistinctModelsIterator(k)
+for true_ρ in EqualitySampler.partition_space(k)
 	j = EqualitySampler.count_parameters(true_ρ)
-	for ρ in EqualitySampler.DistinctModelsIterator(k)
+	for ρ in EqualitySampler.partition_space(k)
 		α_fam_error, α_prop_error, β_prop_error = compute_model_errors(true_ρ, ρ)
 		α_fam_error_prop[j] += α_fam_error
 		α_prop_error_prop[j] += α_prop_error
@@ -250,7 +250,7 @@ compute_sum_partition_eqs_oeis(k) = binomial(k, 2) * bellnumr(k-1, 0)
 [compute_sum_partition_eqs_oeis(i) for i in 2:8]
 
 function compute_hhh(k)
-	nnn = length(EqualitySampler.DistinctModelsIterator(k))^2
+	nnn = length(EqualitySampler.partition_space(k))^2
 	hhh = DataFrame(
 		:ρ_true => Vector{String}(undef, nnn),
 		:ρ      => Vector{String}(undef, nnn),
@@ -259,7 +259,7 @@ function compute_hhh(k)
 		:β_c    => Vector{Int}(undef, nnn),
 		:β_t    => Vector{Int}(undef, nnn),
 	)
-	# mmm = collect(EqualitySampler.DistinctModelsIterator(k))
+	# mmm = collect(EqualitySampler.partition_space(k))
 	mmm = collect(eachcol(generate_distinct_models(k)))
 	idx = 1
 	for m in mmm
@@ -377,8 +377,8 @@ bellnumr.(1:7, 0)
 
 function goo(k)
 	res = 0.0
-	for p in EqualitySampler.DistinctModelsIterator(k)
-		for q in EqualitySampler.DistinctModelsIterator(k)
+	for p in EqualitySampler.partition_space(k)
+		for q in EqualitySampler.partition_space(k)
 
 			num = 0
 			den = 0
@@ -396,10 +396,10 @@ function goo(k)
 end
 function hoo(k)
 	# res = 0.0
-	length(EqualitySampler.DistinctModelsIterator(k)) * compute_sum_partition2_fast(k)
+	length(EqualitySampler.partition_space(k)) * compute_sum_partition2_fast(k)
 
-	# for p in EqualitySampler.DistinctModelsIterator(k)
-	# 	for q in EqualitySampler.DistinctModelsIterator(k)
+	# for p in EqualitySampler.partition_space(k)
+	# 	for q in EqualitySampler.partition_space(k)
 
 	# 		num = 0
 	# 		den = 0
@@ -418,12 +418,12 @@ end
 goo(2)
 hoo(2)
 goo.(2:5)
-(length.(EqualitySampler.DistinctModelsIterator.(2:5)) .- 1) .* compute_sum_partition2_fast.(2:5)
+(length.(EqualitySampler.partition_space.(2:5)) .- 1) .* compute_sum_partition2_fast.(2:5)
 
 function loo(p)
 	k = length(p)
 	res = 0.0
-	for q in EqualitySampler.DistinctModelsIterator(k)
+	for q in EqualitySampler.partition_space(k)
 
 		num = 0
 		den = 0
@@ -438,12 +438,12 @@ function loo(p)
 	end
 	return res
 end
-for p in EqualitySampler.DistinctModelsIterator(3)
+for p in EqualitySampler.partition_space(3)
 	println(p)
 end
-[println(p) for p in EqualitySampler.DistinctModelsIterator(3)]
-[loo(p) for p in collect(EqualitySampler.DistinctModelsIterator(3))]
-[loo(p) for p in collect(EqualitySampler.DistinctModelsIterator(3))]
+[println(p) for p in EqualitySampler.partition_space(3)]
+[loo(p) for p in collect(EqualitySampler.partition_space(3))]
+[loo(p) for p in collect(EqualitySampler.partition_space(3))]
 
 loo([1, 1, 1])
 loo([1, 1, 2])
