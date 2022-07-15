@@ -18,7 +18,7 @@ import Turing
 
 	for k in ks
 
-		α = @inferred dpp_find_α(k)
+		α = @inferred EqualitySampler.dpp_find_α(k)
 		@test isapprox(evaluate_α(α, k), 0.0; atol = 0.01)
 
 	end

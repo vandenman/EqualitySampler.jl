@@ -18,10 +18,10 @@ updateDistribution(D::EqualitySampler.BetaBinomialConditionalUrnDistribution, ur
 				samples[:, i] .= reduce_model(urns)
 			end
 			D = updateDistribution(D, ones(Int, k), 1)
-			empirical_model_probs     = collect(values(empirical_model_probabilities(samples)))
-			empirical_inclusion_probs = collect(values(empirical_no_parameters_probabilities(samples)))
-			expected_model_probs      = expected_model_probabilities(D)
-			expected_inclusion_probs  = expected_inclusion_probabilities(D)
+			empirical_model_probs     = collect(values(EqualitySampler.empirical_model_probabilities(samples)))
+			empirical_inclusion_probs = collect(values(EqualitySampler.empirical_no_parameters_probabilities(samples)))
+			expected_model_probs      = EqualitySampler.expected_model_probabilities(D)
+			expected_inclusion_probs  = EqualitySampler.expected_inclusion_probabilities(D)
 			rtol = 0.15 + 0.02k # TODO: something better than this.
 			@testset "Distribution: $D" begin
 				# correlations fail for uniform model because the theoretical values have 0 variance.

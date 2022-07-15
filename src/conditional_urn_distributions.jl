@@ -25,45 +25,6 @@ function reduce_model(x::AbstractVector{T}) where T <: Integer
 	return y
 end
 
-function reduce_model_dpp(x::AbstractVector{<:Integer})
-
-	y = similar(x)
-	currentMax = 0
-	visited = Set{Int}()
-	for i in eachindex(y)
-		if x[i] ∉ visited
-			currentMax += 1
-			y[i] = currentMax
-			for j in i+1:length(x)
-				if x[i] == x[j]
-					y[j] = currentMax
-				end
-			end
-			push!(visited, x[i])
-		end
-	end
-	return y
-end
-
-# function reduce_model!(x::AbstractVector{T}) where T <: Integer
-# 	# TODO: this is less efficient than just copying x first
-# 	for i in eachindex(x)
-# 		if x[i] != i
-# 			if !any(==(x[i]), x[1:i - 1])
-# 				idx = findall(==(x[i]), x[i:end]) .+ (i - 1)
-
-# 				otherIdx = findall(==(i), x[i:end]) .+ (i - 1)
-# 				v = x[i]
-# 				x[idx] .= i
-# 				x[otherIdx] .= v
-
-# 			end
-# 		end
-# 	end
-# 	return x
-# end
-
-
 function get_conditional_counts(n::Int, known::AbstractVector{T} = [1], include_new::Bool = true) where T <: Integer
 
 	# TODO: just pass d.partitions and d.index to this function! (or just d itself)

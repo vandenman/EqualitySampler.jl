@@ -49,7 +49,6 @@ Given a maximum partition size n, counts the number of partitions that have leng
 count_set_partitions_given_partition_size(n) is more efficient than count_set_partitions_given_partition_size.(n, 1:n).
 The implementation is based on the mathematica code in https://oeis.org/A036040
 """
-
 function count_set_partitions_given_partition_size(f!::Function, n::T, sorted::Bool = true) where T<:Integer
 	part = Combinatorics.integer_partitions(n)
 	f!(part)
@@ -69,27 +68,3 @@ function count_set_partitions_given_partition_size(f!::Function, n::T, sorted::B
 end
 runs(x) = values(StatsBase.StatsBase.countmap(x))
 count_set_partitions_given_partition_size(n::T, sorted::Bool = true) where T = count_set_partitions_given_partition_size(identity, n, sorted)
-
-# runs(x) = sort!(collect(values(StatsBase.StatsBase.countmap(x))))
-
-# """
-# count_set_partitions_given_partition_size(n::T, m::T) where T<:Integer
-
-# Given a maximum partition size n, counts the number of partitions that have length m.
-# """
-# function count_set_partitions_given_partition_size(n::T, m::T) where T<:Integer
-# 	part = sort!(reverse!(sort!.(Combinatorics.integer_partitions(n); rev=true)); by = length)
-# 	result = Combinatorics.multinomial(T.(part[m])...) ÷ mapreduce(x->factorial(T(x)), *, runs(part[m]))
-# 	return result, part[m]
-# end
-
-
-# function count_set_partitions_given_partition_size2(n::T, target_size::T) where T<:Integer
-# 	part = filter!(x->length(x) == target_size, Combinatorics.integer_partitions(n))
-# 	result = Vector{T}(undef, length(part))
-# 	for i in eachindex(result)
-# 		result[i] = Combinatorics.multinomial(T.(part[i])...) ÷ mapreduce(x->factorial(T(x)), *, runs1(part[i]))
-# 	end
-# 	return result, part
-# end
-# runs1(x) = collect(values(StatsBase.StatsBase.countmap(x)))

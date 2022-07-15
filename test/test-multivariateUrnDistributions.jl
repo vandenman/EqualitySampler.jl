@@ -10,6 +10,26 @@ import Distributions, Turing, StatsBase, Statistics
 
 =#
 
+function reduce_model_dpp(x::AbstractVector{<:Integer})
+
+	y = similar(x)
+	currentMax = 0
+	visited = Set{Int}()
+	for i in eachindex(y)
+		if x[i] ∉ visited
+			currentMax += 1
+			y[i] = currentMax
+			for j in i+1:length(x)
+				if x[i] == x[j]
+					y[j] = currentMax
+				end
+			end
+			push!(visited, x[i])
+		end
+	end
+	return y
+end
+
 @testset "Multivariate urn distributions" begin
 
 	noSamples = 15_000
@@ -86,16 +106,17 @@ import Distributions, Turing, StatsBase, Statistics
 						end
 
 						if !(d isa RandomProcessMvUrnDistribution)
-							empirical_model_probs     = collect(values(empirical_model_probabilities(samples)))
-							expected_model_probs      = expected_model_probabilities(d)
+
+							empirical_model_probs     = collect(values(EqualitySampler.empirical_model_probabilities(samples)))
+							expected_model_probs      = EqualitySampler.expected_model_probabilities(d)
 						else # for the DirichletProcess this method doesn't exist (yet) so we brute force it
-							tmp                       = empirical_model_probabilities(samples)
+							tmp                       = EqualitySampler.empirical_model_probabilities(samples)
 							empirical_model_probs     = collect(values(tmp))
 							expected_model_probs      = [exp(EqualitySampler.logpdf_model_distinct(d, reduce_model_dpp(parse.(Int, split(model, ""))))) for model in keys(tmp)]
 						end
 
-						empirical_inclusion_probs = collect(values(empirical_no_parameters_probabilities(samples)))
-						expected_inclusion_probs  = expected_inclusion_probabilities(d)
+						empirical_inclusion_probs = collect(values(EqualitySampler.empirical_no_parameters_probabilities(samples)))
+						expected_inclusion_probs  = EqualitySampler.expected_inclusion_probabilities(d)
 
 						rtol = 0.15 + 0.02k # TODO: something better than this.
 						@test isapprox(empirical_model_probs, expected_model_probs, rtol = rtol)
@@ -103,10 +124,10 @@ import Distributions, Turing, StatsBase, Statistics
 
 					end
 
-					if !(d isa RandomProcessMvUrnDistribution)#hasmethod(log_expected_inclusion_probabilities, (RandomProcessMvUrnDistribution, ))
+					if !(d isa RandomProcessMvUrnDistribution)
 						@testset "Batch computations match individual ones" begin
 
-							expected = log_expected_inclusion_probabilities(d)
+							expected = EqualitySampler.log_expected_inclusion_probabilities(d)
 							observed = logpdf_incl.(Ref(d), 1:length(d))
 
 							@test isapprox(expected, observed)
@@ -126,7 +147,7 @@ import Distributions, Turing, StatsBase, Statistics
 
 			lpdfs = mapslices(x->logpdf_model_distinct(d, x), m, dims = 1)
 			manual_sizes = [sort!(collect(values(StatsBase.countmap(x))); rev = true) for x in eachcol(m)]
-			counts, sizes = count_set_partitions_given_partition_size(k)
+			counts, sizes = EqualitySampler.count_set_partitions_given_partition_size(k)
 
 			for i in eachindex(sizes)
 

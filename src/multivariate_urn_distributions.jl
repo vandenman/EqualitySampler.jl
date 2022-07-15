@@ -322,29 +322,3 @@ function logpdf_incl(d::RandomProcessMvUrnDistribution{RPM, T}, no_parameters::I
 end
 
 expected_inclusion_probabilities(d::RandomProcessMvUrnDistribution) = [pdf_incl(d, i) for i in 1:length(d)]
-
-# TODO: this method doesn't work yet
-# function expected_model_probabilities(d::RandomProcessMvUrnDistribution)
-
-# 	incl_probs  = expected_inclusion_probabilities(d)
-# 	no_models_with_incl = expected_inclusion_counts(length(d))
-# 	probs = incl_probs ./ no_models_with_incl
-
-# 	# TODO: this compact creates type instabilities!
-# 	if compact
-
-# 		result = hcat(0:length(d)-1, no_models_with_incl, probs)
-
-# 	else
-
-# 		# probability of j equalities for j in 1...k
-# 		result = Vector{Float64}(undef, sum(no_models_with_incl))
-# 		index = 1
-# 		for i in eachindex(probs)
-# 			result[index:index + no_models_with_incl[i] - 1] .= probs[i]
-# 			index += no_models_with_incl[i]
-# 		end
-# 	end
-# 	return result
-
-# end
