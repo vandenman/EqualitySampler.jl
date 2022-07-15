@@ -99,7 +99,7 @@ function compute_model_counts(partition_samples::AbstractMatrix, add_missing_mod
 	res = StatsBase.countmap(vec(mapslices(x->join(reduce_model(Int.(x))), partition_samples, dims = 2)))
 	if add_missing_models
 		k = size(partition_samples)[2]
-		expected_size = count_distinct_models(k)
+		expected_size = bellnum(k)
 		if length(res) != expected_size
 			allmodels = vec(mapslices(x->join(reduce_model(x)), generate_distinct_models(k), dims = 1))
 			for m in allmodels

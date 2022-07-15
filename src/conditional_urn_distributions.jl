@@ -132,8 +132,6 @@ end
 # TODO: this could be done more efficiently
 Distributions.rand(::Random.AbstractRNG, d::AbstractConditionalUrnDistribution) = rand(Distributions.Categorical(_pdf(d)), 1)[1]
 
-count_distinct_models(d::AbstractConditionalUrnDistribution) = count_distinct_models(length(d))
-
 outcomes(d::AbstractConditionalUrnDistribution) = eachindex(d.urns)
 Distributions.mean(d::AbstractConditionalUrnDistribution) = sum(_pdf(d) .* outcomes(d))
 Distributions.var(d::AbstractConditionalUrnDistribution) = sum(_pdf(d) .* outcomes(d) .^2) - Distributions.mean(d)^2
@@ -275,7 +273,7 @@ end
 
 #region expected model + inclusion probabilities
 function expected_model_probabilities(k::Integer)
-	x = count_distinct_models(k)
+	x = bellnum(k)
 	return fill(one(k) / x, x)
 end
 expected_inclusion_counts(k::Integer) = stirlings2.(k, 1:k)

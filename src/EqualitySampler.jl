@@ -41,8 +41,6 @@ export
 	logbellnumr,
 
 	# TODO: refactor all the count_xxx methods to a few sensible ones
-	count_combinations,
-	count_distinct_models,
 	count_models_with_no_equalities,
 	count_models_with_no_parameters,
 	count_distinct_models_with_no_parameters,

@@ -7,7 +7,7 @@ function generate_distinct_models(k::Int)
 	# based on https://stackoverflow.com/a/30898130/4917834
 	# TODO: return a generator rather than directly all results
 	current = ones(Int, k)
-	no_models = count_distinct_models(k)
+	no_models = bellnum(k)
 	result = Matrix{Int}(undef, k, no_models)
 	result[:, 1] .= current
 	isone(k) && return result
@@ -29,7 +29,7 @@ struct DistinctModelsIterator{T<:Integer}
 	no_models::T
 	current_model::Vector{T}
 	function DistinctModelsIterator(k::T) where T<:Integer
-		new{T}(count_distinct_models(k), ones(T, k))
+		new{T}(bellnum(k), ones(T, k))
 	end
 end
 

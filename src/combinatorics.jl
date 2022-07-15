@@ -36,13 +36,6 @@ count_combinations(x::AbstractVector) = count_combinations(length(x), no_distinc
 
 log_count_combinations(x::AbstractVector) = log_count_combinations(length(x), no_distinct_groups_in_partition(x))
 
-"""
-	count_distinct_models(k::Int)
-
-returns the n-th bell number, which representats the total number of unique models.
-"""
-count_distinct_models(k::Integer) = bellnumr(k, zero(k))
-
 count_distinct_models_with_no_equalities(k::T, no_equalities::T)     where T<:Integer = stirlings2(k, k - no_equalities)
 count_models_with_no_equalities(k::T, no_equalities::T)              where T<:Integer = count_distinct_models_with_no_equalities(k, no_equalities) * count_combinations(k, k - no_equalities)
 log_count_distinct_models_with_no_equalities(k::T, no_equalities::T) where T<:Integer = logstirlings2(k, k - no_equalities)
