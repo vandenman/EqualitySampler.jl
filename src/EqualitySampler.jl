@@ -36,11 +36,6 @@ export
 	unsignedstirlings1,
 	logunsignedstirlings1,
 
-	# TODO: do not export these
-	StirlingStrategy,
-	ExplicitStrategy,
-	RecursiveStrategy,
-
 	bellnum,
 	bellnumr,
 	logbellnumr,

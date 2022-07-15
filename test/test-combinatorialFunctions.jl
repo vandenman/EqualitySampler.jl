@@ -8,7 +8,7 @@ import Combinatorics
 	rvals = 6
 	@testset "comparison with Combinatorics" begin
 
-		for strategy in (ExplicitStrategy, RecursiveStrategy)
+		for strategy in (EqualitySampler.ExplicitStrategy, EqualitySampler.RecursiveStrategy)
 			@testset "stirlings2, StirlingStrategy: $strategy" begin
 				for n in 1:nvals, k in 1:kvals
 					@test Combinatorics.stirlings2(n, k) == stirlings2(n, k, strategy)
@@ -35,7 +35,7 @@ import Combinatorics
 		end
 	end
 
-	for strategy in (ExplicitStrategy, RecursiveStrategy)
+	for strategy in (EqualitySampler.ExplicitStrategy, EqualitySampler.RecursiveStrategy)
 		@testset "compare r-stirlings2 against tables in Broder (1984), StirlingStrategy: $strategy" begin
 
 			# Tables 1-3 of Broder (1984). The $r$-Stirling numbers
@@ -123,7 +123,7 @@ import Combinatorics
 			0  40320  109584  118124  67284  22449  4536  546  36  1
 		]
 
-		for strategy in (ExplicitStrategy, RecursiveStrategy)
+		for strategy in (EqualitySampler.ExplicitStrategy, EqualitySampler.RecursiveStrategy)
 
 			replication = [unsignedstirlings1(n, k, strategy) for n in 0:9, k in 0:9]
 			@test reference == replication
