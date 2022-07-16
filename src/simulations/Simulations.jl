@@ -2,8 +2,6 @@ module Simulations
 
 using ..EqualitySampler
 
-# TODO: should we just do using Turing?
-
 # stdlib
 import
 	LinearAlgebra,

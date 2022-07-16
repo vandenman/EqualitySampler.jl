@@ -114,7 +114,7 @@ function fit_lm(df, formula = StatsModels.@formula(y ~ 1 + g))
 end
 
 function get_suff_stats(df::SimpleDataSet)
-	return [Distributions.suffstats(Normal, view(df.y[idx]) for idx in df.g)]
+	return [Distributions.suffstats(Distributions.Normal, view(df.y, idx)) for idx in df.g]
 end
 
 function get_suff_stats(df::DataFrames.DataFrame)
@@ -298,7 +298,7 @@ DynamicPPL.@model function one_way_anova_mv_ss_submodel(suff_stats_vec, Q, parti
 
 	# definition from Rouder et. al., (2012) eq 6.
 	@inbounds for i in eachindex(suff_stats_vec)
-		Turing.@addlogprob! loglikelihood_suffstats(Normal(μ_grand + sqrt(σ²) * θ_cs[i], sqrt(σ²)), suff_stats_vec[i])
+		Turing.@addlogprob! loglikelihood_suffstats(Distributions.Normal(μ_grand + sqrt(σ²) * θ_cs[i], sqrt(σ²)), suff_stats_vec[i])
 	end
 
 	return θ_cs
