@@ -27,8 +27,9 @@ Distributions.logpdf(d::JeffreysPriorVariance, x::Real) = Distributions.insuppor
 	Equivalently, the Jeffreys prior for log(σ) = ∫ dσ / σ is the unnormalized uniform distribution
 	on the real line, and thus this distribution is also known as the logarithmic prior.
 
-	Therefore, we "sample" from d<:AbstractJeffreysPrior as a transformation of sampling from the real line.
-	Note that valid sampling is actually impossible.
+	Therefore, `rand(d::AbstractJeffreysPrior)` is implemented as a transformation of sampling from the real line.
+	Sampling uniformly from the real line is done via `exp(rand(Turing.Flat()))`.
+	Note that uniformly sampling from the entire real line is impossible and the validity of `rand(::JeffreysPriorXXX)` hinges on at the validity of `rand(Turing.Flat())`.
 """
 Distributions.rand(rng::Random.AbstractRNG, ::JeffreysPriorStandardDeviation) = exp(rand(rng, Turing.Flat()))
 Distributions.rand(rng::Random.AbstractRNG, ::JeffreysPriorVariance)          = exp(rand(rng, Turing.Flat()))^2

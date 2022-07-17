@@ -2,6 +2,7 @@
 	generate_distinct_models(k::Int)
 
 Generates all distinct models that represent equalities.
+Deprecated in favor of `partition_space(k::Int)`.
 """
 function generate_distinct_models(k::Int)
 	# based on https://stackoverflow.com/a/30898130/4917834
@@ -28,6 +29,7 @@ end
 	generate_distinct_models(k::Int)
 
 Returns an iterator that generates all models that represent equalities, including duplicates that represent the same unique model (e.g., [1, 1, 1] and [2, 2, 2]) .
+Deprecated in favor of `partition_space(k::Int; distinct=false)`.
 """
 function generate_all_models(k::Int)
 	return Iterators.product(fill(1:k, k)...)
@@ -37,45 +39,79 @@ abstract type AbstractPartitionSpace end
 struct DistinctPartitionSpace <: AbstractPartitionSpace end
 struct DuplicatedPartitionSpace <: AbstractPartitionSpace end
 
+"""
+PartitionIterator{T<:Integer, P<:EqualitySampler.AbstractPartitionSpace}
+
+A type to represent the space of partitions.
+`EqualitySampler.AbstractPartitionSpace` indicates whether partitions should contains duplicates or be distinct.
+For example, the distinct iterator will return `[1, 1, 2]` but not `[2, 2, 1]` and `[1, 1, 3]`, which are returned by the duplicated iterator.
+"""
 struct PartitionIterator{T<:Integer, P<:AbstractPartitionSpace}
-	no_models::T
-	current_model::Vector{T}
-	function PartitionIterator(k::T, P::Type{U}) where {T<:Integer, U<:AbstractPartitionSpace}
-		new{T, U}(bellnum(k), ones(T, k))
+	k::T
+	function PartitionIterator(k::T, ::Type{U}) where {T<:Integer, U<:AbstractPartitionSpace}
+		k < one(k) && throw(DomainError(k, "k must be larger than zero."))
+		new{T, U}(k)
 	end
 end
 
-partition_space(k::Integer; distinct::Bool = true) = PartitionIterator(k, distinct ? DistinctPartitionSpace : DuplicatedPartitionSpace)
+"""
+partition_space(k::Integer, P::Type{<:AbstractPartitionSpace} = DistinctPartitionSpace)
 
-# TODO: shouldn't the iterator be stateless?
-function Base.iterate(iter::PartitionIterator{T, DistinctPartitionSpace}, state=1) where T<:Integer
-	state > iter.no_models && return nothing
-	isone(state) && return (copy(iter.current_model), state + 1)
-	state == iter.no_models && return (collect(eachindex(iter.current_model)), state + 1)
+Returns an iterator that iterates over the space of partitions.
+If `P = EqualitySampler.DistinctPartitionSpace` then the iterator will return `[1, 1, 2]` but not `[2, 2, 1]` and `[1, 1, 3]`, which would be returned if `P = EqualitySampler.DuplicatedPartitionSpace`.
+"""
+partition_space(k::Integer, P::Type{<:AbstractPartitionSpace} = DistinctPartitionSpace) = PartitionIterator(k, P)
 
-	k = T(length(iter.current_model))
-	current = iter.current_model
-	range = k:-1:2
-	i = state
-
-	idx = findfirst(i->current[i] < k && any(==(current[i]), view(current, 1:i-1)), range)
-	rightmost_incrementable = range[idx]
-	current[rightmost_incrementable] += 1
-	current[rightmost_incrementable + 1 : end] .= 1
-	iter.current_model .= current
-	return (copy(current), state + 1)
+function Base.iterate(iter::PartitionIterator{T, P}) where {T, P}
+	return ones(Int, iter.k), ones(Int, iter.k)
 end
 
-# function Base.iterate(iter::PartitionIterator{T, DuplicatedPartitionSpace}, state=1) where T<:Integer
-	# TODO: implement this!
-# end
+function Base.iterate(iter::PartitionIterator{T, DistinctPartitionSpace}, state) where T<:Integer
 
+	@inbounds begin
+		k = iter.k
+		range = k:-1:2
+		current = copy(state)
+		idx = findfirst(i->current[i] < k && any(==(@inbounds current[i]), view(current, 1:i-1)), range)
+		isnothing(idx) && return nothing
+		rightmost_incrementable = range[idx]
+		current[rightmost_incrementable] += 1
+		current[rightmost_incrementable + 1 : end] .= 1
+	end
 
-Base.length(iter::PartitionIterator) = iter.no_models
-Base.eltype(::Type{PartitionIterator{T, P}}) where {T, P} = Vector{T}
+	return (current, copy(current))
+
+end
+
+function Base.iterate(iter::PartitionIterator{T, DuplicatedPartitionSpace}, states) where T
+
+	@inbounds begin
+
+		current = copy(states)
+		i = 1
+		while current[i] == iter.k
+			i += 1
+		end
+
+		i > iter.k && return nothing
+
+		current[i] += 1
+		current[1:i-1] .= 1
+
+	end
+
+	return current, copy(current)
+
+end
+
+Base.length(iter::PartitionIterator{T, DistinctPartitionSpace})   where T = bellnum(iter.k)
+Base.length(iter::PartitionIterator{T, DuplicatedPartitionSpace}) where T = iter.k^iter.k
+
+Base.eltype(::Type{PartitionIterator{T, P}}) where {T, P} = Vector{Int}
 Base.IteratorSize(::Type{PartitionIterator{T, P}}) where {T, P} = Base.HasLength()
+
 function Base.Matrix(iter::PartitionIterator{T, P}) where {T, P}
-	res = Matrix{T}(undef, length(iter.current_model), iter.no_models)
+	res = Matrix{Int}(undef, iter.k, length(iter))
 	for (i, m) in enumerate(iter)
 		res[:, i] .= m
 	end
