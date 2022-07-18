@@ -101,7 +101,7 @@ function compute_model_counts(partition_samples::AbstractMatrix, add_missing_mod
 		k = size(partition_samples)[2]
 		expected_size = bellnum(k)
 		if length(res) != expected_size
-			allmodels = vec(mapslices(x->join(reduce_model(x)), generate_distinct_models(k), dims = 1))
+			allmodels = join.(PartitionSpace(k))
 			for m in allmodels
 				if !haskey(res, m)
 					res[m] = 0
