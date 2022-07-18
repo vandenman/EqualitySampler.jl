@@ -39,8 +39,7 @@ export
 	compute_post_prob_eq,
 	anova_test,
 	westfall_test,
-	proportion_test#,
-	# variance_test
+	proportion_test
 
 include("MCMCSettings.jl")
 include("brute_force_epsilon.jl")
@@ -50,6 +49,5 @@ include("simpledataset.jl")
 include("anova_functions.jl")
 include("logpdf_noncentral_t.jl")
 include("westfall_functions.jl")
-# include("variance_functions.jl") # <- TODO
 
 end
