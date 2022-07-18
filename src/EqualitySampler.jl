@@ -25,7 +25,7 @@ export
 			perhaps skip/ remove logpdf_mv_normal_chol_suffstat and friends (constructing the full matrix is not super expensive)
 			also use PDMats.invquad and friends
 
-		- [ ] consider renaming "model" to "partition" everywhere. For example, 
+		- [ ] consider renaming "model" to "partition" everywhere. For example,
 			AbstractMvUrnDistribution	-> AbstractPartitionDistribution
 			reduce_model 				-> normalize_partition
 
@@ -60,7 +60,7 @@ export
 	# TODO: deprecate in favor of the iterator
 	generate_distinct_models,
 	generate_all_models,
-	partition_space,
+	PartitionSpace,
 
 	AbstractMvUrnDistribution,
 	UniformMvUrnDistribution,

@@ -6,7 +6,7 @@ import StatsBase
 	@testset "fast_countmap_partition" begin
 		@testset "k = 2:7" begin
 			for k in 2:7
-				for model in EqualitySampler.partition_space(k)
+				for model in PartitionSpace(k)
 					@test EqualitySampler.fast_countmap_partition(model) == collect(values(sort(StatsBase.countmap(model))))
 				end
 			end
@@ -22,7 +22,7 @@ import StatsBase
 	@testset "no_distinct_groups_in_partition" begin
 		@testset "k = 2:7" begin
 			for k in 2:7
-				for model in EqualitySampler.partition_space(k)
+				for model in PartitionSpace(k)
 					@test EqualitySampler.no_distinct_groups_in_partition(model) == length(Set(model))
 				end
 			end
