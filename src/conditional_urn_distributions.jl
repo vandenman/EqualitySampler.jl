@@ -27,17 +27,9 @@ end
 
 function get_conditional_counts(n::Int, known::AbstractVector{T} = [1], include_new::Bool = true) where T <: Integer
 
-	# TODO: just pass d.partitions and d.index to this function! (or just d itself)
-	# then we can get rid of the include_new and use dispatch, although it might duplicate some code
-	# or maybe not?
-	# NOTE: profiling shows that reduce_model is by far the most expensive function here
-
-	# known = reduce_model(known) # TODO: double check that this is unnecessary!
-	# refinement = length(unique(known))
 	n_known = length(known)
 
 	res = zeros(Int, n_known + (include_new ? 1 : 0))
-	# idx = findall(i->known[i] == i, 1:n_known) # This step fails when not doing reduce_model
 	idx = get_idx_for_conditional_counts(known)
 
 	n_idx = length(idx)

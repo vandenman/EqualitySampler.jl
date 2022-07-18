@@ -218,7 +218,7 @@ end
 
 function plot_modelspace(k::Integer, save::Bool = true, vertical::Bool = true)
 
-	models = generate_distinct_models(k)
+	models = Matrix(PartitionSpace(k))
 	order = sortperm(ordering.(eachcol(models)), lt = !isless)
 	plots = [plot_model(view(models, :, i)) for i in order]
 	layout, max_rows, max_cols = make_grid(k, vertical)
@@ -262,18 +262,3 @@ function ordering2(x)
 	res += lexicographic_order(x)
 	return res
 end
-
-# k = 5
-# vertical = false
-# models = generate_distinct_models(k)
-# order = sortperm(ordering.(eachcol(models)), lt = !isless)
-# layout, max_rows, max_cols = make_grid(k, vertical)
-# w = 100
-
-# plots = [plot_model(view(models, :, i); legend=false, border=:none, axis=nothing) for i in order]
-# plt = plot(plots..., layout = layout, size = (max_cols*w, max_rows*w))
-
-# l2 = make_grid_5(5)
-# plot(plots..., layout = l2, size = reverse(size(l2)) .* w)
-# l3 = make_grid_5(5, false)
-# plot(plots..., layout = l3, size = reverse(size(l3)) .* w)

@@ -40,7 +40,7 @@ function extract_partition_samples(model, chn)
 	gen = generated_quantities(model, Turing.MCMCChains.get_sections(chn, :parameters))
 	partition_samples = Matrix{Int}(undef, length(gen), length(gen[1][end]))
 	for i in eachindex(gen)
-		partition_samples[i, :] .= reduce_model(gen[i][end])
+		partition_samples[i, :] .= EqualitySampler.reduce_model(gen[i][end])
 	end
 	return partition_samples
 end

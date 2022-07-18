@@ -15,7 +15,7 @@ updateDistribution(D::EqualitySampler.BetaBinomialConditionalUrnDistribution, ur
 					D = updateDistribution(D, urns, j)
 					urns[j] = rand(D)
 				end
-				samples[:, i] .= reduce_model(urns)
+				samples[:, i] .= EqualitySampler.reduce_model(urns)
 			end
 			D = updateDistribution(D, ones(Int, k), 1)
 			empirical_model_probs     = collect(values(EqualitySampler.empirical_model_probabilities(samples)))

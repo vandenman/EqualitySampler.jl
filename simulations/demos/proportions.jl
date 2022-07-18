@@ -220,14 +220,6 @@ for i in 1:8, j in i:8
 	eq_table[i, j] = NaN
 end
 
-# prior_eq_probs = mapreduce(+, eachcol(generate_distinct_models(8)); init = 0.0) do model
-# 	if model[1] == model[2]
-# 		return EqualitySampler.pdf_model_distinct(priors.Betabinomial2, model)
-# 	else
-# 		return 0.0
-# 	end
-# end
-
 x_nms = journal_data[!, :journal]# names(eq_table)[1]
 color_gradient = cgrad(cgrad(ColorSchemes.magma)[0.15:0.01:1.0])
 annotations = []

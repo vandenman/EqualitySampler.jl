@@ -44,7 +44,7 @@ make_label(::Type{RandomProcessMvUrnDistribution{DirichletProcess{Float64}, Int6
 
 function get_data(k, priors)
 
-	models = generate_distinct_models(k)
+	models = Matrix(PartitionSpace(k))
 
 	models_int = parse.(Int, vec(mapslices(join, models, dims = 1)))
 	df_wide_model_probs = DF.DataFrame(
@@ -108,7 +108,7 @@ end
 function get_data(dists)
 
 	k = length(dists[1][:dist])
-	models = generate_distinct_models(k)
+	models = Matrix(PartitionSpace(k))
 
 	models_int = parse.(Int, vec(mapslices(join, models, dims = 1)))
 	df_wide_model_probs = DF.DataFrame(

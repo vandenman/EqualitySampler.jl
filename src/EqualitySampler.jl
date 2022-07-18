@@ -54,12 +54,7 @@ export
 	count_equalities,
 	count_parameters,
 
-	# models
-	reduce_model,
-
 	# TODO: deprecate in favor of the iterator
-	generate_distinct_models,
-	generate_all_models,
 	PartitionSpace,
 
 	AbstractMvUrnDistribution,
@@ -76,9 +71,6 @@ export
 	logpdf_model,
 	logpdf_model_distinct,
 	logpdf_incl,
-
-	# TODO: better name
-	PartitionSampler,
 
 	# Jeffreys priors for variances and sds
 	JeffreysPriorStandardDeviation,

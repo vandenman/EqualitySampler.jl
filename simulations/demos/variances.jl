@@ -52,7 +52,7 @@ function get_starting_values(obs_mean_1, obs_mean_2, obs_sd_1, obs_sd_2, obs_cov
 		diff_vals = filter(!iszero, triangular_to_vec(LA.UpperTriangular(partition_diff)))
 		target = SB.quantile(diff_vals, target_quantile)
 		adj_mat = abs.(partition_diff) .< target
-		partition_sample = reduce_model(map(x->findfirst(isone, x), eachcol(adj_mat)))
+		partition_sample = EqualitySampler.reduce_model(map(x->findfirst(isone, x), eachcol(adj_mat)))
 
 		return (;
 			obs_mean_1, obs_mean_2,

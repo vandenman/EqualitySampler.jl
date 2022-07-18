@@ -227,16 +227,7 @@ end
 # end
 
 function logpdf_incl(d::RandomProcessMvUrnDistribution, ::Integer)
-
 	throw(DomainError(d, "only implemented for rpm<:Turing.RandomMeasures.DirichletProcess"))
-	# generate one instance of all different models with no_parameters
-
-	# result = zero(Float64)
-	# opts = generate_distinct_models_with_sum(length(d), no_parameters)
-	# for i in axes(opts, 2)
-	# 	result += logpdf(d, view(opts, :, i)) + count_distinct_models_with_pattern(opts)
-	# end
-	# return result
 end
 
 function logpdf_model_distinct(d::RandomProcessMvUrnDistribution{W, T}, x::U) where {T<:Integer, U<:Integer, W}

@@ -63,17 +63,16 @@ end
 
 				k = first(args)
 				d = dist.dist(args...)
-				# m0 = generate_distinct_models(k)
-				m = generate_all_models(k)
+				m = PartitionSpace(k, EqualitySampler.DuplicatedPartitionSpace)
 
 				@testset "args: $args" begin
 
 					@testset "pdf sums to 1, inclusion probabilities match, model probabilities match " begin
 
-						s = vec([count_parameters(collect(col)) for col in m])
+						s = vec([count_parameters(col) for col in m])
 						indices = [findall(==(i), s) for i in 1:k]
 
-						probs = vec([Distributions.pdf(d, collect(col)) for col in m])
+						probs = vec([Distributions.pdf(d, col) for col in m])
 						# pdf over all models sums to 1.0
 						@test sum(probs) ≈ 1.0
 
@@ -102,7 +101,7 @@ end
 						for i in axes(samples, 2)
 							v = view(samples, :, i)
 							Distributions.rand!(d, v)
-							v .= reduce_model(v)
+							v .= EqualitySampler.reduce_model(v)
 						end
 
 						if !(d isa RandomProcessMvUrnDistribution)
@@ -143,7 +142,7 @@ end
 
 		for k in 2:10
 			d = DirichletProcessMvUrnDistribution(k, .5)
-			m = generate_distinct_models(k)
+			m = Matrix(PartitionSpace(k))
 
 			lpdfs = mapslices(x->logpdf_model_distinct(d, x), m, dims = 1)
 			manual_sizes = [sort!(collect(values(StatsBase.countmap(x))); rev = true) for x in eachcol(m)]
@@ -173,7 +172,7 @@ end
 
 			d_u  = UniformMvUrnDistribution(k)
 			d_bb = BetaBinomialMvUrnDistribution(k, k, 1)
-			models = generate_distinct_models(k)
+			models = Matrix(PartitionSpace(k))
 			parameters = count_parameters.(eachcol(models))
 
 			logprob_d_bb_models     = logpdf_model_distinct.(Ref(d_bb), eachcol(models))

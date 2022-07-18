@@ -1,7 +1,7 @@
 
 # just a hack for GibbsConditional
 
-mutable struct PartitionSampler <: Distributions.DiscreteMultivariateDistribution
+struct PartitionSampler <: Distributions.DiscreteMultivariateDistribution
 	size::Int
 	nextValues::Vector{Int}
 	logposterior::Function

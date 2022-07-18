@@ -239,7 +239,7 @@ k = 5
 
 function compute_sum_partition_eqs(k)
 	res = 0
-	for ρ in eachcol(generate_distinct_models(k)), i in 1:k-1, j in i+1:k
+	for ρ in PartitionSpace(k), i in 1:k-1, j in i+1:k
 		res += ρ[i] == ρ[j] ? 1 : 0
 	end
 	res
@@ -260,7 +260,7 @@ function compute_hhh(k)
 		:β_t    => Vector{Int}(undef, nnn),
 	)
 	# mmm = collect(EqualitySampler.partition_space(k))
-	mmm = collect(eachcol(generate_distinct_models(k)))
+	mmm = collect(PartitionSpace(k))
 	idx = 1
 	for m in mmm
 		tmp = compute_model_errors.(Ref(m), mmm)
@@ -327,7 +327,7 @@ end
 function compute_sum_partition2(k)
 	# res = zeros(Int, k, k)
 	res = zeros(Int, binomial(k, 2))
-	mmm = eachcol(generate_distinct_models(k))
+	mmm = eachcol(PartitionSpace(k))
 	for m in mmm
 		idx = 1
 		for i in 1:k-1, j in i+1:k
@@ -358,7 +358,7 @@ end
 function compute_sum_partition3(k)
 	# res = zeros(Int, k, k)
 	res = zeros(Int, binomial(k, 2))
-	mmm = eachcol(generate_distinct_models(k))
+	mmm = eachcol(PartitionSpace(k))
 	for m in mmm
 		idx = 1
 		for i in 1:k-1, j in i+1:k
