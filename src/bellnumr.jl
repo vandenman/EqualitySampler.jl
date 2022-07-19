@@ -1,9 +1,3 @@
-#=
-
-	r-Bell numbers
-
-=#
-
 """
 	bellnumr(n::T, r::T) where T <: Integer
 

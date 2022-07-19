@@ -96,7 +96,7 @@ end
 compute_model_counts(chn::MCMCChains.Chains, add_missing_models::Bool = true) = compute_model_counts(get_eq_samples(chn), add_missing_models)
 
 function compute_model_counts(partition_samples::AbstractMatrix, add_missing_models::Bool = true)
-	res = StatsBase.countmap(vec(mapslices(x->join(reduce_model(Int.(x))), partition_samples, dims = 2)))
+	res = StatsBase.countmap(vec(mapslices(x->join(EqualitySampler.reduce_model(Int.(x))), partition_samples, dims = 2)))
 	if add_missing_models
 		k = size(partition_samples)[2]
 		expected_size = bellnum(k)

@@ -20,6 +20,7 @@
 \usepackage{amsmath,amsfonts,amssymb,bm,bbm,amsthm}
 \usepackage[colorinlistoftodos,textsize=small]{todonotes}
 \usepackage{graphicx}
+\graphicspath{{../figures/}}
 %\usepackage{breqn}
 \usepackage{todonotes}
 \usepackage{xcolor} % color math symbols, delete later
@@ -92,9 +93,10 @@
 \renewcommand\Affilfont{\fontsize{10}{10.8}\itshape}
 \providecommand{\keywords}[1]
 {
-  \small	
+  \small
   \textbf{Keywords:} #1
 }
+
 
 \date{}
 \title{Flexible Bayesian Multiple Comparison Adjustment Using Dirichlet Process and Beta-Binomial Model Priors}
@@ -131,9 +133,9 @@
    \item Figure 3 add Westfall uncorrected (and call it ``pairwise BFs'')
    \item Change title of panels: Inequalities: 0, Inequalities: 1, Inequalities: 2, Inequalities: 3; etc.
    \item Run it with $n = 50$ and $n = 100$
-   
+
    \item Writing: add simulation result description, clean up notation
-   
+
    \item Finish application plots, add interpretation
    \item Implement \textcite{westfall1997bayesian} and run it as well
    \item Run big simulation study, decide on which $\beta$ value as default
@@ -157,7 +159,7 @@ Main takeaways / issues
         \item Skeptic: Don't you lose a lot of statistical power?
         \item Skeptic: Is the current setup of the manuscript strong on this necessity?
     \end{itemize}
-    \item 
+    \item
 \end{enumerate}
 \fi
 
@@ -213,7 +215,7 @@ The first to propose a prior over all partitions to adjust for multiple hypothes
 
 
 \section{Preliminary Remarks} \label{sec:setup}
-In this section, we set up the hypothesis testing problem, discuss the relation between partitions and models, and describe P\'{o}lya's urn scheme that will unify the presentation of the priors in the following section. 
+In this section, we set up the hypothesis testing problem, discuss the relation between partitions and models, and describe P\'{o}lya's urn scheme that will unify the presentation of the priors in the following section.
 
 \subsection{Problem Setup}
 Our goal is to adjust for multiple comparisons in a flexible manner. Multiple comparisons are not a problem if we wish to compare only two hypotheses, denoted as $\mathcal{H}_0$ and $\mathcal{H}_1$. The Bayes factor quantifies how strongly we should update our prior beliefs about $\mathcal{H}_0$ relative to $\mathcal{H}_1$ after observing the data \parencite{kass1995bayes, ly2016harold}. Let group $j$ consist of $n_j$ observations $\vec{y}_j = \{y_{j1}, \ldots, y_{jn_j}\}$ for $j \in \{1, \ldots, K\}$ and $i \in \{1, \ldots, n_j\}$, and let $\vec{y} = \{\vec{y}_1, \ldots ,\vec{y}_K\}$. The Bayes factor is given by:
@@ -246,7 +248,7 @@ The Bell numbers grow very quickly, with the number of partitions for a vector $
 
 \begin{figure}
     \centering
-    \includegraphics[width = \textwidth, keepaspectratio]{figures/modelspace_5_horizontal.pdf}
+    \includegraphics[width = \textwidth, keepaspectratio]{modelspace_5_horizontal.pdf}
     \caption{All 52 possible models given $K = 5$, represented as partitions. Circles represent individual parameters and shaded regions indicate which parameters are equal.}
     \label{fig:partitions}
 \end{figure}
@@ -314,14 +316,36 @@ As $\alpha \rightarrow 0$, the prior of the model with all $K - 1$ equalities $\
 
 \begin{figure}
     \centering
-    \includegraphics[width = 0.95\textwidth]{figures/visualizePriors_2x3_new.pdf}
+    \includegraphics[width = 0.95\textwidth]{visualizePriors_2x3_new.pdf}
     \caption{Top: Dirichlet process (left), beta-binomial (middle), and uniform prior (right) across distinct model types for $K = 5$ groups and different prior parameters. Bottom: Same but for the number of inequalities across models.
     % \FD{Nice! Only thing left is to swap the order of $\beta = K$ and the binomial coefficient. If that doesn't work because it touches the line, let's not do it in this figure. I think that $\beta = K$ and $\beta = binom(K, 2)$ are incorrectly labelled and should be swapped (see also figures below).}
     } %Note that while the uniform prior is uniform over the models, it is not uniform over the number of inequalities. In contrast, the beta-binomial prior with $\alpha = \beta = 1$ is uniform over the number of inequalities but not uniform over the models.} %A key difference between the Dirichlet and beta-binomial priors is that the second and third partition, which imply the same number of equality constraints, are assigned equal prior probability by latter but not the former.}
     \label{fig:prior-comparison}
 \end{figure}
 
-\input{tables/overview-table}
+\begin{table}[!htbp]
+	\begin{center}
+		\begingroup
+		\renewcommand{\arraystretch}{1.75}
+		\resizebox{\textwidth}{!}{%
+			\begin{tabular}{l ccc ccc ccc}
+				\toprule
+				& \multicolumn{1}{c}{Dirichlet process prior} & \multicolumn{1}{c}{Beta-binomial prior} & \multicolumn{1}{c}{Uniform prior}\\
+				\midrule
+				Parameters  & $\alpha$ & $(\alpha = 1, \beta)$ & \xmark \\[1.4mm]
+				%Prediction rule  & 8.77 & 17.09 & 31.47 \\[1.4mm]
+				Prior over partitions  & $\frac{\alpha^{|\rho|}\Gamma(\alpha)}{\Gamma(n + \alpha)} \prod_{c \in \rho} \Gamma(|c|)$ & $\binom{K - 1}{|\rho| - 1}\frac{\FBeta{|\rho| - 1 + \alpha}{K - |\rho| + \beta}}{\FBeta{\alpha}{\beta}\stirling{K}{|\rho|}}$ & $\left(B_K\right)^{-1}$ \\[1.4mm]
+				Prior monotonically decreasing  & $\alpha \leq 1$ & $\beta \geq K$, $\beta \geq {K \choose 2}$ & \xmark \\[1.4mm]
+				Prior probability of null model  & $\nicefrac{\alpha (K - 1)!}{\prod_{j = 1}^K (\alpha + j - 1)}$ & $\nicefrac{\FBeta{\alpha}{K - 1 + \beta}}{\FBeta{\alpha}{\beta}}$ & $\left(B_K\right)^{-1}$ \\[1.4mm]
+				Prior probability of full model & $\nicefrac{\alpha^K}{\prod_{j = 1}^K (\alpha + j - 1)}$ & $\nicefrac{\FBeta{K - 1 + \alpha}{\beta}}{\FBeta{\alpha}{\beta}}$ & $\left(B_K\right)^{-1}$ \\[1.4mm]
+				Prior probability of ratio (null / full) & $\nicefrac{\alpha (K - 1)!}{\alpha^K}$ & $\nicefrac{\FBeta{\alpha}{K - 1 + \beta}}{\FBeta{K - 1 + \alpha}{\beta}}$ & $1$ \\[1.4mm]
+				\bottomrule
+		\end{tabular}}
+		\endgroup
+	\end{center}
+	\caption{Characterizations of the different priors studied in this paper. Note: $\beta \geq K$ implies a prior decreasing in terms of the number of inequalities, but not in terms of the partitions. $\beta \geq {K \choose 2}$ implies both.}
+	\label{tab:overview}
+\end{table}
 
 
 \subsection{Beta-binomial Prior}
@@ -341,14 +365,14 @@ where $\alpha$ and $\beta$ are hyperparameters. The prior probability of a parti
 
 % Fabian: This was the equation we had before, which is incorrect
 %\begin{equation}
-%    \pi(\rho \mid K, \alpha, \beta) = \binom{K - 1}{|\rho| - 1} 
+%    \pi(\rho \mid K, \alpha, \beta) = \binom{K - 1}{|\rho| - 1}
 %    \frac{\FBeta{|\rho| - 1 + \alpha}{K - |\rho| - 2 + \beta}}
 %    {\FBeta{\alpha}{\beta}\stirling{K-1}{K-|\rho|-1}} \enspace ,
 %\end{equation}
 
 For the multiple comparison problem discussed in this paper, we consider the number of inequality constraints and use the beta-binomial prior to introduce a penalty for each additional inequality among the groups considered. For $K$ groups, there can be a maximum of $K - 1$ inequalities, resulting in a $\BetaBinom{i}{K-1}{\alpha}{\beta}$ prior distribution over the number of included inequalities $i$ out of $K$ groups. To see how this translates to a prior over the partitions $\rho$, note that there is a one-to-many correspondence between the number of inequalities $i$ out of $K$ groups and the resulting partitions $\rho$. For example, having $i = 1$ inequalities with $K = 3$ groups is consistent with the partitions $\{\{\theta_1, \theta_2\}, \{\theta_3\}\}$, $\{\{\theta_1, \theta_3\}, \{\theta_1\}\}$, and $\{\{\theta_2, \theta_3\}, \{\theta_1\}\}$, all of which are of size $|\rho| = i + 1$. The number of partitions of size $|\rho|$ is given, as discussed above, by the Stirling number $\stirling{K}{|\rho|}$. For the assignment of the prior probability, it is only the size of the partition (the number of inequalities) that counts. With these observations in hand, we arrive at the following (adjusted) beta-binomial prior distribution over partitions $\rho$:
 \begin{equation}
-    \pi(\rho \mid K, \alpha, \beta) = \binom{K - 1}{|\rho| - 1} 
+    \pi(\rho \mid K, \alpha, \beta) = \binom{K - 1}{|\rho| - 1}
     \frac{\FBeta{|\rho| - 1 + \alpha}{K - |\rho| + \beta}}
     {\FBeta{\alpha}{\beta}\stirling{K}{|\rho|}} \enspace .
 \end{equation}
@@ -361,7 +385,7 @@ The prediction rule of the beta-binomial prior is given by:
 \end{equation}
 where
 \begin{align}
-    P_{\pi} &= 
+    P_{\pi} &=
     \frac{
         % \sum_{\substack{\partition \in \Rho\\\vec{\theta} \subseteq \rho\\\theta_j \notin \vec{\theta}_{-j}}}
         \sum_{\substack{\partition \in \Rho\\\theta_j \notin \vec{\theta}_{-j} \subseteq \rho}}
@@ -385,7 +409,7 @@ where
 \end{align}
 where $\len$ is number of unique parameters in $\vec{\theta}$, that is, the size of the partition.
 % \DB{The paragraph below makes no sense.}
-% where $s_j = \setsize{\{\theta_1, \ldots, \theta_{j - 1}\}}$ is the number of distinct elements in $\{\theta_1, \ldots, \theta_{j - 1}\}$. The $r$-Stirling number in the numerator counts the number of models with $i$ equalities if $\theta_j$ is a new value. Next, this is multiplied by the probability of including $i$ equalities. This is summed for all possible numbers of equalities. 
+% where $s_j = \setsize{\{\theta_1, \ldots, \theta_{j - 1}\}}$ is the number of distinct elements in $\{\theta_1, \ldots, \theta_{j - 1}\}$. The $r$-Stirling number in the numerator counts the number of models with $i$ equalities if $\theta_j$ is a new value. Next, this is multiplied by the probability of including $i$ equalities. This is summed for all possible numbers of equalities.
 % The first sum in the denominator does the same, assuming that $\theta_j$ is a value in $\{\theta_1, \dots, \theta_{j-1}\}$. With probability $1 - P_{\pi}$ we have that $\theta_j$ is equal to one of the previously drawn parameters. This draw is from a categorical distribution over the possible models, that is, conditional on drawing a previous value the probability of $\theta_j = \theta_i$ is proportional to $\rbellnum{K-i-1}{s_j}$. \FD{Double check this and adjust the text and Equation (9). Make clear that this is exchangeable; do Equation (10) and show that this yields the beta-binomial.}
 
 The beta-binomial prior on the partitions and the induced prior on the number of inequalities are shown for different parameterizations in the middle column in Figure \ref{fig:prior-comparison}. For $\alpha = \beta = 1$, the beta-binomial distribution over the partitions has a characteristic U-shape (orange triangles). This prior specification in turn implies a uniform prior on the number of inequalities. We follow \textcite{wilson2010bayesian} who, in the context of regression, suggested to set $\alpha = 1$ as a default so that the distribution over model size (here the number of inequalities) is nonincreasing, and to scale $\beta = \lambda K$ with the number of groups to force the prior to be monotonically decreasing, with a default of $\lambda = 1$ \parencite{wilson2010bayesian}. This is illustrated as the red line (leftward pointing triangles) in Figure \ref{fig:prior-comparison} using $\beta = 5$. In the multiple comparison case, we additionally investigate $\beta = {K \choose 2}$, which implies that the prior on the number of inequalities of individual models is nonincreasing, see Appendix~\ref{ap:decreasing-odds}. The purple line (upside-down triangles) in Figure \ref{fig:prior-comparison} shows a decreasing prior for $\beta = {5 \choose 2} = 10$. This prior assigns the least mass to models with an increasing number of inequalities compared to all others beta-binomial priors.
@@ -402,7 +426,7 @@ Lastly, note that for the beta-binomial prior we have that $P(\mathcal{M}_0) = \
 %\FD{The paper by \textcite{wallach2010alternative} seems extremely relevant here. The define the uniform process as having a prediction rule that is uniform over the already existing partitions ... so not quite the same. How is it related to what we do here? Actually, they show that the expected number of clusters of size $M$ is a constant, so it seems to be exactly what we do. Interestingly, the uniform process is not exchangeable. Also, it seems to me that it will not penalize multiplicity.}
 For completeness, we give a prior that is uniform over the space of partitions. The probability mass function is straightforward. All valid configurations of size $K$ have probability $\nicefrac{1}{\bellnum{K}}$. The prediction rule of the uniform prior is given by:
 \begin{equation}
-    \theta_{j + 1} \mid \theta_1, \ldots, \theta_j%, \ldots, \theta_{j - 1}, \theta_{j + 1}, \ldots, \theta_{K} 
+    \theta_{j + 1} \mid \theta_1, \ldots, \theta_j%, \ldots, \theta_{j - 1}, \theta_{j + 1}, \ldots, \theta_{K}
     \sim \begin{cases}
     % \mathcal{K} & \text{with probability } \rbellnum{K - j - 1}{s_j + 1} \\
     % \text{Categorical}\left(\theta_1^{\star}, \ldots, \theta_\len^{\star} \mid \rbellnum{K - 1 - 1}{s_1}, \ldots, \rbellnum{K - m - 1}{s_\len}\right) & \text{else} \enspace ,
@@ -412,7 +436,7 @@ For completeness, we give a prior that is uniform over the space of partitions. 
 \end{equation}
 where
 \begin{align}
-    P_{\pi_{U}} %&= 
+    P_{\pi_{U}} %&=
     % \frac{\text{(\# partitions with size $\len + 1$)}}{\text{(\# partitions with size $\len + 1$)} + (\len \times \text{\# partitions with size $\len$)}}\\[0.50em]
     &=
     \frac{\rbellnum{K-j+1}{\len + 1}}{\rbellnum{K-j+1}{\len + 1} + \len\rbellnum{K-j+1}{\len}}
@@ -434,7 +458,7 @@ Complementarily, $\rbellnum{K-j+1}{\len}$ counts the number of models where $\th
 \subsection{Posterior Model Consistency}
 Model selection consistency is a key desiderata that a good Bayes factor should fulfill \parencite[e.g.,][]{bayarri2012criteria, ly2016harold, consonni2018prior}. In the situation of multiple models, the notion of pairwise model selection consistency needs to be extended. This extension is referred to as posterior model selection consistency. Posterior model consistency in a model class $\mathfrak{M}$ is the convergence to one, in probability, of the posterior probabilities to the true model \parencite[e.g.,][]{casella2009consistency, moreno2015posterior}. Let $\mathcal{M}_j \in \mathfrak{M}$ be the model that instantiates the hypothesis $\mathcal{H}_j$ that specifies the (in)equalities among $K$ groups. The posterior probability of $\mathcal{M}_j$ is given by:
 \begin{align}
-    p(\mathcal{M}_j \mid \mathcal{D}) &= \frac{p(\mathcal{D} \mid \mathcal{M}_j) \pi(\mathcal{M}_j)}{\sum_{i = 0}^{\bellnum{K}} p(\mathcal{D} \mid \mathcal{M}_i) \pi(\mathcal{M}_i)} 
+    p(\mathcal{M}_j \mid \mathcal{D}) &= \frac{p(\mathcal{D} \mid \mathcal{M}_j) \pi(\mathcal{M}_j)}{\sum_{i = 0}^{\bellnum{K}} p(\mathcal{D} \mid \mathcal{M}_i) \pi(\mathcal{M}_i)}
     = \frac{\text{BF}_{j0}\pi(\mathcal{M}_j)}{\sum_{i = 0}^{\bellnum{K}} \text{BF}_{i0} \pi(\mathcal{M}_i)} \enspace .
 \end{align}
 It follows that if the Bayes factor is model selection consistent, posterior model consistency holds \parencite[see also][Theorem 1]{moreno2015posterior} --- unless the prior assigns zero mass to the true model. This is not the case for any of the priors discussed above, and hence whether posterior model consistency holds depends solely on the priors on the parameters within models.
@@ -474,7 +498,7 @@ To assess how well the respective priors adjust for multiplicity, we calculated 
 
 \begin{figure}
     \centering
-    \includegraphics[width=1\textwidth]{figures/2_panel_alpha_familywise.pdf}
+    \includegraphics[width=1\textwidth]{2_panel_alpha_familywise.pdf}
     \caption{Left: Probability of making at least one false claim about a difference between two groups when there is none. Right: Proportion of falsely claiming no difference between two groups when there is one. %All measures as a function of the number of groups $K$ for different priors; see main text for details.
     % \FD{Can we swap the order of $\beta = K$ and the binomial coefficient? Same in Figure 4.}
     }
@@ -484,7 +508,7 @@ To assess how well the respective priors adjust for multiplicity, we calculated 
 \iffalse
 \begin{figure}
     \centering
-    \includegraphics[width=1\textwidth]{figures/multipleComparisonPlot_lambda_4x4_2.pdf}
+    \includegraphics[width=1\textwidth]{multipleComparisonPlot_lambda_4x4_2.pdf}
     \caption{Left: Probability of at least once falsely claiming a difference between two groups when there is none under the null model. Right: Proportion of falsely claiming no difference between two groups when there is one under the full model. All measures are a function of the number of groups $K$ for different priors; see main text for details.}
     \label{fig:small_simulation}
 \end{figure}
@@ -524,7 +548,7 @@ The rightmost panel in Figure \ref{fig:big_simulation-I} shows the results avera
 
 \begin{figure}[!h]
     \centering
-    \includegraphics[width=1\textwidth]{figures/subset_k_5_alpha_familywise.pdf}
+    \includegraphics[width=1\textwidth]{subset_k_5_alpha_familywise.pdf}
     \caption{Familywise error rate across priors and sample sizes under a model with 0 (top left), 1 (top right), 2 (bottom left), and 3 (bottom right) true inequalities for $K = 5$ groups. The rightmost panel shows the average familywise error rate across inequalities.}
     \label{fig:big_simulation-I}
 \end{figure}
@@ -538,7 +562,7 @@ The rightmost panel in Figure \ref{fig:big_simulation-II} shows the results aver
 
 \begin{figure}[!h]
     \centering
-    \includegraphics[width=1\textwidth]{figures/subset_k_5_beta.pdf}
+    \includegraphics[width=1\textwidth]{subset_k_5_beta.pdf}
     \caption{Proportion of falsely claiming a difference between two groups when there is none across priors and sample sizes under a model with 0 (top left), 1 (top right), 2 (bottom left), and 3 (bottom right) true inequalities for $K = 5$ groups. The rightmost panel shows the average error rate across inequalities.}
     \label{fig:big_simulation-II}
 \end{figure}
@@ -578,8 +602,8 @@ The unconstrained chances $\theta^u_j$ are assigned beta priors from which — t
 
 \begin{figure}
     \centering
-    \includegraphics[width=\textwidth]{figures/application_proportions_2panel_plot.pdf}
-    \caption{Left: Posterior means of the full model where all proportions are assumed to be different (top) and posterior means when averaging over all models using a beta-binomial($\alpha = 1$, $\beta = 8$) prior (bottom). Right: Posterior probabilities for pairwise equality across all journals. The abbreviations stand for: 
+    \includegraphics[width=\textwidth]{application_proportions_2panel_plot.pdf}
+    \caption{Left: Posterior means of the full model where all proportions are assumed to be different (top) and posterior means when averaging over all models using a beta-binomial($\alpha = 1$, $\beta = 8$) prior (bottom). Right: Posterior probabilities for pairwise equality across all journals. The abbreviations stand for:
     \emph{Journal of Applied Psychology} (JAP), \emph{Psychological Science} (PS), \emph{Journal of Consulting and Clinical Psychology} (JCCP), \emph{ Public Library of Science} (PLOS), \emph{Developmental Psychology} (DP), \emph{Journal of Experimental Psychology: General} (JEPG), and \emph{Journal of Personality and Social Psychology} (JPSP).}
     \label{fig:demo_proportions}
 \end{figure}
@@ -588,7 +612,7 @@ We can see that the posterior distributions for JCCP (green), PLOS (purple), DP 
 
 %\FD{The shrinkage seems really strong actually. How does it look for the DP? Fabian runs it! I ran it and the shrinkage is quite extreme also with the DP (for all values of $\alpha$, see demo-proportions-joined-density-plots.pdf; even the uniform prior shows some shrinkage ...}
 
-%of allowing different error chances to be equal. The left panel shows the results for the full model --- the observer proportions and posterior means are in near perfect agreement. The right panel shows the results for a default beta-binomial prior with $\alpha = 8$, $\beta = 1$ prior, illustrating that adjusting for multiplicity introduces shrinkage in the parameter estimates towards each other. 
+%of allowing different error chances to be equal. The left panel shows the results for the full model --- the observer proportions and posterior means are in near perfect agreement. The right panel shows the results for a default beta-binomial prior with $\alpha = 8$, $\beta = 1$ prior, illustrating that adjusting for multiplicity introduces shrinkage in the parameter estimates towards each other.
 
 %\FD{How is the model implemented? Is it like ANOVA, but on proportions? Then it would be log linear analysis. \textcite{gopalan1998bayesian} just compare proportions, for example. It seems that the Bayesian loglinear analysis in JASP (due to Overstall \& Forster) does model averaging, so in a sense it should be very similar to our approach. It also makes more sense conceptually, see the example below.}
 %\textcite{radelet1991choosing} study decisions on death penalties (yes / no) by race of defendant (black / white) and race of victim (black / white). This yields 6 cells, data are in JASP. An interaction in a loglinear model would have a particular effect on the posterior equivalence of groups, so there is some relation here. Let's discuss this.
@@ -620,7 +644,7 @@ When the partition states that all standard deviations are distinct we recover t
 The top left panel of Figure~\ref{fig:demo_variances} shows the posterior distributions under the full model that assumes all standard deviations are different.
 \begin{figure}
     \centering
-    \includegraphics[width=\textwidth]{figures/demo_variances_2panel_plot.pdf}
+    \includegraphics[width=\textwidth]{demo_variances_2panel_plot.pdf}
     \caption{Left: Posterior means of the full model where all standard deviations are assumed to be different (top) and posterior means when averaging across all models using a beta-binomial($\alpha$ = 1, $\beta$ = 10) prior (bottom).
     Right: Posterior probabilities for pairwise equality across all personality traits. In the abbreviations the first letter stands for \emph{men} (m) or \emph{women} (w). The second letter stands for \emph{neuroticism} (n), \emph{extraversion} (e), \emph{openness} (o), \emph{agreeableness} (a), and \emph{conscientiousness} (c).}
     \label{fig:demo_variances}
@@ -639,7 +663,7 @@ Testing the (in)equality between groups while adjusting for multiple comparisons
 % Implications
 We found that a beta-binomial prior with $\alpha = 1$ and $\beta \in \{K, {K \choose 2}\}$ as well as a Dirichlet process prior with $\alpha < 1$ adequately control the familywise error rate, while a uniform prior and using only pairwise Bayes factors, unsurprisingly, do not. We also found that the method proposed by \textcite{westfall1997bayesian} compares favorably in terms of error control but not in terms of power. While we have focused on a posterior probability threshold of $0.50$ (i.e., a Bayes factor of 1), other thresholds will naturally impact the trade-off between the two types of errors. Importantly, and in contrast to conventional adjustments for multiple comparisons \parencite[e.g.,][]{westfall1997bayesian, jeffreys1961theory}, specifying a prior over the partitions allows inferences over all possible (in)equalities. This means that researchers can use the methods we provide to assess not only the probability of pairwise (in)equalities --- as is common in standard post-hoc tests for, say, ANOVA --- but in fact can make probabilistic statements over any set of (in)equalities they wish to assess. Similarly, the outlined approach also allows for model-averaging, which as we have seen in the applications yields shrinkage of the groups towards each other. Using a prior over partitions further avoids violations of transitivity, i.e. claiming for example that $\mu_1 \neq \mu_3$ while both $\mu_1 = \mu_2$ and $\mu_2 = \mu_3$.
 
-%Simulation study two looks at the problem: first only from null model across increasing group sizes, second fixing group size across sample size and equalities ... 
+%Simulation study two looks at the problem: first only from null model across increasing group sizes, second fixing group size across sample size and equalities ...
 %Reflection on transitivity violation of pairwise methods
 %Reflection on shrinkage versus testing (?), Gelman
 
@@ -705,7 +729,7 @@ While the blue lines in the bottom panel of Figure~\ref{fig:scott_berger} show t
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.89\textwidth]{figures/prior_comparison_plot_2x3_log_scale.pdf}
+    \includegraphics[width=0.89\textwidth]{prior_comparison_plot_2x3_log_scale.pdf}
     \caption{Top: Penalty imposed by the Dirichlet process, uniform, and beta-binomial priors for including additional inequality constraints. Shows log prior probability of the number of inequalities in the model for $K = 30$. Bottom: Shows the prior odds of adding one additional inequality to a model as a function of how many inequalities already exist (0: blue, 1: orange, 4: green, 9: purple) as a function of the number of groups $K$.}
     \label{fig:scott_berger}
 \end{figure}
@@ -738,7 +762,7 @@ library('EqualitySelection')
 \newpage
 \begin{figure}
     \centering
-    \includegraphics[width=\textwidth]{figures/simulation_results_test_clean_figures/simulation_appendix.pdf}
+    \includegraphics[width=\textwidth]{simulation_results_test_clean_figures/simulation_appendix.pdf}
     \caption{Proportion of false inequalities recovered across all simulations.}
     \label{app_fig:big_simulation}
 \end{figure}
@@ -753,15 +777,15 @@ The prior density of the beta-binomial distribution over partitions is decreasin
 \begin{proof}
 Recall the beta-binomial prior over partitions:
 \begin{equation}
-    \pi(\rho \mid K, \alpha, \beta) = \binom{K - 1}{|\rho| - 1} 
+    \pi(\rho \mid K, \alpha, \beta) = \binom{K - 1}{|\rho| - 1}
     \frac{\FBeta{|\rho| - 1 + \alpha}{K - |\rho| + \beta}}
     {\FBeta{\alpha}{\beta}\stirling{K}{|\rho|}} \enspace .
 \end{equation}
 Fixing $\alpha = 1$, our goal is to find values for $\beta$ such that a partition of size $|\rho| + 1$ (under the condition that $|\rho| + 1 \leq K$) is assigned at least as much prior probability than a partition of size $|\rho|$. We write:
 \begin{align}
-    \binom{K - 1}{|\rho|} 
+    \binom{K - 1}{|\rho|}
     \frac{\FBeta{|\rho| + 1}{K - |\rho| - 1 + \beta}}
-    {\FBeta{1}{\beta}\stirling{K}{|\rho| + 1}} &\geq \binom{K - 1}{|\rho| - 1} 
+    {\FBeta{1}{\beta}\stirling{K}{|\rho| + 1}} &\geq \binom{K - 1}{|\rho| - 1}
     \frac{\FBeta{|\rho|}{K - |\rho| + \beta}}
     {\FBeta{1}{\beta}\stirling{K}{|\rho|}} \\[0.50em]
     \frac{\FBeta{|\rho| + 1}{K - |\rho| - 1 + \beta}\stirling{K}{|\rho|}}
@@ -809,7 +833,7 @@ Fixing $\alpha = 1$, our goal is to find values for $\beta$ such that a partitio
 % Using the recurrence relation of the Stirling numbers, the ratio $\nicefrac{\stirling{K}{j+1}}{\stirling{K}{j}}$ is equivalent to $\nicefrac{\stirling{k+1}{j+1}}{\stirling{k}{j+1}} - (j+1)$.
 % This ratio of Stirling numbers was studied by \textcite{berg1975some} and their property 2 provides this inequality
 % \begin{align*}
-%     \frac{\stirling{K+1}{j+1}}{\stirling{K}{j+1}} - j - 1 
+%     \frac{\stirling{K+1}{j+1}}{\stirling{K}{j+1}} - j - 1
 %     \geq
 %     \frac{\stirling{K+1}{j}}{\stirling{K}{j}} - j.
 % \end{align*}
@@ -825,7 +849,7 @@ Fixing $\alpha = 1$, our goal is to find values for $\beta$ such that a partitio
 \begin{proof}
 The prior density of the Beta-binomial over partitions is given by:
 \begin{align*}
-    \pi\left(\rho \mid K, \alpha, \beta\right) = \binom{K - 1}{|\rho| - 1} 
+    \pi\left(\rho \mid K, \alpha, \beta\right) = \binom{K - 1}{|\rho| - 1}
     \frac{\FBeta{|\rho| - 1 + \alpha}{K - |\rho| + \beta}}
     {\FBeta{\alpha}{\beta}\stirling{K}{|\rho|}} \enspace .
 \end{align*}
@@ -836,7 +860,7 @@ To examine the ratio of two consecutive model sizes we evaluate the ratio of the
     }{
         \pi\left(q \mid K,\,\alpha,\,\beta\right)
     }
-    &= 
+    &=
     \frac{\binom{K - 1}{|\rho| - 1}}{\binom{K - 1}{|\rho|}}
     \,
     \frac{
@@ -847,7 +871,7 @@ To examine the ratio of two consecutive model sizes we evaluate the ratio of the
     \,
     \frac{\stirling{K}{|\rho|+1}}{\stirling{K}{|\rho|}},
     \\
-    &= 
+    &=
     \frac{|\rho|}{K - |\rho|}
     \,
     \frac{\beta +K-|\rho| -1}{\alpha +|\rho| -1}
@@ -870,7 +894,7 @@ To examine the ratio of two consecutive model sizes we evaluate the ratio of the
 Using the recurrence relation of the Stirling numbers $\stirling{n+1}{k} = k\stirling{n}{k} + \stirling{n}{k-1}$, the ratio $\nicefrac{\stirling{K}{|\rho|+1}}{\stirling{K}{|\rho|}}$ is equivalent to $\nicefrac{\stirling{K+1}{|\rho|+1}}{\stirling{K}{|\rho|+1}} - (|\rho|+1)$.
 This ratio of Stirling numbers was studied by \textcite{berg1975some} and their property 2 provides this inequality
 \begin{align*}
-    \frac{\stirling{K+1}{|\rho|+1}}{\stirling{K}{|\rho|+1}} - |\rho| - 1 
+    \frac{\stirling{K+1}{|\rho|+1}}{\stirling{K}{|\rho|+1}} - |\rho| - 1
     \geq
     \frac{\stirling{K+1}{|\rho|}}{\stirling{K}{|\rho|}} - |\rho|.
 \end{align*}
@@ -888,14 +912,14 @@ Here we present the extended simulation results for the $K = 9$ group case. Figu
 
 \begin{figure}[!h]
     \centering
-    \includegraphics[width=1\textwidth]{figures/subset_k_9_alpha_familywise.pdf}
+    \includegraphics[width=1\textwidth]{subset_k_9_alpha_familywise.pdf}
     \caption{Familywise error rate across priors and sample sizes under a model with 0 (top left), 3 (top right), 5 (bottom left), and 7 (bottom right) true inequalities for $K = 9$ groups. The rightmost panel shows the average familywise error rate across inequalities.}
     \label{fig:big_simulation-k9-I}
 \end{figure}
 
 \begin{figure}[!h]
     \centering
-    \includegraphics[width=1\textwidth]{figures/subset_k_9_beta.pdf}
+    \includegraphics[width=1\textwidth]{subset_k_9_beta.pdf}
     \caption{Proportion of falsely claiming a difference between two groups when there is none across priors and sample sizes under a model with 0 (top left), 3 (top right), 5 (bottom left), and 7 (bottom right) true inequalities for $K = 9$ groups. The rightmost panel shows the average error rate across inequalities.}
     \label{fig:big_simulation-k9-II}
 \end{figure}

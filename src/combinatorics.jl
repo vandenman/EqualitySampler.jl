@@ -1,8 +1,3 @@
-#=
-
-	combinatorial functions over the model space
-
-=#
 """
 	count_combinations(k::Int, islands::Int)
 	count_combinations(s::AbstractString)

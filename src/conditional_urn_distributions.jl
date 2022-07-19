@@ -14,7 +14,7 @@ function reduce_model(x::AbstractVector{T}) where T <: Integer
 	y = copy(x)
 	# reduce_model!(y)
 	# return y
-	for i in eachindex(x)
+	@inbounds for i in eachindex(x)
 		if x[i] != i
 			if !any(==(x[i]), x[1:i - 1])
 				idx = findall(==(x[i]), x[i:end]) .+ (i - 1)
@@ -33,9 +33,9 @@ function get_conditional_counts(n::Int, known::AbstractVector{T} = [1], include_
 	idx = get_idx_for_conditional_counts(known)
 
 	n_idx = length(idx)
-	res[idx] .= bellnumr(n - n_known - 1, n_idx)
+	@inbounds res[idx] .= bellnumr(n - n_known - 1, n_idx)
 	if include_new
-		res[n_known + 1] = bellnumr(n - n_known - 1, n_idx + 1)
+		@inbounds res[n_known + 1] = bellnumr(n - n_known - 1, n_idx + 1)
 	end
 	res
 end
@@ -45,7 +45,7 @@ function get_idx_for_conditional_counts(known)
 	idx = Vector{Int}(undef, no_distinct_groups_in_partition(known))
 	s = Set{Int}()
 	count = 1
-	for i in eachindex(known)
+	@inbounds for i in eachindex(known)
 		if known[i] ∉ s
 			idx[count] = i
 			count += 1
@@ -117,7 +117,7 @@ function _pdf_helper(d::Union{AbstractConditionalUrnDistribution{T}, AbstractMvU
 
 end
 
-function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, ::Union{UniformConditionalUrnDistribution{T}, UniformMvUrnDistribution{T}}, index::T, complete_urns::AbstractVector{T}) where T<:Integer
+@inbounds function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, ::Union{UniformConditionalUrnDistribution{T}, UniformMvUrnDistribution{T}}, index::T, complete_urns::AbstractVector{T}) where T<:Integer
 
 	k = length(result)
 	if isone(index)
@@ -174,7 +174,7 @@ end
 _pdf(d::BetaBinomialConditionalUrnDistribution) = _pdf_helper(d, d.index, d.urns)
 
 log_model_probs_by_incl(d::BetaBinomialConditionalUrnDistribution) = d._log_model_probs_by_incl
-function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, d::T, index::U, complete_urns::AbstractVector{U}) where
+@inbounds function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, d::T, index::U, complete_urns::AbstractVector{U}) where
 	{U<:Integer, T<:Union{BetaBinomialConditionalUrnDistribution{U}, BetaBinomialMvUrnDistribution{U}, CustomInclusionMvUrnDistribution}}
 
 	k = length(result)
@@ -205,22 +205,6 @@ function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, d::T, index::U, c
 			result[i] = prob_new_label / (k - r)
 		end
 	end
-	# return
-
-	# #old approach
-	# prob_equality = num / (num + den)
-
-	# # probability of an equality
-	# known = reduce_model(v_known_urns)
-	# counts = get_conditional_counts(k, known, false)
-	# idx_nonzero = findall(!iszero, counts)
-	# result[v_known_urns[idx_nonzero]] .= prob_equality .* (counts[idx_nonzero] ./ sum(counts[idx_nonzero]))
-
-	# # probability of an inequality
-	# inequality_options = setdiff(1:k, v_known_urns)
-	# result[inequality_options] .= (1 - prob_equality) ./ length(inequality_options)
-	# return
-
 end
 #endregion
 
