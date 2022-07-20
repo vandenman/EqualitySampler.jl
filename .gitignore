@@ -32,3 +32,6 @@ simulations/old/*
 
 feedbackround/*
 literature/*
+
+docs/build
+docs/site

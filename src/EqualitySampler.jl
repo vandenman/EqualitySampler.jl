@@ -8,6 +8,7 @@ import
 	Bijectors,
 	Combinatorics,
 	Distributions,
+	LogExpFunctions,
 	OrderedCollections,
 	PDMats,
 	StatsBase,
@@ -54,7 +55,6 @@ export
 	count_equalities,
 	count_parameters,
 
-	# TODO: deprecate in favor of the iterator
 	PartitionSpace,
 
 	AbstractMvUrnDistribution,
@@ -85,22 +85,22 @@ include("rstirling2.jl")
 include("bellnumr.jl")
 include("lookup_tables_stirling_r_bellnumbers.jl")
 include("partition_shortcuts.jl")
-include("generate_model_space.jl")
+include("partitionspace.jl")
 include("combinatorics.jl")
 include("multivariate_urn_distributions.jl")
 include("conditional_urn_distributions.jl")
 include("normal_loglikelihood.jl")
 include("helpers.jl")
-include("partition_sampler.jl")
 include("dpp_find_alpha.jl")
 include("jeffreys_prior.jl")
 
 include("simulations/Simulations.jl")
-import .Simulations: anova_test, proportion_test
+import .Simulations: anova_test, proportion_test, average_equality_constraints, MCMCSettings
 export
 	anova_test,
-	proportion_test
-
+	proportion_test,
+	average_equality_constraints,
+	MCMCSettings
 
 
 

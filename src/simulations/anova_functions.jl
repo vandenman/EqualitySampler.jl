@@ -337,7 +337,7 @@ function precompute_integrated_log_lik(dat)
 	ỹTỹ = ỹ'ỹ
 	ỹTX̃ = ỹ'X̃
 	X̃TX̃ = X̃'X̃
-	gamma_a = EqualitySampler.logabsgamma((N-1)/2)
+	gamma_a = SpecialFunctions.loggamma((N-1)/2)
 
 	return (; ỹTỹ, ỹTX̃, X̃TX̃, gamma_a, N)
 end

@@ -93,9 +93,9 @@ end
 
 
 function compute_density_estimate(mat, npoints = 2^12)
-	no_groups = size(mat, 2)
-	x = Matrix{Float64}(undef, npoints, no_groups)
-	y = Matrix{Float64}(undef, npoints, no_groups)
+	ngroups = size(mat, 2)
+	x = Matrix{Float64}(undef, npoints, ngroups)
+	y = Matrix{Float64}(undef, npoints, ngroups)
 
 	for (i, col) in enumerate(eachcol(mat))
 		k = KernelDensity.kde(col; npoints = npoints)#, boundary = (0, Inf))

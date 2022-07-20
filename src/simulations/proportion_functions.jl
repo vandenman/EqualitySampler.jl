@@ -2,8 +2,8 @@ DynamicPPL.@model function proportion_model_full(no_errors, total_counts, partit
 
 	p_raw ~ DistributionsAD.filldist(Distributions.Beta(1.0, 1.0), length(no_errors))
 	p_constrained = isnothing(partition) ? p_raw : average_equality_constraints(p_raw, partition)
-	no_errors ~ Distributions.Product(Binomial.(total_counts, p_constrained))
-	return (p_constrained, )
+	no_errors ~ Distributions.Product(Distributions.Binomial.(total_counts, p_constrained))
+	return p_constrained
 end
 
 DynamicPPL.@model function proportion_model_equality_selector(no_errors, total_counts, partition_prior)
@@ -13,7 +13,6 @@ DynamicPPL.@model function proportion_model_equality_selector(no_errors, total_c
 end
 
 function get_p_constrained(model, samps)
-	# TODO: delete this function?
 
 	default_result = DynamicPPL.generated_quantities(model, MCMCChains.get_sections(samps, :parameters))
 	clean_result = Matrix{Float64}(undef, length(default_result[1][1]), size(default_result, 1))
@@ -23,7 +22,7 @@ function get_p_constrained(model, samps)
 	return vec(mean(clean_result, dims = 2)), clean_result
 end
 
-function get_proportion_model_and_spl(no_errors, total_counts, partition_prior)
+function get_proportion_model(no_errors, total_counts, partition_prior)
 
 	if isnothing(partition_prior)
 		model = proportion_model_full(no_errors, total_counts)
@@ -34,26 +33,30 @@ function get_proportion_model_and_spl(no_errors, total_counts, partition_prior)
 	return model
 end
 
+get_proportion_sampler(model, spl::Symbol, ϵ::Float64, n_leapfrog::Int) = get_sampler(model, spl, ϵ, n_leapfrog)
+get_proportion_sampler(model, spl::Turing.Inference.InferenceAlgorithm, ::Float64, ::Int) = spl
+
+
 function proportion_test(
-		no_success::AbstractVector{T}, total_observations::AbstractVector{T}, partition_prior::Union{Nothing, AbstractMvUrnDistribution};
-		no_samples::Integer = 1_000, no_burnin::Integer = 500, no_chains::Integer = 3,
-		spl = nothing,
+		successes::AbstractVector{T}, observations::AbstractVector{T},
+		partition_prior::Union{Nothing, AbstractMvUrnDistribution}
+		;
+		spl::Union{Symbol, Turing.Inference.InferenceAlgorithm} = :custom,
+		mcmc_settings::MCMCSettings = MCMCSettings(),
+		ϵ::Float64 = 0.0,
+		n_leapfrog::Int = 20,
 		kwargs...
 	) where T<:Integer
 
-	model = get_proportion_model(no_success, total_observations, partition_prior)
-
-	if isnothing(spl)
-		spl = get_sampler(model)
+	length(successes) != length(observations) && throw(ArgumentError("length(successes) != length(observations)"))
+	if !isnothing(partition_prior)
+		length(successes) != length(partition_prior) && throw(ArgumentError("length(successes) != length(partition_prior)"))
 	end
 
-	# TODO: what package should be prefixed here?
-	chain = sample(model, spl, no_samples, no_chains; discard_initial = no_burnin, kwargs...);
+	model = get_proportion_model(successes, observations, partition_prior)
+	sampler = get_proportion_sampler(model, spl, ϵ, n_leapfrog)
+
+	chain = sample_model(model, sampler, mcmc_settings; kwargs...);
 	return combine_chain_with_generated_quantities(model, chain, "p_constrained")
-
-
-	# TODO: maybe don't return the model? also should this be a struct rather than a named tuple?
-	# posterior_means, posterior_samples = get_p_constrained(model, all_samples)
-	# return (posterior_means = posterior_means, posterior_samples = posterior_samples, all_samples = all_samples, model = model)
 
 end

@@ -25,7 +25,7 @@ function sample_next_values(c, o)
 
 	new_label_log_posterior = 0.0
 	new_label_log_posterior_computed = false
-	present_labels = fast_countmap_partition_incl_zero(nextValues)
+	present_labels = EqualitySampler.fast_countmap_partition_incl_zero(nextValues)
 
 	# O(k^2) with at worst k*(k-1) likelihood evaluations if all labels are distinct and at best 2k likelihood evaluations
 	@inbounds for j in eachindex(probvec)

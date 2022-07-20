@@ -1,5 +1,18 @@
+"""
+$(TYPEDSIGNATURES)
+
+Compute the absolute value of the Stirlings numbers of the first kind.
+The `EqualitySampler.ExplicitStrategy` (default) uses an explicit loop and is computationally more efficient but subject to overflow, so using BigInt is advised.
+The `EqualitySampler.RecursiveStrategy` uses recursion and is mathematically elegant yet inefficient for large values.
+"""
 unsignedstirlings1(n::T, k::T) where T <: Integer = unsignedstirlings1(n, k, ExplicitStrategy)
 unsignedstirlings1(n::T, k::U) where {T<:Integer, U<:Integer} = unsignedstirlings1(promote(n, k)...)
+
+"""
+$(TYPEDSIGNATURES)
+
+Compute the logarithm of the absolute value of the Stirlings numbers of the first kind.
+"""
 logunsignedstirlings1(n::T, k::U) where {T<:Integer, U<:Integer} = logunsignedstirlings1(promote(n, k)...)
 
 function unsignedstirlings1_base_cases(n::T, k::T) where T <: Integer

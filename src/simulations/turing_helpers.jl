@@ -32,13 +32,18 @@ function get_sampler(model, discrete_sampler::Symbol = :custom, ϵ::Float64 = 0.
 				Turing.GibbsConditional(:partition, PartitionSampler(length(model.args.partition_prior), get_logπ(model)))
 			)
 		else
-			no_groups = length(model.args.obs_mean)::Int
+			if haskey(model.args, :obs_mean)
+				no_groups = length(model.args.obs_mean)::Int
+			elseif haskey(model.args, :no_errors)
+				no_groups = length(model.args.:no_errors)::Int
+			else
+				throw(error("invalid model"))
+			end
 			return Turing.Gibbs(
 				Turing.HMC(ϵ, n_leapfrog, continuous_parameters...),
 				Turing.PG(no_groups, :partition)
 			)
 		end
-
 	else
 		return Turing.NUTS()
 	end

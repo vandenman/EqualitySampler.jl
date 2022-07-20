@@ -79,7 +79,7 @@ function logstirlings2r(n::T, k::T, r::T) where T <: Integer
 	succes, value = stirlings2r_base_cases(n, k, r)
 	succes && value >= zero(T) && return log(value)
 
-	return logsumexp_batch(map(j->stirlings2rExplLogTerm(n, k, r, j), one(T):n-r))
+	return LogExpFunctions.logsumexp(map(j->stirlings2rExplLogTerm(n, k, r, j), one(T):n-r))
 
 end
 

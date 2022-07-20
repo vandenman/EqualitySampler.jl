@@ -9,9 +9,7 @@ stirlings2ExplLogTerm(n::T, k::T, j::T) where T<:Integer = logbinomial(k, j) + n
 stirlings2ExplTerm(n::T, k::T, j::T) where T<:Integer = binomial(k, j) * j^n
 
 """
-	stirlings2(n::T, k::T) where T <: Integer
-	stirlings2(n::T, k::T, ::Type{EqualitySampler.ExplicitStrategy})  where T <: Integer
-	stirlings2(n::T, k::T, ::Type{EqualitySampler.RecursiveStrategy}) where T <: Integer
+$(TYPEDSIGNATURES)
 
 Compute the Stirlings numbers of the second kind.
 The `EqualitySampler.ExplicitStrategy` (default) uses an explicit loop and is computationally more efficient but subject to overflow, so using BigInt is advised.
@@ -71,7 +69,7 @@ function stirlings2_base_cases(n::T, k::T) where T <: Integer
 end
 
 """
-	logstirlings2(n::T, k::T) where T <: Integer
+$(TYPEDSIGNATURES)
 
 Compute the logarithm of the Stirlings numbers of the second kind with an explicit formula.
 """

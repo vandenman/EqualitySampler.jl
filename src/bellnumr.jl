@@ -1,7 +1,7 @@
 """
-	bellnumr(n::T, r::T) where T <: Integer
+$(TYPEDSIGNATURES)
 
-	Computes the r-Bell numbers.
+Computes the ``r``-Bell numbers.
 """
 function bellnumr(n::T, r::T) where T <: Integer
 
@@ -22,6 +22,11 @@ function bellnumr_inner(n::T, r::T) where T <: Integer
 
 end
 
+"""
+$(TYPEDSIGNATURES)
+
+Computes the logarithm of the ``r``-Bell numbers.
+"""
 function logbellnumr(n::T, r::T) where T <: Integer
 
 	succes, value = bellnumr_base_cases(n, r)
@@ -31,7 +36,7 @@ function logbellnumr(n::T, r::T) where T <: Integer
 	for k in 0:n
 		values[k+1] = logstirlings2r(n+r, k+r, r)
 	end
-	return logsumexp_batch(values)
+	return LogExpFunctions.logsumexp(values)
 end
 logbellnumr(n::T, r::U) where {T <: Integer, U <: Integer} = logbellnumr(promote(n, r)...)
 
@@ -55,8 +60,8 @@ function bellnumr_base_cases(n::T, r::T) where T <: Integer
 end
 
 """
-	bellnum(n::T) where T <: Integer
+$(TYPEDSIGNATURES)
 
-	Computes the Bell numbers.
+Computes the Bell numbers.
 """
 bellnum(n::T) where {T <: Integer} = bellnumr(n, zero(T))

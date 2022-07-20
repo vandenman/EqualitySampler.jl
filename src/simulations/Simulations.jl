@@ -20,6 +20,8 @@ import
 	DynamicPPL,
 	FillArrays,
 	GLM,
+	KernelDensity,
+	LogExpFunctions,
 	MCMCChains,
 	OrderedCollections,
 	QuadGK,
@@ -41,6 +43,7 @@ export
 	westfall_test,
 	proportion_test
 
+include("partition_sampler.jl")
 include("MCMCSettings.jl")
 include("brute_force_epsilon.jl")
 include("turing_helpers.jl")
@@ -49,5 +52,6 @@ include("simpledataset.jl")
 include("anova_functions.jl")
 include("logpdf_noncentral_t.jl")
 include("westfall_functions.jl")
+include("kernel_density.jl")
 
 end

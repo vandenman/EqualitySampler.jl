@@ -1,7 +1,16 @@
 # TODO: this entire file needs to be refactored!
 
 """
-	reduce a model to a unique representation. For example, [2, 2, 2] -> [1, 1, 1]
+$(TYPEDSIGNATURES)
+
+Reduce a partition to a unique representation. For example, [2, 2, 2] -> [1, 1, 1]
+# Examples
+```julia-repl
+julia> reduce_model([2, 2, 2])
+[1, 1, 1]
+julia> reduce_model([2, 1, 1])
+[1, 2, 2]
+```
 """
 function reduce_model(x::AbstractVector{T}) where T <: Integer
 
@@ -56,9 +65,22 @@ function get_idx_for_conditional_counts(known)
 
 end
 
+"""
+$(TYPEDSIGNATURES)
+
+Count the number of equality constraints implied by a partition.
+This assumes some elegant ordering of the constraints.
+For example the partition ``\\{\\{\\theta_1, \\theta_3\\}, \\{\\theta_2\\}\\}`` can be written as ``\\theta_1 = \\theta_3 \\neq \\theta_2\`` and therefore
+`count_equalities([1, 2, 1]) == 1`.
+"""
 count_equalities(urns::AbstractVector{T}) where T <: Integer = length(urns) - no_distinct_groups_in_partition(urns)
 count_equalities(urns::AbstractString) = length(urns) - length(Set(urns))
 
+"""
+$(TYPEDSIGNATURES)
+
+Count the number of free parameters implied by a partition.
+"""
 count_parameters(urns::AbstractString) = length(Set(urns))
 count_parameters(urns::AbstractVector{<:Integer}) = no_distinct_groups_in_partition(urns)
 
@@ -229,7 +251,7 @@ expected_inclusion_probabilities(d::UniformUrnDists) = expected_inclusion_probab
 log_expected_equality_counts(d::UniformUrnDists) = log_expected_equality_counts(length(d))
 function log_expected_inclusion_probabilities(d::UniformUrnDists)
 	vals = log_expected_equality_counts(length(d))
-	z = logsumexp_batch(vals)
+	z = LogExpFunctions.logsumexp(vals)
 	return vals .- z
 end
 

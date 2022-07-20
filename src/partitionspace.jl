@@ -3,7 +3,11 @@ struct DistinctPartitionSpace <: AbstractPartitionSpace end
 struct DuplicatedPartitionSpace <: AbstractPartitionSpace end
 
 """
-PartitionSpace{T<:Integer, P<:EqualitySampler.AbstractPartitionSpace}
+$(TYPEDEF)
+```julia
+# constructor
+PartitionSpace(k::T, ::Type{U} = EqualitySampler.DistinctPartitionSpace)
+```
 
 A type to represent the space of partitions.
 `EqualitySampler.AbstractPartitionSpace` indicates whether partitions should contains duplicates or be distinct.
