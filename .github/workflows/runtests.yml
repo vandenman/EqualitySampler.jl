@@ -1,11 +1,11 @@
 name: runtests
 
-on: 
+on:
   push:
-    paths: ['**.jl']
+    paths: ['**.jl', 'docs/**']
   pull_request:
-    paths: ['**.jl']
-    
+    paths: ['**.jl', 'docs/**']
+
 
 jobs:
   test:
