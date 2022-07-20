@@ -1,7 +1,7 @@
 using Documenter, EqualitySampler
 
 makedocs(
-	sitename="My Documentation",
+	sitename="EqualitySampler.jl",
 	modules  = [EqualitySampler],
     format   = Documenter.HTML(; prettyurls = get(ENV, "CI", nothing) == "true"),
 )
