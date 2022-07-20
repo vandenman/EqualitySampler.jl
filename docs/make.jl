@@ -8,5 +8,5 @@ makedocs(
 
 deploydocs(;
     repo = "github.com/vandenman/EqualitySampler.git",
-    versions = ["stable" => "v^", "v#.#", "dev" => "master"]
+    versions = ["stable" => "v^", "v#.#", "dev" => "main"]
 )
