@@ -60,7 +60,7 @@ function stirlings2r_base_cases(n::T, k::T, r::T) where T <: Integer
 
 	if n <= _r_stirling2r_N_MAX && r <= _r_stirling2r_R_MAX
 		index = _stirling2r_index(n, k, r)
-		return (true, T(_stirlings2r_table_BigInt[index]))
+		return (true, T(@inbounds _stirlings2r_table_BigInt[index]))
 	end
 
 	return (false, zero(T))

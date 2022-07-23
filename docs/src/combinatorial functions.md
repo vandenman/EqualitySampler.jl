@@ -1,4 +1,4 @@
-# [Combinatorics](@id combinatorics)
+# [Combinatorial Functions](@id combinatorics)
 
 ```@docs
 stirlings2

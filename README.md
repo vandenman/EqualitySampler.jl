@@ -1,6 +1,7 @@
 # EqualitySampler - a Julia package for sampling equality constraints
 
-[![Build Status](https://github.com/vandenman/EqualitySampler/workflows/CI/badge.svg)](https://github.com/vandenman/EqualitySampler/EqualitySampler/actions)
+[![Docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://vandenman.github.io/EqualitySampler/dev/)
+[![Build Status](https://github.com/vandenman/EqualitySampler/workflows/runtests/badge.svg)](https://github.com/vandenman/EqualitySampler/EqualitySampler/actions)
 
 # Installation
 

@@ -40,7 +40,7 @@ function logbellnumr(n::T, r::T) where T <: Integer
 end
 logbellnumr(n::T, r::U) where {T <: Integer, U <: Integer} = logbellnumr(promote(n, r)...)
 
-function bellnumr_base_cases(n::T, r::T) where T <: Integer
+function bellnumr_base_cases_inner(n::T, r::T) where T <: Integer
 
 	# base cases
 	n == 0		&& 		return (true, 		one(T))
@@ -51,6 +51,14 @@ function bellnumr_base_cases(n::T, r::T) where T <: Integer
 	n == 3		&&		return (true, 		T((r + 1)^3 + 3(r + 1) + 1))
 	# https://oeis.org/A005492 simplify equations for a(n)
 	n == 4		&&		return (true, 		T(15 + r * (20 + r * (12 + r * (4 + r)))))
+	(false, zero(T))
+end
+
+function bellnumr_base_cases(n::T, r::T) where T <: Integer
+
+	# base cases
+	(b, value) = bellnumr_base_cases_inner(n, r)
+	b && return (b, value)
 
 	if 0 <= r < size(_bellnumr_table_BigInt, 1) && 5 <= n < size(_bellnumr_table_BigInt, 2)
 		return (true, T(_bellnumr_table_BigInt[r+1, n-4]))
@@ -64,4 +72,6 @@ $(TYPEDSIGNATURES)
 
 Computes the Bell numbers.
 """
-bellnum(n::T) where {T <: Integer} = bellnumr(n, zero(T))
+function bellnum(n::T) where {T <: Integer}
+	bellnumr(n, zero(T))
+end

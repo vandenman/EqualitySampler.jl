@@ -16,7 +16,7 @@ import
 	Turing,
 	Turing.RandomMeasures
 
-using DocStringExtensions: TYPEDEF, TYPEDFIELDS, TYPEDSIGNATURES
+using DocStringExtensions
 
 export
 	#=
