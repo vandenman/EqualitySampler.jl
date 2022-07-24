@@ -94,7 +94,7 @@ function _pdf_helper(d::AbstractMvUrnDistribution{T}, index::T, complete_urns::A
 
 end
 
-@inbounds function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, ::UniformMvUrnDistribution{T}, index::T, complete_urns::AbstractVector{T}) where T<:Integer
+function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, ::UniformMvUrnDistribution{T}, index::T, complete_urns::AbstractVector{T}) where T<:Integer
 
 	k = length(result)
 	if isone(index)
@@ -110,7 +110,7 @@ end
 	den = r * bellnumr(k - index, r)
 	prob_new_label = num / (num + den)
 
-	for i in eachindex(result)
+	@inbounds for i in eachindex(result)
 		if i in urns_set
 			result[i] = (1 - prob_new_label) / r
 		else
@@ -121,7 +121,7 @@ end
 
 end
 
-@inbounds function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, d::T, index::U, complete_urns::AbstractVector{U}) where
+function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, d::T, index::U, complete_urns::AbstractVector{U}) where
 	{U<:Integer, T<:Union{BetaBinomialMvUrnDistribution{U}, CustomInclusionMvUrnDistribution}}
 
 	k = length(result)
@@ -141,11 +141,11 @@ end
 	model_probs_by_incl = exp.(log_model_probs_by_incl(d))
 
 	# no. parameters k j m
-	num = r * sum(model_probs_by_incl[i] * stirlings2r(n - 1, i, r    ) for i in 1:k)
-	den =     sum(model_probs_by_incl[i] * stirlings2r(n    , i, r + 1) for i in 1:k)
+	num = r * sum(@inbounds model_probs_by_incl[i] * stirlings2r(n - 1, i, r    ) for i in 1:k)
+	den =     sum(@inbounds model_probs_by_incl[i] * stirlings2r(n    , i, r + 1) for i in 1:k)
 
 	prob_new_label = den / (den + num)
-	for i in eachindex(result)
+	@inbounds for i in eachindex(result)
 		if i in v_known_set
 			result[i] = (1 - prob_new_label) / r
 		else
