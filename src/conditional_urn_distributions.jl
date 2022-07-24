@@ -84,53 +84,8 @@ Count the number of free parameters implied by a partition.
 count_parameters(urns::AbstractString) = length(Set(urns))
 count_parameters(urns::AbstractVector{<:Integer}) = no_distinct_groups_in_partition(urns)
 
-#region AbstractConditionalUrnDistribution
-abstract type AbstractConditionalUrnDistribution{T} <: Distributions.DiscreteUnivariateDistribution where T <: Integer end
-
-Distributions.minimum(::AbstractConditionalUrnDistribution{T}) where T = one(T)
-Distributions.maximum(d::AbstractConditionalUrnDistribution{T}) where T = T(length(d))
-Base.length(d::AbstractConditionalUrnDistribution) = length(d.urns)
-
-Distributions.logpdf(::AbstractConditionalUrnDistribution, x::Real) = -Inf
-Distributions.pdf(d::AbstractConditionalUrnDistribution{T}, x::Real) where T = exp(Distributions.logpdf(d, x))
-function Distributions.logpdf(d::AbstractConditionalUrnDistribution{T}, x::T) where T <: Integer
-	Distributions.insupport(d, x) || return -Inf
-	return log(_pdf(d)[x])
-end
-
-Distributions.cdf(d::AbstractConditionalUrnDistribution, x::Real) = 0.0
-function Distributions.cdf(d::AbstractConditionalUrnDistribution, x::T) where T <: Integer
-	cdf = cumsum(_pdf(d))
-	return cumsum[x]
-end
-
-# TODO: this could be done more efficiently
-Distributions.rand(::Random.AbstractRNG, d::AbstractConditionalUrnDistribution) = rand(Distributions.Categorical(_pdf(d)), 1)[1]
-
-outcomes(d::AbstractConditionalUrnDistribution) = eachindex(d.urns)
-Distributions.mean(d::AbstractConditionalUrnDistribution) = sum(_pdf(d) .* outcomes(d))
-Distributions.var(d::AbstractConditionalUrnDistribution) = sum(_pdf(d) .* outcomes(d) .^2) - Distributions.mean(d)^2
-
-#endregion
-
-#region UniformConditionalUrnDistribution
-struct UniformConditionalUrnDistribution{T, U<:AbstractVector{T}} <: AbstractConditionalUrnDistribution{T}
-	urns::U
-	index::T
-	function UniformConditionalUrnDistribution(urns::U, index::T = 1) where {T <: Integer, U <: AbstractVector{T}}
-		n = length(urns)
-		all(x-> one(T) <= x <= n, urns) || throw(DomainError(urns, "condition: 0 < urns[i] < length(urns) ∀i is violated"))
-		one(T) <= index <= n || throw(DomainError(urns, "condition: 0 < index < length(urns) is violated"))
-		return new{T, U}(urns, index)
-	end
-end
-UniformConditionalUrnDistribution(k::T) where T <: Integer = UniformConditionalUrnDistribution(ones(T, k), k)
-
-
-_pdf(d::UniformConditionalUrnDistribution) = _pdf_helper(d, d.index, d.urns)
-
-# _pdf_uniform_helper exists so that it can also be reused by the multivariate distribution without explicitly creating a UniformConditionalUrnDistribution
-function _pdf_helper(d::Union{AbstractConditionalUrnDistribution{T}, AbstractMvUrnDistribution{T}}, index::T, complete_urns::AbstractVector{T}) where T<:Integer
+# _pdf_uniform_helper exists so that it can also be used by the multivariate distribution
+function _pdf_helper(d::AbstractMvUrnDistribution{T}, index::T, complete_urns::AbstractVector{T}) where T<:Integer
 
 	k = length(complete_urns)
 	result = zeros(Float64, length(complete_urns))
@@ -139,7 +94,7 @@ function _pdf_helper(d::Union{AbstractConditionalUrnDistribution{T}, AbstractMvU
 
 end
 
-@inbounds function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, ::Union{UniformConditionalUrnDistribution{T}, UniformMvUrnDistribution{T}}, index::T, complete_urns::AbstractVector{T}) where T<:Integer
+@inbounds function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, ::UniformMvUrnDistribution{T}, index::T, complete_urns::AbstractVector{T}) where T<:Integer
 
 	k = length(result)
 	if isone(index)
@@ -166,38 +121,8 @@ end
 
 end
 
-#endregion
-#region BetaBinomialConditionalUrnDistribution
-struct BetaBinomialConditionalUrnDistribution{T, U<:AbstractVector{T}} <: AbstractConditionalUrnDistribution{T}
-	urns::U
-	index::T
-	α::Float64
-	β::Float64
-	_log_model_probs_by_incl::Vector{Float64}
-	function BetaBinomialConditionalUrnDistribution(urns::U, index::T = 1, α::Float64 = 1.0, β::Float64 = 1.0) where {T <: Integer, U <: AbstractVector{T}}
-		n = length(urns)
-		all(x-> one(T) <= x <= n, urns) || throw(DomainError(urns, "condition: 0 < urns[i] < length(urns) ∀i is violated"))
-		one(T) <= index <= n || throw(DomainError(urns, "condition: 0 <= index <= length(urns) is violated"))
-		0.0 <= α || throw(DomainError(α, "condition: 0 <= α is violated"))
-		0.0 <= β || throw(DomainError(β, "condition: 0 <= β is violated"))
-		log_model_probs_by_incl = Distributions.logpdf.(Distributions.BetaBinomial(n - 1, α, β), 0:n - 1) .- log_expected_equality_counts(n)
-		new{T, U}(urns, index, α, β, log_model_probs_by_incl)
-	end
-end
-
-function BetaBinomialConditionalUrnDistribution(urns::AbstractVector{T}, index::T, α::Real, β::Real) where T <: Integer
-	BetaBinomialConditionalUrnDistribution(urns, index, convert(Float64, α), convert(Float64, β))
-end
-
-function BetaBinomialConditionalUrnDistribution(k::T, α::Real = 1.0, β::Real = 1.0) where T <: Integer
-	BetaBinomialConditionalUrnDistribution(ones(T, k), k, convert(Float64, α), convert(Float64, β))
-end
-
-_pdf(d::BetaBinomialConditionalUrnDistribution) = _pdf_helper(d, d.index, d.urns)
-
-log_model_probs_by_incl(d::BetaBinomialConditionalUrnDistribution) = d._log_model_probs_by_incl
 @inbounds function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, d::T, index::U, complete_urns::AbstractVector{U}) where
-	{U<:Integer, T<:Union{BetaBinomialConditionalUrnDistribution{U}, BetaBinomialMvUrnDistribution{U}, CustomInclusionMvUrnDistribution}}
+	{U<:Integer, T<:Union{BetaBinomialMvUrnDistribution{U}, CustomInclusionMvUrnDistribution}}
 
 	k = length(result)
 	if isone(index)
@@ -244,30 +169,29 @@ log_expected_equality_counts(k::Integer) = logstirlings2.(k, 1:k)
 log_expected_equality_counts(k::Integer, j::Integer) = logstirlings2(k, j)
 
 
-const UniformUrnDists = Union{UniformConditionalUrnDistribution, UniformMvUrnDistribution}
-expected_model_probabilities(d::UniformUrnDists) = expected_model_probabilities(length(d))
-expected_inclusion_counts(d::UniformUrnDists) = expected_inclusion_counts(length(d))
-expected_inclusion_probabilities(d::UniformUrnDists) = expected_inclusion_probabilities(length(d))
-log_expected_equality_counts(d::UniformUrnDists) = log_expected_equality_counts(length(d))
-function log_expected_inclusion_probabilities(d::UniformUrnDists)
+expected_model_probabilities(d::UniformMvUrnDistribution) = expected_model_probabilities(length(d))
+expected_inclusion_counts(d::UniformMvUrnDistribution) = expected_inclusion_counts(length(d))
+expected_inclusion_probabilities(d::UniformMvUrnDistribution) = expected_inclusion_probabilities(length(d))
+log_expected_equality_counts(d::UniformMvUrnDistribution) = log_expected_equality_counts(length(d))
+function log_expected_inclusion_probabilities(d::UniformMvUrnDistribution)
 	vals = log_expected_equality_counts(length(d))
 	z = LogExpFunctions.logsumexp(vals)
 	return vals .- z
 end
 
-function expected_inclusion_probabilities(d::T) where T<:Union{BetaBinomialConditionalUrnDistribution, BetaBinomialMvUrnDistribution}
+function expected_inclusion_probabilities(d::BetaBinomialMvUrnDistribution)
 	# return exp.(d._log_model_probs_by_incl)
 	k = length(d) - 1
 	return Distributions.pdf.(Distributions.BetaBinomial(k, d.α, d.β), 0:k)
 end
 
-function log_expected_inclusion_probabilities(d::T) where T<:Union{BetaBinomialConditionalUrnDistribution, BetaBinomialMvUrnDistribution}
+function log_expected_inclusion_probabilities(d::BetaBinomialMvUrnDistribution)
 	k = length(d) - 1
 	return Distributions.logpdf.(Distributions.BetaBinomial(k, d.α, d.β), 0:k)
 end
 
 
-function expected_model_probabilities(d::T, compact::Bool = false) where T<:Union{BetaBinomialConditionalUrnDistribution, BetaBinomialMvUrnDistribution}
+function expected_model_probabilities(d::BetaBinomialMvUrnDistribution, compact::Bool = false)
 	incl_probs  = expected_inclusion_probabilities(d)
 	no_models_with_incl = expected_inclusion_counts(length(d))
 	probs = incl_probs ./ no_models_with_incl
