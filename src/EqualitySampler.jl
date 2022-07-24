@@ -19,6 +19,27 @@ import
 using DocStringExtensions
 
 export
+
+	#=
+
+		TODO:
+
+			Work out package idea for efficient log likelihood evaluation through sufficient statistics
+
+				- work out abstract types, e.g., AbstractSuffStatDistribution
+				- Distribution over tuple?
+				- Example MvNormal
+				struct MvNormalSuffStat{D}
+					dist::D
+					params::typeof(params(D))
+					suffstats
+				end
+				# does this work with D as parametric type or does it need to be a field?
+				- rand fallback calls compute_suffstats(D, rand(D, n))
+
+
+	=#
+
 	#=
 		TODO:
 

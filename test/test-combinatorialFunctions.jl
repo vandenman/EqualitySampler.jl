@@ -24,8 +24,22 @@ import Combinatorics
 
 		@testset "bell numbers" begin
 			for n in 1:12
-				@test Combinatorics.bellnum(n) == bellnumr(n, 0)
+				@test Combinatorics.bellnum(n) == bellnum(n)
 			end
+
+			# from https://oeis.org/A000110/list
+			reference = BigInt[1,1,2,5,15,52,203,877,4140,21147,115975,678570,
+				4213597,27644437,190899322,1382958545,10480142147,
+				82864869804,682076806159,5832742205057,
+				51724158235372,474869816156751,4506715738447323,
+				44152005855084346,445958869294805289,
+				4638590332229999353,49631246523618756274
+			]
+
+			replication = bellnum.(BigInt(0):length(reference)-1)
+
+			@test reference == replication
+
 		end
 
 		@testset "unsignedstirlings1" begin
@@ -88,8 +102,9 @@ import Combinatorics
 			203     877     3263    10481   29371   73013   163967
 		]
 
-		replication = [bellnumr(r, n) for r in 0:6, n in 0:6]
+		replication = [bellnumr(n, r) for n in 0:6, r in 0:6]
 		@test reference == replication
+
 	end
 
 	@testset "compare logstirlings2 against log(stirlings2)" begin

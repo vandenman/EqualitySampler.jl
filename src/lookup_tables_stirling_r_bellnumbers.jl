@@ -57,9 +57,9 @@ const _stirlings2r_table_BigInt = _precompute_r_stirlings2_new()
 # end
 
 function _precompute_r_bell_numbers(n_max::Int = 31, r_max::Int = 31, T::Type{<:Integer} = BigInt)
-	bellnumr_table = Matrix{T}(undef, n_max, r_max);
-	for n in range(T(5), length = size(bellnumr_table, 1)),
-		r in range(T(0), length = size(bellnumr_table, 2))
+	bellnumr_table = Matrix{T}(undef, r_max, n_max);
+	for n in range(T(5),    length = size(bellnumr_table, 1)),
+		r in range(zero(T), length = size(bellnumr_table, 2))
 		bellnumr_table[r+1, n-4] = bellnumr_inner(n, r);
 	end
 	return bellnumr_table
@@ -74,50 +74,41 @@ function _precompute_r_bell_numbers_new(n_max::Int = 31, r_max::Int = 31, T::Typ
 		n_start = T(5)
 		n_end   = n_start + n_max# - 1
 
-		n_first = T(5)
-
-		# TODO: there is some gain by computing this differently!
-		# cache_bellnum = bellnumr_inner.(zero(T):n_end, zero(T))
 		# adapted from Combinatorics.bellnum to return all the bell numbers
-		cache_bellnum = Vector{T}(undef, n_end + 1)
+		cache_bellnum = Vector{T}(undef, n_end)
 		cache_bellnum[1] = one(T)
 		cache_bellnum[2] = one(T)
-		list = Vector{T}(undef, n_end + 1)
-		list[1] = 1
-		for i = 2:n_end
+		list = Vector{T}(undef, n_end)
+		list[1] = one(T)
+		for i = 2:n_end-1
 			for j = 1:i - 2
 				list[i - j - 1] += list[i - j]
 			end
 			list[i] = list[1] + list[i - 1]
 			cache_bellnum[i+1] = list[i]
 		end
-		# @assert cache_bellnum == bellnumr_inner.(zero(T):n_end, zero(T))
+		# @assert cache_bellnum == bellnumr_inner.(zero(T):n_end-1, zero(T))
 
-		# cache_bellnum = Vector{T}(undef, n_end + 1)
-		# cache_bellnum[1] = 1
-		# temp = 1
-		# for n in 1:n_end
-		# 	cache_bellnum[n+1] = binomial(ncache_bellnum[n]
-		# end
-		cache_bellnum[2] = 1
-		bellnumr_table[:, 1] .= cache_bellnum[n_first+1:n_end]#bellnumr_inner.(range(n_first, length = size(bellnumr_table, 1)), zero(T))
+		bellnumr_table[1, :] .= cache_bellnum[n_start+1:n_end]
+		# @assert bellnumr_table[1, :] == bellnumr_inner.(n_start:n_end-1, zero(T))
+		# @assert bellnumr_table[1, :] == _precompute_r_bell_numbers(31, 31)[1, :]
 
 		cache_binomials = Vector{T}(undef, n_end + 1) # +1 since k = 0 also counts
 		cache_binomials[1] = one(T)
-		for k in 1:n_start + 1
-			cache_binomials[k+1] = cache_binomials[k] * (n_start + 1 - k + 1) ÷ k
+		for k in 1:n_start
+			cache_binomials[k+1] = cache_binomials[k] * (n_start - k + 1) ÷ k
 		end
-		# @assert cache_binomials[1:n_start+2] == binomial.(n_start + 1, 0:n_start + 1)
+		# @assert cache_binomials[1:n_start+1] == binomial.(n_start, 0:n_start)
 
 		multiplication_cache = Vector{T}(undef, n_end + 1)
-		for n in range(n_start + 1, length = size(bellnumr_table, 1)-1)
+		for n in range(n_start, length = n_max)
 			for k in 0:n
 				multiplication_cache[k+1] = cache_binomials[k+1] * cache_bellnum[n - k + 1]
 			end
-			for r in range(zero(T), length = size(bellnumr_table, 2))
+			for r in range(one(T), length = r_max - 1)
 
 				bellnumr_table[r+1, n-4] = Base.sum(r^k * multiplication_cache[k+1] for k in 0:n)
-				# @assert  bellnumr_table[r+1, n-4] == bellnumr_inner(n, r)
+				# @assert bellnumr_table[r+1, n-4] == bellnumr_inner(n, r)
 
 			end
 
@@ -137,8 +128,15 @@ function _precompute_r_bell_numbers_new(n_max::Int = 31, r_max::Int = 31, T::Typ
 	return bellnumr_table
 end
 
-# TODO: this guy drives the load times!
 const _bellnumr_table_BigInt = _precompute_r_bell_numbers_new()
+# sufficient for all simulation sizes (this could be more clever though)
+# const _bellnumr_table_BigInt = Matrix{BigInt}(undef, 31, 31);
+# for n in range(BigInt(5), length = size(_bellnumr_table_BigInt, 1)), r in range(BigInt(0), length = size(_bellnumr_table_BigInt, 2))
+# 	_bellnumr_table_BigInt[r+1, n-4] = bellnumr_inner(n, r);
+# end
+
+# TODO: this guy drives the load times!
+# const _bellnumr_table_BigInt = _precompute_r_bell_numbers()# _precompute_r_bell_numbers_new()
 
 # since k = 0, 1, 2, n-3, n-2, n-1, n are trivial to compute, the triangle starts at S1(7, 3)
 

@@ -51,7 +51,8 @@ function bellnumr_base_cases_inner(n::T, r::T) where T <: Integer
 	n == 3		&&		return (true, 		T((r + 1)^3 + 3(r + 1) + 1))
 	# https://oeis.org/A005492 simplify equations for a(n)
 	n == 4		&&		return (true, 		T(15 + r * (20 + r * (12 + r * (4 + r)))))
-	(false, zero(T))
+
+	return (false, zero(T))
 end
 
 function bellnumr_base_cases(n::T, r::T) where T <: Integer
