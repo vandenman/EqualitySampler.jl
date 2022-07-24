@@ -32,11 +32,8 @@ function logbellnumr(n::T, r::T) where T <: Integer
 	succes, value = bellnumr_base_cases(n, r)
 	succes && return Float64(log(value))
 
-	values = Vector{Float64}(undef, n + 1)
-	for k in 0:n
-		values[k+1] = logstirlings2r(n+r, k+r, r)
-	end
-	return LogExpFunctions.logsumexp(values)
+	return LogExpFunctions.logsumexp(logstirlings2r(n+r, k+r, r) for k in 0:n)
+
 end
 logbellnumr(n::T, r::U) where {T <: Integer, U <: Integer} = logbellnumr(promote(n, r)...)
 

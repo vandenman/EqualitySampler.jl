@@ -107,6 +107,12 @@ import Combinatorics
 
 	end
 
+	@testset "compare logbellnumr against log(bellnumr)" begin
+		for n in 1:nvals, r in 1:rvals
+			@test logbellnumr(n, r) ≈ log(bellnumr(n, r))
+		end
+	end
+
 	@testset "compare logstirlings2 against log(stirlings2)" begin
 		for n in 1:nvals, k in 1:kvals
 			@test logstirlings2(n, k) ≈ log(stirlings2(n, k))
