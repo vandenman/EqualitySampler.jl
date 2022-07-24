@@ -50,30 +50,15 @@ end
 const _stirlings2r_table_BigInt = _precompute_r_stirlings2_new()
 
 
-# sufficient for all simulation sizes (this could be more clever though)
-# const _bellnumr_table_BigInt = Matrix{BigInt}(undef, 31, 31);
-# for n in range(BigInt(5), length = size(_bellnumr_table_BigInt, 1)), r in range(BigInt(0), length = size(_bellnumr_table_BigInt, 2))
-# 	_bellnumr_table_BigInt[r+1, n-4] = bellnumr_inner(n, r);
-# end
-
-function _precompute_r_bell_numbers(n_max::Int = 31, r_max::Int = 31, T::Type{<:Integer} = BigInt)
-	bellnumr_table = Matrix{T}(undef, r_max, n_max);
-	for n in range(T(5),    length = size(bellnumr_table, 1)),
-		r in range(zero(T), length = size(bellnumr_table, 2))
-		bellnumr_table[r+1, n-4] = bellnumr_inner(n, r);
-	end
-	return bellnumr_table
-end
-
 function _precompute_r_bell_numbers_new(n_max::Int = 31, r_max::Int = 31, T::Type{<:Integer} = BigInt)
 
 	@inbounds begin
 
 		bellnumr_table = Matrix{T}(undef, n_max, r_max);
-		# first compute the bell numbers
 		n_start = T(5)
 		n_end   = n_start + n_max# - 1
 
+		# first compute the bell numbers
 		# adapted from Combinatorics.bellnum to return all the bell numbers
 		cache_bellnum = Vector{T}(undef, n_end)
 		cache_bellnum[1] = one(T)
@@ -129,17 +114,8 @@ function _precompute_r_bell_numbers_new(n_max::Int = 31, r_max::Int = 31, T::Typ
 end
 
 const _bellnumr_table_BigInt = _precompute_r_bell_numbers_new()
-# sufficient for all simulation sizes (this could be more clever though)
-# const _bellnumr_table_BigInt = Matrix{BigInt}(undef, 31, 31);
-# for n in range(BigInt(5), length = size(_bellnumr_table_BigInt, 1)), r in range(BigInt(0), length = size(_bellnumr_table_BigInt, 2))
-# 	_bellnumr_table_BigInt[r+1, n-4] = bellnumr_inner(n, r);
-# end
-
-# TODO: this guy drives the load times!
-# const _bellnumr_table_BigInt = _precompute_r_bell_numbers()# _precompute_r_bell_numbers_new()
 
 # since k = 0, 1, 2, n-3, n-2, n-1, n are trivial to compute, the triangle starts at S1(7, 3)
-
 function _stirling1_index(n::T, k::T) where T<:Integer
 	#=
 	triangle starts at S1(7, 3) so
