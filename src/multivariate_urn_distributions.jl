@@ -8,6 +8,11 @@
 
 
 #region AbstractMvUrnDistribution
+"""
+AbstractMvUrnDistribution{<:Integer} <: Distributions.DiscreteMultivariateDistribution
+
+Supertype for distributions over partitions.
+"""
 abstract type AbstractMvUrnDistribution{T} <: Distributions.DiscreteMultivariateDistribution where T <: Integer end
 
 Base.length(d::AbstractMvUrnDistribution) = d.k
@@ -50,21 +55,48 @@ function Distributions._rand!(rng::Random.AbstractRNG, d::AbstractMvUrnDistribut
 end
 
 # TODO: rename no_parameters
+"""
+logpdf_incl(d::AbstractMvUrnDistribution, no_parameters::Integers)
+
+Log probability of all partitions with a particular number of parameters.
+"""
 function logpdf_incl(d::AbstractMvUrnDistribution, no_parameters::T) where T<:Integer
 	in_eqsupport(d, no_parameters) || return T === BigInt ? BigFloat(-Inf) : Float64(-Inf)
 	k = length(d)
 	logpdf_model_distinct(d, no_parameters) + logstirlings2(k, no_parameters)
 end
+"""
+pdf_incl(d::AbstractMvUrnDistribution, no_parameters::Integers)
+
+Probability of all partitions with a particular number of parameters.
+"""
 pdf_incl(d::AbstractMvUrnDistribution,  no_parameters) = exp(logpdf_incl(d,  no_parameters))
 
 
+"""
+logpdf_model(d::AbstractMvUrnDistribution, x::Integer)
+logpdf_model(d::AbstractMvUrnDistribution, x::AbstractVector{<:Integer})
 
+Synonym for `logpdf(d::AbstractMvUrnDistribution, x)`, computes the log probability of a partition.
+"""
 function logpdf_model(d::AbstractMvUrnDistribution, x::T) where T <: Integer
 	in_eqsupport(d, x) || return T === BigInt ? BigFloat(-Inf) : Float64(-Inf)
 	logpdf_model_distinct(d, x) - log_count_combinations(length(d), x)
 end
 logpdf_model(d::AbstractMvUrnDistribution, x::AbstractVector{T}) where T <: Integer = logpdf_model_distinct(d, x) - log_count_combinations(x)
+
+"""
+pdf_model(d::AbstractMvUrnDistribution, x::Integer)
+pdf_model(d::AbstractMvUrnDistribution, x::AbstractVector{<:Integer})
+
+Synonym for `pdf(d::AbstractMvUrnDistribution, x)`, computes the probability of a partition.
+"""
 pdf_model(d::AbstractMvUrnDistribution, x) = exp(logpdf_model(d, x))
+"""
+pdf_model_distinct(d::AbstractMvUrnDistribution, x)
+
+Computes the probability of a partition without considering duplicated partitions (i.e., assuming all partitions are unique).
+"""
 pdf_model_distinct(d::AbstractMvUrnDistribution, x) = exp(logpdf_model_distinct(d, x))
 
 Distributions.logpdf(d::AbstractMvUrnDistribution, x::AbstractVector{T}) where T<:Integer = logpdf_model(d, x)
@@ -72,10 +104,22 @@ Distributions.logpdf(d::AbstractMvUrnDistribution, x::AbstractVector{T}) where T
 #endregion
 
 #region UniformMvUrnDistribution
+"""
+UniformMvUrnDistribution{T <: Integer} <: AbstractMvUrnDistribution{T}
+
+Uniform distribution over partitions.
+"""
 struct UniformMvUrnDistribution{T <: Integer} <: AbstractMvUrnDistribution{T}
 	k::T
 end
 
+
+
+"""
+logpdf_model_distinct(d::AbstractMvUrnDistribution, x)
+
+Computes the log probability of a partition without considering duplicated partitions (i.e., assuming all partitions are unique).
+"""
 logpdf_model_distinct(d::UniformMvUrnDistribution, ::AbstractVector{T}) where T <: Integer = -logbellnumr(convert(T, length(d)), zero(T))
 logpdf_model_distinct(d::UniformMvUrnDistribution, ::T) where T <: Integer = -logbellnumr(convert(T, length(d)), zero(T))
 
@@ -84,6 +128,13 @@ logpdf_model_distinct(d::UniformMvUrnDistribution, ::T) where T <: Integer = -lo
 #endregion
 
 #region BetaBinomialMvUrnDistribution
+"""
+BetaBinomialMvUrnDistribution{T <: Integer} <: AbstractMvUrnDistribution{T}
+
+Beta binomial distribution over partitions.
+If ``\\rho \\sim \\text{BetaBinomialMvUrnDistribution}(k, \\alpha, \\beta)`` then ``\\text{count_parameters}(\\rho)\\sim \\text{BetaBinomial}(k - 1, \\alpha, \\beta)``.
+
+"""
 struct BetaBinomialMvUrnDistribution{T <: Integer} <: AbstractMvUrnDistribution{T}
 	k::T
 	α::Float64
@@ -97,11 +148,6 @@ function BetaBinomialMvUrnDistribution(k::Integer, α::Number, β::Number = 1.0)
 	BetaBinomialMvUrnDistribution(k, convert(Float64, α), convert(Float64, β))
 end
 
-
-# function Distributions.logpdf(d::BetaBinomialMvUrnDistribution, x::AbstractVector{<:Integer})
-# 	log_model_probs_by_incl(d)[count_equalities(x) + 1]
-# 	# Distributions.logpdf(Distributions.BetaBinomial(length(d) - 1, d.α, d.β), count_equalities(x))
-# end
 
 function log_model_probs_by_incl(d::BetaBinomialMvUrnDistribution{T}) where T
 	Distributions.logpdf.(Distributions.BetaBinomial(d.k - one(T), d.α, d.β), zero(T):d.k - one(T)) .- log_expected_equality_counts(d.k)
@@ -156,12 +202,16 @@ end
 
 function logpdf_incl(d::CustomInclusionMvUrnDistribution, no_parameters::Integer)
 	in_eqsupport(d, no_parameters) || return -Inf
-	d.logpdf[no_parameters - 1]
+	@inbounds d.logpdf[no_parameters - 1]
 end
 
 
 #endregion
+"""
+RandomProcessMvUrnDistribution{RPM <: Turing.RandomMeasures.AbstractRandomProbabilityMeasure, T <: Integer} <: AbstractMvUrnDistribution{T}
 
+Distribution over partitions defined by a Random Probabiltiy Measure (RPM) as defined in Turing.RandomMeasures.
+"""
 struct RandomProcessMvUrnDistribution{RPM <: Turing.RandomMeasures.AbstractRandomProbabilityMeasure, T <: Integer} <: AbstractMvUrnDistribution{T}
 	k::T
 	rpm::RPM
