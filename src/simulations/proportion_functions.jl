@@ -39,7 +39,7 @@ get_proportion_sampler(model, spl::Turing.Inference.InferenceAlgorithm, ::Float6
 
 function proportion_test(
 		successes::AbstractVector{T}, observations::AbstractVector{T},
-		partition_prior::Union{Nothing, AbstractMvUrnDistribution}
+		partition_prior::Union{Nothing, AbstractPartitionDistribution}
 		;
 		spl::Union{Symbol, Turing.Inference.InferenceAlgorithm} = :custom,
 		mcmc_settings::MCMCSettings = MCMCSettings(),

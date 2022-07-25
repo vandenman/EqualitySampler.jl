@@ -37,16 +37,16 @@ end
 function instantiate_prior(symbol::Symbol, k::Integer)
 	# this works nicely with jld2 but it's not type stable
 
-	symbol == :uniform				&&	return UniformMvUrnDistribution(k)
-	symbol == :BetaBinomial11		&&	return BetaBinomialMvUrnDistribution(k, 1.0, 1.0)
-	symbol == :BetaBinomialk1		&&	return BetaBinomialMvUrnDistribution(k, k, 1.0)
-	symbol == :BetaBinomial1k		&&	return BetaBinomialMvUrnDistribution(k, 1.0, k)
-	symbol == :BetaBinomial1binomk2	&&	return BetaBinomialMvUrnDistribution(k, 1.0, binomial(k, 2))
-	symbol == :DirichletProcess0_5	&&	return DirichletProcessMvUrnDistribution(k, 0.5)
-	symbol == :DirichletProcess1_0	&&	return DirichletProcessMvUrnDistribution(k, 1.0)
-	symbol == :DirichletProcess2_0	&&	return DirichletProcessMvUrnDistribution(k, 2.0)
+	symbol == :uniform				&&	return UniformPartitionDistribution(k)
+	symbol == :BetaBinomial11		&&	return BetaBinomialPartitionDistribution(k, 1.0, 1.0)
+	symbol == :BetaBinomialk1		&&	return BetaBinomialPartitionDistribution(k, k, 1.0)
+	symbol == :BetaBinomial1k		&&	return BetaBinomialPartitionDistribution(k, 1.0, k)
+	symbol == :BetaBinomial1binomk2	&&	return BetaBinomialPartitionDistribution(k, 1.0, binomial(k, 2))
+	symbol == :DirichletProcess0_5	&&	return DirichletProcessPartitionDistribution(k, 0.5)
+	symbol == :DirichletProcess1_0	&&	return DirichletProcessPartitionDistribution(k, 1.0)
+	symbol == :DirichletProcess2_0	&&	return DirichletProcessPartitionDistribution(k, 2.0)
 	# symbol == :DirichletProcessGP	&&
-	return DirichletProcessMvUrnDistribution(k, :Gopalan_Berry)
+	return DirichletProcessPartitionDistribution(k, :Gopalan_Berry)
 
 end
 

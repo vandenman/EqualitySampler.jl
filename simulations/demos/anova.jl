@@ -32,7 +32,7 @@ n_groups = length(unique(df[!, :g]))
 
 # fit the model
 fitBB11	= fit_model(df, mcmc_iterations = 100_000, mcmc_burnin = 5_000,
-					partition_prior = BetaBinomialMvUrnDistribution(n_groups, 1.0, 1.0));
+					partition_prior = BetaBinomialPartitionDistribution(n_groups, 1.0, 1.0));
 
 mean_θ_cs_eq, θ_cs_eq, chain_eq, model_eq = fitBB11;
 plot(θ_cs_eq') # trace plots

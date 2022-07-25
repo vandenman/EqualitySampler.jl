@@ -305,7 +305,7 @@ DynamicPPL.@model function one_way_anova_mv_ss_submodel(suff_stats_vec, Q, parti
 
 end
 
-DynamicPPL.@model function one_way_anova_mv_ss_eq_submodel(suff_stats_vec, Q, partition_prior::D, ::Type{T} = Float64) where {T, D<:AbstractMvUrnDistribution}
+DynamicPPL.@model function one_way_anova_mv_ss_eq_submodel(suff_stats_vec, Q, partition_prior::D, ::Type{T} = Float64) where {T, D<:AbstractPartitionDistribution}
 
 	partition ~ partition_prior
 	DynamicPPL.@submodel prefix="one_way_anova_mv_ss_submodel" θ_cs = one_way_anova_mv_ss_submodel(suff_stats_vec, Q, partition, T)
@@ -475,7 +475,7 @@ end
 
 function fit_eq_model(
 		df,
-		partition_prior::EqualitySampler.AbstractMvUrnDistribution
+		partition_prior::EqualitySampler.AbstractPartitionDistribution
 		;
 		spl = :custom,
 		mcmc_settings::MCMCSettings = MCMCSettings(),
@@ -564,7 +564,7 @@ anova_test(y::AbstractVector{<:AbstractFloat}, g::AbstractVector{<:UnitRange{<:I
 	$(TYPEDSIGNATURES)
 
 positional arguments:
-- `partition_prior::Union{Nothing, AbstractMvUrnDistribution}`, either nothing (i.e., fit the full model) or a subtype of `AbstractMvUrnDistribution`.
+- `partition_prior::Union{Nothing, AbstractPartitionDistribution}`, either nothing (i.e., fit the full model) or a subtype of `AbstractPartitionDistribution`.
 
 keyword arguments:
 
@@ -576,14 +576,14 @@ keyword arguments:
 """
 function anova_test(
 	df::Union{SimpleDataSet, DataFrames.DataFrame},
-	partition_prior::Union{Nothing, AbstractMvUrnDistribution},
+	partition_prior::Union{Nothing, AbstractPartitionDistribution},
 	;
 	spl = :custom,
 	mcmc_settings::MCMCSettings = MCMCSettings(),
 	modeltype::Symbol = :old,
 	rng = Random.GLOBAL_RNG
 )
-	# TODO: dispatch based on Nothing vs AbstractMvUrnDistribution?
+	# TODO: dispatch based on Nothing vs AbstractPartitionDistribution?
 	if isnothing(partition_prior)
 		return fit_full_model(df;                spl = spl, mcmc_settings = mcmc_settings, modeltype = modeltype, rng = rng)
 	else

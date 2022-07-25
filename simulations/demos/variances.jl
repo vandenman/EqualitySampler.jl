@@ -183,7 +183,7 @@ n, p = 1_000, 5
 μ_1 = randn(p)
 μ_2 = randn(p)
 τ   = 40# 5p#50.0 # this should scale with p, e.g., 10p or so
-partition = rand(UniformMvUrnDistribution(2p))
+partition = rand(UniformPartitionDistribution(2p))
 ρ_constrained = EqualitySampler.Simulations.average_equality_constraints(rand(Dirichlet(ones(2p))), partition)
 σ_1, σ_2 = τ .* view(ρ_constrained,   1: p), τ .* view(ρ_constrained, p+1:2p)
 
@@ -219,7 +219,7 @@ plot_retrieval2(true_values,     post_means_full, string.(keys(post_means_full))
 
 # the model with equality constraints converges slower than the model without and requires more samples
 n_iter = 50_000; n_burn = n_iter ÷ 5
-partition_prior = BetaBinomialMvUrnDistribution(2p, 1, 1)
+partition_prior = BetaBinomialPartitionDistribution(2p, 1, 1)
 mod_var_ss_eq = varianceMANOVA_suffstat_equality_selector(obs_mean_1, obs_cov_chol_1, n_1, obs_mean_2, obs_cov_chol_2, n_2, partition_prior)
 
 starting_values = get_starting_values(data_1, data_2)
@@ -325,7 +325,7 @@ post_mean_μ_m, post_mean_μ_w, post_mean_σ_m, post_mean_σ_w, post_mean_Σ_cho
 
 plot_retrieval2(observed_values, post_means_full, string.(keys(post_means_full)))
 
-partition_prior = BetaBinomialMvUrnDistribution(10, 1, 10)
+partition_prior = BetaBinomialPartitionDistribution(10, 1, 10)
 mod_var_ss_eq = varianceMANOVA_suffstat_equality_selector(obs_mean_m, obs_cov_chol_m, n_m, obs_mean_w, obs_cov_chol_w, n_w, partition_prior)
 
 starting_values = get_starting_values(data_m, data_w; target_quantile = .3)

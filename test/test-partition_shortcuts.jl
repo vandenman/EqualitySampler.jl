@@ -13,7 +13,7 @@ import StatsBase
 		end
 		@testset "random larger models" begin
 			for k in BigInt(15):35
-				model = rand(UniformMvUrnDistribution(k))
+				model = rand(UniformPartitionDistribution(k))
 				@test EqualitySampler.fast_countmap_partition(model) == collect(values(sort(StatsBase.countmap(model))))
 			end
 		end
@@ -29,7 +29,7 @@ import StatsBase
 		end
 		@testset "random larger models" begin
 			for k in BigInt(15):35
-				model = rand(UniformMvUrnDistribution(k))
+				model = rand(UniformPartitionDistribution(k))
 				@test EqualitySampler.no_distinct_groups_in_partition(model) == length(Set(model))
 			end
 		end

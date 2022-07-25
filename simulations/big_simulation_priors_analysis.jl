@@ -4,60 +4,60 @@ import LogExpFunctions
 include("priors_plot_colors_shapes_labels.jl")
 include("simulation_helpers.jl")
 
-# PairwiseMvUrnDistribution is not valid in general and only logpdf_model_distinct and pdf_model_distinct make sense
-function _pairwiseMvUrnDistribution_helper(m, k, logp, logip)
+# PairwisePartitionDistribution is not valid in general and only logpdf_model_distinct and pdf_model_distinct make sense
+function _pairwisePartitionDistribution_helper(m, k, logp, logip)
 	no_parameters = count_parameters(m)
 	no_equal_pairs   = k - no_parameters + 1
 	no_unequal_pairs = no_parameters - 1
 	return no_equal_pairs * logp + no_unequal_pairs * logip
 end
 
-struct PairwiseMvUrnDistribution{T <: Integer} <: AbstractMvUrnDistribution{T}
+struct PairwisePartitionDistribution{T <: Integer} <: AbstractPartitionDistribution{T}
 	k::T
 	p::Float64
 	_logZ::Float64
-	function PairwiseMvUrnDistribution(k::T, p::AbstractFloat = 0.5, logZ::AbstractFloat = 0.0) where T<:Integer
+	function PairwisePartitionDistribution(k::T, p::AbstractFloat = 0.5, logZ::AbstractFloat = 0.0) where T<:Integer
 		new{T}(k, p, logZ)
 	end
 end
-function PairwiseMvUrnDistribution(k::T, p::AbstractFloat = 0.5) where T<:Integer
+function PairwisePartitionDistribution(k::T, p::AbstractFloat = 0.5) where T<:Integer
 	# logZ = LogExpFunctions.sum(
-	# 	m->_pairwiseMvUrnDistribution_helper(m, k, log(p), log1p(-p)),
+	# 	m->_pairwisePartitionDistribution_helper(m, k, log(p), log1p(-p)),
 	# 	EqualitySampler.partition_space(k)
 	# )
-	logZ = LogExpFunctions.logsumexp(_pairwiseMvUrnDistribution_helper(m, k, log(p), log1p(-p)) for m in EqualitySampler.partition_space(k))
-	PairwiseMvUrnDistribution(k, p, logZ)
+	logZ = LogExpFunctions.logsumexp(_pairwisePartitionDistribution_helper(m, k, log(p), log1p(-p)) for m in EqualitySampler.partition_space(k))
+	PairwisePartitionDistribution(k, p, logZ)
 end
 
-EqualitySampler.logpdf_model_distinct(d::PairwiseMvUrnDistribution, x::AbstractVector{<:Integer}) = logpdf_model_distinct(d, count_parameters(x))
-function EqualitySampler.logpdf_model_distinct(d::PairwiseMvUrnDistribution, no_parameters::Integer)
+EqualitySampler.logpdf_model_distinct(d::PairwisePartitionDistribution, x::AbstractVector{<:Integer}) = logpdf_model_distinct(d, count_parameters(x))
+function EqualitySampler.logpdf_model_distinct(d::PairwisePartitionDistribution, no_parameters::Integer)
 	EqualitySampler.in_eqsupport(d, no_parameters) || return -Inf
 	no_equal_pairs   = d.k - no_parameters + 1
 	no_unequal_pairs = no_parameters - 1
 	no_equal_pairs * log(d.p) + no_unequal_pairs * log1p(-d.p) - d._logZ
 end
-function westfallMvUrnDistribution(k::T, pH0::AbstractFloat = 0.5, logZ::AbstractFloat = NaN) where T<:Integer
+function westfallPartitionDistribution(k::T, pH0::AbstractFloat = 0.5, logZ::AbstractFloat = NaN) where T<:Integer
 	τ = pH0 ^ (1 / k)
 	# logτ = Float64((1 / k) * log(pH0))
-	isnan(logZ) ? PairwiseMvUrnDistribution(k, Float64(τ)) : PairwiseMvUrnDistribution(k, Float64(τ), logZ)
+	isnan(logZ) ? PairwisePartitionDistribution(k, Float64(τ)) : PairwisePartitionDistribution(k, Float64(τ), logZ)
 end
 
-# # pdf_model_distinct(westfallMvUrnDistribution(5, .5), [1, 1, 1, 1, 1]) ≈ .5
-# @assert pdf_model_distinct(westfallMvUrnDistribution(5, .5, 0.0), [1, 1, 1, 1, 1]) ≈ .5
-# @assert pdf_model_distinct(PairwiseMvUrnDistribution(5, .5, 0.0), [1, 1, 1, 1, 1]) ≈ .5^5
-# @assert pdf_model_distinct(PairwiseMvUrnDistribution(5, .6, 0.0), [1, 1, 1, 2, 3]) ≈ .6^3 * .4^2
+# # pdf_model_distinct(westfallPartitionDistribution(5, .5), [1, 1, 1, 1, 1]) ≈ .5
+# @assert pdf_model_distinct(westfallPartitionDistribution(5, .5, 0.0), [1, 1, 1, 1, 1]) ≈ .5
+# @assert pdf_model_distinct(PairwisePartitionDistribution(5, .5, 0.0), [1, 1, 1, 1, 1]) ≈ .5^5
+# @assert pdf_model_distinct(PairwisePartitionDistribution(5, .6, 0.0), [1, 1, 1, 2, 3]) ≈ .6^3 * .4^2
 
 # mmm = Matrix(EqualitySampler.partition_space(5))
-# d = westfallMvUrnDistribution(5, .5, 0.0)
+# d = westfallPartitionDistribution(5, .5, 0.0)
 # ppp = pdf_model_distinct.(Ref(d), eachcol(mmm))
-# d2 = PairwiseMvUrnDistribution(5, 0.8705505632961241)
+# d2 = PairwisePartitionDistribution(5, 0.8705505632961241)
 # ppp2 = pdf_model_distinct.(Ref(d2), eachcol(mmm))
-# d3 = PairwiseMvUrnDistribution(5, 0.5)
+# d3 = PairwisePartitionDistribution(5, 0.5)
 # ppp3 = pdf_model_distinct.(Ref(d3), eachcol(mmm))
 # [sum(ppp); sum(ppp2); sum(ppp3)]
 
-# dp = PairwiseMvUrnDistribution(5, .5)
-# dw = westfallMvUrnDistribution(5, .5)
+# dp = PairwisePartitionDistribution(5, .5)
+# dw = westfallPartitionDistribution(5, .5)
 # [pdf_model_distinct(d, [1, 1, 1, 1, 1]) for d in (dp, dw)]
 # [pdf_model_distinct(d, [1, 1, 1, 1, 2]) for d in (dp, dw)]
 # [pdf_model_distinct(d, [1, 1, 1, 2, 2]) for d in (dp, dw)]
@@ -95,18 +95,18 @@ end
 
 
 # function barrier
-function get_prob_ρ(s, ρ, z_PairwiseMvUrnDistribution, z_westfallMvUrnDistribution)
+function get_prob_ρ(s, ρ, z_PairwisePartitionDistribution, z_westfallPartitionDistribution)
 	if s !== :Westfall && s !== :Westfall_uncorrected
 		d = instantiate_prior(s, k)
 		prob_ρ = pdf_model_distinct(d, ρ)
 	elseif s === :Westfall_uncorrected
-		d = PairwiseMvUrnDistribution(k, .5, z_PairwiseMvUrnDistribution)
+		d = PairwisePartitionDistribution(k, .5, z_PairwisePartitionDistribution)
 		prob_ρ = pdf_model_distinct(d, ρ)
-		# prob_ρ = pdf_model_distinct(UniformMvUrnDistribution(k), ρ)
+		# prob_ρ = pdf_model_distinct(UniformPartitionDistribution(k), ρ)
 	else #s !== :Westfall
-		d = westfallMvUrnDistribution(k, .5, z_westfallMvUrnDistribution)
+		d = westfallPartitionDistribution(k, .5, z_westfallPartitionDistribution)
 		prob_ρ = pdf_model_distinct(d, ρ)
-		# prob_ρ = pdf_model_distinct(UniformMvUrnDistribution(k), ρ)
+		# prob_ρ = pdf_model_distinct(UniformPartitionDistribution(k), ρ)
 	end
 	return prob_ρ::Float64
 end
@@ -116,9 +116,9 @@ function compute_prior_performance(k::Integer, priors_sym, hypotheses)
 	α_errors = zeros(length(priors_sym), length(hypotheses))
 	β_errors = zeros(length(priors_sym), length(hypotheses))
 
-	z_PairwiseMvUrnDistribution = PairwiseMvUrnDistribution(k, .5)._logZ
+	z_PairwisePartitionDistribution = PairwisePartitionDistribution(k, .5)._logZ
 	τ = 0.5 ^ (1 / k)
-	z_westfallMvUrnDistribution = LogExpFunctions.logsumexp(_pairwiseMvUrnDistribution_helper(m, k, log(τ),  log1p(-τ))  for m in EqualitySampler.partition_space(k))
+	z_westfallPartitionDistribution = LogExpFunctions.logsumexp(_pairwisePartitionDistribution_helper(m, k, log(τ),  log1p(-τ))  for m in EqualitySampler.partition_space(k))
 
 	hypo_counts = zeros(Int, k)
 	@showprogress for true_ρ in EqualitySampler.partition_space(k)
@@ -130,7 +130,7 @@ function compute_prior_performance(k::Integer, priors_sym, hypotheses)
 
 			for (l, s) in enumerate(priors_sym)
 
-				prob_ρ = get_prob_ρ(s, ρ, z_PairwiseMvUrnDistribution, z_westfallMvUrnDistribution)
+				prob_ρ = get_prob_ρ(s, ρ, z_PairwisePartitionDistribution, z_westfallPartitionDistribution)
 				α_fam_errors[l, j] += α_fam_error  * prob_ρ
 				α_errors[l, j]     += α_prop_error * prob_ρ
 				β_errors[l, j]     += β_prop_error * prob_ρ

@@ -42,15 +42,15 @@ end
 
 	Dset = (
 		(
-			dist = UniformMvUrnDistribution,
+			dist = UniformPartitionDistribution,
 			args = ks
 		),
 		(
-			dist = BetaBinomialMvUrnDistribution,
+			dist = BetaBinomialPartitionDistribution,
 			args = Iterators.product((ks, αs, βs)...)
 		),
 		(
-			dist = (k, α) -> RandomProcessMvUrnDistribution(k, Turing.RandomMeasures.DirichletProcess(α)),
+			dist = (k, α) -> RandomProcessPartitionDistribution(k, Turing.RandomMeasures.DirichletProcess(α)),
 			args = Iterators.product((ks, αs2)...)
 		)
 	)
@@ -83,7 +83,7 @@ end
 						@test efficient_incl_probs ≈ brute_force_incl_probs
 
 						# no. equalities is insufficient for model probabilities for DPP
-						if !(d isa RandomProcessMvUrnDistribution)
+						if !(d isa RandomProcessPartitionDistribution)
 							model_probs  = pdf_model.(Ref(d), 1:k)
 							model_counts = stirlings2.(k, 1:k) .* EqualitySampler.count_combinations.(k, 1:k)
 
@@ -104,7 +104,7 @@ end
 							v .= EqualitySampler.reduce_model(v)
 						end
 
-						if !(d isa RandomProcessMvUrnDistribution)
+						if !(d isa RandomProcessPartitionDistribution)
 
 							empirical_model_probs     = collect(values(EqualitySampler.empirical_model_probabilities(samples)))
 							expected_model_probs      = EqualitySampler.expected_model_probabilities(d)
@@ -123,7 +123,7 @@ end
 
 					end
 
-					if !(d isa RandomProcessMvUrnDistribution)
+					if !(d isa RandomProcessPartitionDistribution)
 						@testset "Batch computations match individual ones" begin
 
 							expected = EqualitySampler.log_expected_inclusion_probabilities(d)
@@ -141,7 +141,7 @@ end
 	@testset "logpdf_model_distinct works with DPP" begin
 
 		for k in 2:10
-			d = DirichletProcessMvUrnDistribution(k, .5)
+			d = DirichletProcessPartitionDistribution(k, .5)
 			m = Matrix(PartitionSpace(k))
 
 			lpdfs = mapslices(x->logpdf_model_distinct(d, x), m, dims = 1)
@@ -170,8 +170,8 @@ end
 
 		for k in 3:6
 
-			d_u  = UniformMvUrnDistribution(k)
-			d_bb = BetaBinomialMvUrnDistribution(k, k, 1)
+			d_u  = UniformPartitionDistribution(k)
+			d_bb = BetaBinomialPartitionDistribution(k, k, 1)
 			models = Matrix(PartitionSpace(k))
 			parameters = count_parameters.(eachcol(models))
 

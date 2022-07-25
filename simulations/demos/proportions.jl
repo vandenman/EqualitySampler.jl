@@ -18,9 +18,9 @@ scatter(journal_data[!, :journal], journal_data[!, :errors], ylims = (0, 1), yla
 @assert journal_data[!, :errors] ≈ journal_data[!, :perc_articles_with_errors] ./ 100
 
 make_title(d::BetaBinomial) = "Beta-binomial α=$(round_2_decimals(d.α)) β=$(round_2_decimals(d.β))"
-make_title(::UniformMvUrnDistribution) = "Uniform"
-make_title(d::BetaBinomialMvUrnDistribution) = "Beta-binomial α=$(round_2_decimals(d.α)) β=$(round_2_decimals(d.β))"
-make_title(d::RandomProcessMvUrnDistribution) = "Dirichlet Process α=$(round_2_decimals(d.rpm.α))"
+make_title(::UniformPartitionDistribution) = "Uniform"
+make_title(d::BetaBinomialPartitionDistribution) = "Beta-binomial α=$(round_2_decimals(d.α)) β=$(round_2_decimals(d.β))"
+make_title(d::RandomProcessPartitionDistribution) = "Dirichlet Process α=$(round_2_decimals(d.rpm.α))"
 make_title(::Nothing) = "Full model"
 
 function get_p_constrained(model, samps)
@@ -69,13 +69,13 @@ no_errors = round.(Int, journal_data[!, :x])
 
 priors = (
 	full = nothing,
-	DPP1 = DirichletProcessMvUrnDistribution(length(no_errors), 0.5),
-	DPP2 = DirichletProcessMvUrnDistribution(length(no_errors), 1.0),
-	DPP3 = DirichletProcessMvUrnDistribution(length(no_errors), 2.0),
-	Betabinomial1 = BetaBinomialMvUrnDistribution(length(no_errors), 1, 1),
-	Betabinomial2 = BetaBinomialMvUrnDistribution(length(no_errors), 1, length(no_errors)),
-	Betabinomial3 = BetaBinomialMvUrnDistribution(length(no_errors), 1, binomial(length(no_errors), 2)),
-	Uniform = UniformMvUrnDistribution(length(no_errors))
+	DPP1 = DirichletProcessPartitionDistribution(length(no_errors), 0.5),
+	DPP2 = DirichletProcessPartitionDistribution(length(no_errors), 1.0),
+	DPP3 = DirichletProcessPartitionDistribution(length(no_errors), 2.0),
+	Betabinomial1 = BetaBinomialPartitionDistribution(length(no_errors), 1, 1),
+	Betabinomial2 = BetaBinomialPartitionDistribution(length(no_errors), 1, length(no_errors)),
+	Betabinomial3 = BetaBinomialPartitionDistribution(length(no_errors), 1, binomial(length(no_errors), 2)),
+	Uniform = UniformPartitionDistribution(length(no_errors))
 )
 
 fits_file = joinpath(pwd(), "simulations", "demos", "saved_objects", "proportions_fits.jld2")

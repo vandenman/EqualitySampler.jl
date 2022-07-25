@@ -8,16 +8,16 @@ import Logging, Random, Statistics
 function instantiate_prior(symbol::Symbol, k::Integer)
 	# this works nicely with jld2 but it's not type stable
 
-	symbol == :uniform				&&	return EqualitySampler.UniformMvUrnDistribution(k)
-	symbol == :BetaBinomial11		&&	return EqualitySampler.BetaBinomialMvUrnDistribution(k, 1.0, 1.0)
-	symbol == :BetaBinomialk1		&&	return EqualitySampler.BetaBinomialMvUrnDistribution(k, k, 1.0)
-	symbol == :BetaBinomial1k		&&	return EqualitySampler.BetaBinomialMvUrnDistribution(k, 1.0, k)
-	symbol == :BetaBinomial1binomk2	&&	return EqualitySampler.BetaBinomialMvUrnDistribution(k, 1.0, binomial(k, 2))
-	symbol == :DirichletProcess0_5	&&	return EqualitySampler.DirichletProcessMvUrnDistribution(k, 0.5)
-	symbol == :DirichletProcess1_0	&&	return EqualitySampler.DirichletProcessMvUrnDistribution(k, 1.0)
-	symbol == :DirichletProcess2_0	&&	return EqualitySampler.DirichletProcessMvUrnDistribution(k, 2.0)
+	symbol == :uniform				&&	return EqualitySampler.UniformPartitionDistribution(k)
+	symbol == :BetaBinomial11		&&	return EqualitySampler.BetaBinomialPartitionDistribution(k, 1.0, 1.0)
+	symbol == :BetaBinomialk1		&&	return EqualitySampler.BetaBinomialPartitionDistribution(k, k, 1.0)
+	symbol == :BetaBinomial1k		&&	return EqualitySampler.BetaBinomialPartitionDistribution(k, 1.0, k)
+	symbol == :BetaBinomial1binomk2	&&	return EqualitySampler.BetaBinomialPartitionDistribution(k, 1.0, binomial(k, 2))
+	symbol == :DirichletProcess0_5	&&	return EqualitySampler.DirichletProcessPartitionDistribution(k, 0.5)
+	symbol == :DirichletProcess1_0	&&	return EqualitySampler.DirichletProcessPartitionDistribution(k, 1.0)
+	symbol == :DirichletProcess2_0	&&	return EqualitySampler.DirichletProcessPartitionDistribution(k, 2.0)
 	# symbol == :DirichletProcessGP	&&
-	return EqualitySampler.DirichletProcessMvUrnDistribution(k, :Gopalan_Berry)
+	return EqualitySampler.DirichletProcessPartitionDistribution(k, :Gopalan_Berry)
 
 end
 
@@ -225,7 +225,7 @@ function sample_true_model(rng::Random.AbstractRNG, hypothesis::Symbol, n_groups
 		logpdf_idx_one = (n_groups-1) * percentage ÷ 100 + 1
 		logpdf = ntuple(i->log(i==logpdf_idx_one), n_groups)
 
-		return rand(rng, EqualitySampler.CustomInclusionMvUrnDistribution(n_groups, logpdf))
+		return rand(rng, EqualitySampler.CustomInclusionPartitionDistribution(n_groups, logpdf))
 
 	end
 end

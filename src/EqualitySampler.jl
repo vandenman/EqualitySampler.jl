@@ -48,7 +48,7 @@ export
 			also use PDMats.invquad and friends
 
 		- [ ] consider renaming "model" to "partition" everywhere. For example,
-			AbstractMvUrnDistribution	-> AbstractPartitionDistribution
+			AbstractPartitionDistribution	-> AbstractPartitionDistribution
 			reduce_model 				-> normalize_partition
 
 
@@ -78,12 +78,12 @@ export
 
 	PartitionSpace,
 
-	AbstractMvUrnDistribution,
-	UniformMvUrnDistribution,
-	BetaBinomialMvUrnDistribution,
-	CustomInclusionMvUrnDistribution,
-	RandomProcessMvUrnDistribution,
-	DirichletProcessMvUrnDistribution,
+	AbstractPartitionDistribution,
+	UniformPartitionDistribution,
+	BetaBinomialPartitionDistribution,
+	CustomInclusionPartitionDistribution,
+	RandomProcessPartitionDistribution,
+	DirichletProcessPartitionDistribution,
 
 	pdf_model,
 	pdf_model_distinct,

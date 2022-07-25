@@ -6,8 +6,8 @@
 
 	Distributions:
 
-		UniformMvUrnDistribution
-		BetaBinomialMvUrnDistribution
+		UniformPartitionDistribution
+		BetaBinomialPartitionDistribution
 		DirichletProcessDistribution (Chinese restaurant process)
 
 =#
@@ -26,21 +26,21 @@ round_2_decimals(x) = x
 
 include("plot_partitions (Figure 1).jl")
 
-updateDistribution(d::UniformMvUrnDistribution, args) = d
-updateDistribution(d::BetaBinomialMvUrnDistribution, args) = BetaBinomialMvUrnDistribution(d.k, args...)
-updateDistribution(d::RandomProcessMvUrnDistribution, args) = DirichletProcessMvUrnDistribution(d.k, args...)
+updateDistribution(d::UniformPartitionDistribution, args) = d
+updateDistribution(d::BetaBinomialPartitionDistribution, args) = BetaBinomialPartitionDistribution(d.k, args...)
+updateDistribution(d::RandomProcessPartitionDistribution, args) = DirichletProcessPartitionDistribution(d.k, args...)
 
-make_title_wide(::UniformMvUrnDistribution) = "Uniform"
-make_title_wide(d::BetaBinomialMvUrnDistribution) = "BetaBinomial α=$(d.α) β=$(d.β)"
-make_title_wide(d::RandomProcessMvUrnDistribution) = "Dirichlet Process α=$(d.rpm.α)"
+make_title_wide(::UniformPartitionDistribution) = "Uniform"
+make_title_wide(d::BetaBinomialPartitionDistribution) = "BetaBinomial α=$(d.α) β=$(d.β)"
+make_title_wide(d::RandomProcessPartitionDistribution) = "Dirichlet Process α=$(d.rpm.α)"
 
-make_title(::Type{UniformMvUrnDistribution{Int64}}) = "Uniform prior"
-make_title(::Type{BetaBinomialMvUrnDistribution{Int64}}) = "Beta-binomial prior"
-make_title(::Type{RandomProcessMvUrnDistribution{DirichletProcess{Float64}, Int64}}) = "Dirichlet process prior"
+make_title(::Type{UniformPartitionDistribution{Int64}}) = "Uniform prior"
+make_title(::Type{BetaBinomialPartitionDistribution{Int64}}) = "Beta-binomial prior"
+make_title(::Type{RandomProcessPartitionDistribution{DirichletProcess{Float64}, Int64}}) = "Dirichlet process prior"
 
-make_label(::Type{UniformMvUrnDistribution{Int64}}, args) = nothing
-make_label(::Type{BetaBinomialMvUrnDistribution{Int64}}, args) = "α=$(round_2_decimals(args[1])) β=$(round_2_decimals(args[2]))"
-make_label(::Type{RandomProcessMvUrnDistribution{DirichletProcess{Float64}, Int64}}, args) = "α=$(round_2_decimals(args[1]))"
+make_label(::Type{UniformPartitionDistribution{Int64}}, args) = nothing
+make_label(::Type{BetaBinomialPartitionDistribution{Int64}}, args) = "α=$(round_2_decimals(args[1])) β=$(round_2_decimals(args[2]))"
+make_label(::Type{RandomProcessPartitionDistribution{DirichletProcess{Float64}, Int64}}, args) = "α=$(round_2_decimals(args[1]))"
 
 function get_data(k, priors)
 
@@ -214,12 +214,12 @@ function make_all_plots(dfg, dfg_incl;
 
 
 
-		if subdf[1, :distribution]<: UniformMvUrnDistribution
+		if subdf[1, :distribution]<: UniformPartitionDistribution
 			legend_position = :none
 		else
 			legend_position = (0.6, 0.96)#:topright
 			# legend_position = :top#right
-			if subdf[1, :distribution]<: BetaBinomialMvUrnDistribution
+			if subdf[1, :distribution]<: BetaBinomialPartitionDistribution
 				start = 4
 				labels = labels[:, [1, 3, 2]]
 			else
@@ -231,7 +231,7 @@ function make_all_plots(dfg, dfg_incl;
 			end
 		end
 
-		if subdf[1, :distribution] <: RandomProcessMvUrnDistribution{DirichletProcess{Float64}, Int64}
+		if subdf[1, :distribution] <: RandomProcessPartitionDistribution{DirichletProcess{Float64}, Int64}
 			legend_position = (0.8, 0.96)#:top#right
 			# y = y[:, [2, 1, 3]]
 			labels = labels[:, [2, 1, 3]]
@@ -275,7 +275,7 @@ function make_all_plots(dfg, dfg_incl;
 			y[:, j] .= subdf_incl[j, :value]
 		end
 
-		if subdf[1, :distribution] <: RandomProcessMvUrnDistribution{DirichletProcess{Float64}, Int64}
+		if subdf[1, :distribution] <: RandomProcessPartitionDistribution{DirichletProcess{Float64}, Int64}
 			y = y[:, [2, 1, 3]]
 		end
 

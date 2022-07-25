@@ -85,7 +85,7 @@ count_parameters(urns::AbstractString) = length(Set(urns))
 count_parameters(urns::AbstractVector{<:Integer}) = no_distinct_groups_in_partition(urns)
 
 # _pdf_uniform_helper exists so that it can also be used by the multivariate distribution
-function _pdf_helper(d::AbstractMvUrnDistribution{T}, index::T, complete_urns::AbstractVector{T}) where T<:Integer
+function _pdf_helper(d::AbstractPartitionDistribution{T}, index::T, complete_urns::AbstractVector{T}) where T<:Integer
 
 	k = length(complete_urns)
 	result = zeros(Float64, length(complete_urns))
@@ -94,7 +94,7 @@ function _pdf_helper(d::AbstractMvUrnDistribution{T}, index::T, complete_urns::A
 
 end
 
-function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, ::UniformMvUrnDistribution{T}, index::T, complete_urns::AbstractVector{T}) where T<:Integer
+function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, ::UniformPartitionDistribution{T}, index::T, complete_urns::AbstractVector{T}) where T<:Integer
 
 	k = length(result)
 	if isone(index)
@@ -122,7 +122,7 @@ function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, ::UniformMvUrnDis
 end
 
 function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, d::T, index::U, complete_urns::AbstractVector{U}) where
-	{U<:Integer, T<:Union{BetaBinomialMvUrnDistribution{U}, CustomInclusionMvUrnDistribution}}
+	{U<:Integer, T<:Union{BetaBinomialPartitionDistribution{U}, CustomInclusionPartitionDistribution}}
 
 	k = length(result)
 	if isone(index)
@@ -169,29 +169,29 @@ log_expected_equality_counts(k::Integer) = logstirlings2.(k, 1:k)
 log_expected_equality_counts(k::Integer, j::Integer) = logstirlings2(k, j)
 
 
-expected_model_probabilities(d::UniformMvUrnDistribution) = expected_model_probabilities(length(d))
-expected_inclusion_counts(d::UniformMvUrnDistribution) = expected_inclusion_counts(length(d))
-expected_inclusion_probabilities(d::UniformMvUrnDistribution) = expected_inclusion_probabilities(length(d))
-log_expected_equality_counts(d::UniformMvUrnDistribution) = log_expected_equality_counts(length(d))
-function log_expected_inclusion_probabilities(d::UniformMvUrnDistribution)
+expected_model_probabilities(d::UniformPartitionDistribution) = expected_model_probabilities(length(d))
+expected_inclusion_counts(d::UniformPartitionDistribution) = expected_inclusion_counts(length(d))
+expected_inclusion_probabilities(d::UniformPartitionDistribution) = expected_inclusion_probabilities(length(d))
+log_expected_equality_counts(d::UniformPartitionDistribution) = log_expected_equality_counts(length(d))
+function log_expected_inclusion_probabilities(d::UniformPartitionDistribution)
 	vals = log_expected_equality_counts(length(d))
 	z = LogExpFunctions.logsumexp(vals)
 	return vals .- z
 end
 
-function expected_inclusion_probabilities(d::BetaBinomialMvUrnDistribution)
+function expected_inclusion_probabilities(d::BetaBinomialPartitionDistribution)
 	# return exp.(d._log_model_probs_by_incl)
 	k = length(d) - 1
 	return Distributions.pdf.(Distributions.BetaBinomial(k, d.α, d.β), 0:k)
 end
 
-function log_expected_inclusion_probabilities(d::BetaBinomialMvUrnDistribution)
+function log_expected_inclusion_probabilities(d::BetaBinomialPartitionDistribution)
 	k = length(d) - 1
 	return Distributions.logpdf.(Distributions.BetaBinomial(k, d.α, d.β), 0:k)
 end
 
 
-function expected_model_probabilities(d::BetaBinomialMvUrnDistribution, compact::Bool = false)
+function expected_model_probabilities(d::BetaBinomialPartitionDistribution, compact::Bool = false)
 	incl_probs  = expected_inclusion_probabilities(d)
 	no_models_with_incl = expected_inclusion_counts(length(d))
 	probs = incl_probs ./ no_models_with_incl
