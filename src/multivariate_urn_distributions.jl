@@ -1,15 +1,8 @@
-#= NOTES
-
-	*_distinct	does NOT account for duplicate configurations. For example, [1, 1, 1] is     the only null model and [2, 2, 2] does NOT exist
-	*			does     account for duplicate configurations. For example, [1, 1, 1] is NOT the only null model and [2, 2, 2] does     exist (and so does [3, 3, 3])
-
-=#
-
-
-
 #region AbstractPartitionDistribution
 """
+```
 AbstractPartitionDistribution{<:Integer} <: Distributions.DiscreteMultivariateDistribution
+```
 
 Supertype for distributions over partitions.
 """
@@ -56,7 +49,9 @@ end
 
 # TODO: rename no_parameters
 """
+```
 logpdf_incl(d::AbstractPartitionDistribution, no_parameters::Integers)
+```
 
 Log probability of all partitions with a particular number of parameters.
 """
@@ -66,7 +61,9 @@ function logpdf_incl(d::AbstractPartitionDistribution, no_parameters::T) where T
 	logpdf_model_distinct(d, no_parameters) + logstirlings2(k, no_parameters)
 end
 """
+```
 pdf_incl(d::AbstractPartitionDistribution, no_parameters::Integers)
+```
 
 Probability of all partitions with a particular number of parameters.
 """
@@ -74,8 +71,10 @@ pdf_incl(d::AbstractPartitionDistribution,  no_parameters) = exp(logpdf_incl(d, 
 
 
 """
+```
 logpdf_model(d::AbstractPartitionDistribution, x::Integer)
 logpdf_model(d::AbstractPartitionDistribution, x::AbstractVector{<:Integer})
+```
 
 Synonym for `logpdf(d::AbstractPartitionDistribution, x)`, computes the log probability of a partition.
 """
@@ -86,14 +85,18 @@ end
 logpdf_model(d::AbstractPartitionDistribution, x::AbstractVector{T}) where T <: Integer = logpdf_model_distinct(d, x) - log_count_combinations(x)
 
 """
+```
 pdf_model(d::AbstractPartitionDistribution, x::Integer)
 pdf_model(d::AbstractPartitionDistribution, x::AbstractVector{<:Integer})
+```
 
 Synonym for `pdf(d::AbstractPartitionDistribution, x)`, computes the probability of a partition.
 """
 pdf_model(d::AbstractPartitionDistribution, x) = exp(logpdf_model(d, x))
 """
+```
 pdf_model_distinct(d::AbstractPartitionDistribution, x)
+```
 
 Computes the probability of a partition without considering duplicated partitions (i.e., assuming all partitions are unique).
 """
@@ -105,7 +108,9 @@ Distributions.logpdf(d::AbstractPartitionDistribution, x::AbstractVector{T}) whe
 
 #region UniformPartitionDistribution
 """
+```
 UniformPartitionDistribution{T <: Integer} <: AbstractPartitionDistribution{T}
+```
 
 Uniform distribution over partitions.
 """
@@ -116,7 +121,9 @@ end
 
 
 """
+```
 logpdf_model_distinct(d::AbstractPartitionDistribution, x)
+```
 
 Computes the log probability of a partition without considering duplicated partitions (i.e., assuming all partitions are unique).
 """
@@ -129,10 +136,12 @@ logpdf_model_distinct(d::UniformPartitionDistribution, ::T) where T <: Integer =
 
 #region BetaBinomialPartitionDistribution
 """
+```
 BetaBinomialPartitionDistribution{T <: Integer} <: AbstractPartitionDistribution{T}
+```
 
 Beta binomial distribution over partitions.
-If ``\\rho \\sim \\text{BetaBinomialPartitionDistribution}(k, \\alpha, \\beta)`` then ``\\text{count_parameters}(\\rho)\\sim \\text{BetaBinomial}(k - 1, \\alpha, \\beta)``.
+If ``\\rho \\sim \\text{BetaBinomialPartitionDistribution}(k, \\alpha, \\beta)`` then ``\\text{count\\_parameters}(\\rho) \\sim \\text{BetaBinomial}(k - 1, \\alpha, \\beta)``.
 
 """
 struct BetaBinomialPartitionDistribution{T <: Integer} <: AbstractPartitionDistribution{T}
@@ -208,7 +217,9 @@ end
 
 #endregion
 """
+```
 RandomProcessPartitionDistribution{RPM <: Turing.RandomMeasures.AbstractRandomProbabilityMeasure, T <: Integer} <: AbstractPartitionDistribution{T}
+```
 
 Distribution over partitions defined by a Random Probabiltiy Measure (RPM) as defined in Turing.RandomMeasures.
 """
@@ -219,9 +230,11 @@ end
 rpm(d::RandomProcessPartitionDistribution) = d.rpm
 
 """
+```
 DirichletProcessPartitionDistribution(k::Integer, α::Float64)
 DirichletProcessPartitionDistribution(k::Integer, ::Symbol = :Gopalan_Berry)
 DirichletProcessPartitionDistribution(k::Integer, α::Real)
+```
 
 Wrapper function to create an object representing a Dirichlet process prior. These call RandomProcessPartitionDistribution but are a bit more user friendly.
 Either set α directly by passing a float, or pass (any) symbol to use `EqualitySampler.dpp_find_α` to specify α, which uses the heuristic by

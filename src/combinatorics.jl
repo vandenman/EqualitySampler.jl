@@ -9,7 +9,7 @@ For example, given "1122" we have k = 4 and islands = 2.
 Note that s may contains spaces, e.g., "11 22 33" will be interpreted as "112233"
 
 # Examples
-```jldoctest
+```julia
 julia> count_combinations(3, 1)
 3
 julia> count_combinations("111") # 111, 222, 333

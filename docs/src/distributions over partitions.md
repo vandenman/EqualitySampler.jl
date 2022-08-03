@@ -11,7 +11,7 @@ RandomProcessPartitionDistribution
 
 Aside from the interface for multivariate distributions, the following methods are also defined.
 ```@docs
-pdf_model,
+pdf_model
 logpdf_model
 pdf_model_distinct
 logpdf_model_distinct

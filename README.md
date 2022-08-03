@@ -1,4 +1,4 @@
-# EqualitySampler - a Julia package for sampling equality constraints
+# EqualitySampler.jl - a Julia package for sampling equality constraints
 
 [![Docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://vandenman.github.io/EqualitySampler/dev/)
 [![Build Status](https://github.com/vandenman/EqualitySampler/workflows/runtests/badge.svg)](https://github.com/vandenman/EqualitySampler/EqualitySampler/actions)
@@ -18,13 +18,13 @@ julia> import Pkg; Pkg.add("EqualitySampler")
 
 # Functionality
 
-This package defines four distributions over [partitions of a set](https://en.wikipedia.org/wiki/Partition_of_a_set):
-- `UniformMvUrnDistribution`
-- `BetaBinomialMvUrnDistribution`
-- `RandomProcessMvUrnDistribution`
-- `CustomInclusionMvUrnDistribution`
+*EqualitySampler* defines four distributions over [partitions of a set](https://en.wikipedia.org/wiki/Partition_of_a_set):
+- `UniformPartitionDistribution`
+- `BetaBinomialPartitionDistribution`
+- `CustomInclusionPartitionDistribution`
+- `RandomProcessPartitionDistribution`
 
-Each of these is a subtype of the abstract type `AbstractMvUrnDistribution`, which is a subtype of [`Distributions.DiscreteMultivariateDistribution`](https://juliastats.org/Distributions.jl/stable/multivariate/#multivariates).
+Each of these is a subtype of the abstract type `AbstractPartitionDistribution`, which is a subtype of [`Distributions.DiscreteMultivariateDistribution`](https://juliastats.org/Distributions.jl/stable/multivariate/#multivariates).
 
 Thus, each of these types can be called with e.g., `rand` and `logpdf`.
 
@@ -50,7 +50,7 @@ The main reason for this is that in a Gibbs sampling scheme, a transition from `
 ```julia
 using EqualitySampler, Distributions
 n_groups  = 5
-true_partition     = rand(UniformMvUrnDistribution(n_groups))
+true_partition     = rand(UniformPartitionDistribution(n_groups))
 true_probabilities = average_equality_constraints
 obs_counts    = rand(100:200, n_groups)
 obs_successes =
@@ -63,23 +63,23 @@ For example, one could do
 ```julia
 @model function hotellingsT(x)
 
-	p = size(x, 2)
-	# partition prior
-	partition ~ BetaBinomialMvUrnDistrbiution(p, 1, p)
+    p = size(x, 2)
+    # partition prior
+    partition ~ BetaBinomialPartitionDistrbiution(p, 1, p)
 
-	# right Haar prior on the grand mean and standard deviation
-	μ    ~ Turing.Flat()
-	logσ ~ Turing.Flat()
+    # right Haar prior on the grand mean and standard deviation
+    μ ~ Turing.Flat()
+    logσ ~ Turing.Flat()
 
-	σ = exp(logσ)
+    σ = exp(logσ)
 
-	# prior on unconstrained offsets
-	θ  ~ MvNormal(p, 5)
-	# constrains offsets according to
-	θc = EqualitySampler.average_equality_constraints(θ .- mean(θ), partition)
+    # prior on unconstrained offsets
+    θ ~ MvNormal(p, 5)
+    # constrains offsets according to
+    θc = EqualitySampler.average_equality_constraints(θ .- mean(θ), partition)
 
-	# Likelihood
-	x  ~ MvNormal(θc, σ)
+    # Likelihood
+    x ~ MvNormal(θc, σ)
 
 end
 ```

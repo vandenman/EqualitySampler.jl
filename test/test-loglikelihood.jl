@@ -58,15 +58,11 @@ end
 		x = rand(D, n)
 		refvalue = loglikelihood(D, x)
 
-		# obs_mean, obs_cov, n = get_normal_dense_suff_stats(x)
-		# D1 = MvNormalDenseSuffStat(obs_cov, n, pop_mu, pop_Σ)
-		# testvalue1 = logpdf(D1, obs_mean)
-		# @test refvalue ≈ testvalue1
 
-		obs_mean, obs_cov_chol, n_obs = get_normal_dense_chol_suff_stats(x)
-		# D2 = MvNormalCholDenseSuffStat(obs_cov_chol, n, pop_mu, pop_Σ_chol)
-		testvalue2 = logpdf_mv_normal_chol_suffstat(obs_mean, obs_cov_chol, n_obs, pop_mu, pop_Σ_chol)
-		@test refvalue ≈ testvalue2
+		ss = suffstats(MvNormal, x)
+		testvalue = @inferred loglikelihood_suffstats(D, ss)
+
+		@test refvalue ≈ testvalue
 
 	end
 end
