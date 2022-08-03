@@ -2,11 +2,11 @@
 
 The following distributions are implemented.
 ```@docs
-AbstractMvUrnDistribution
-UniformMvUrnDistribution
-BetaBinomialMvUrnDistribution
-CustomInclusionMvUrnDistribution
-RandomProcessMvUrnDistribution
+AbstractPartitionDistribution
+UniformPartitionDistribution
+BetaBinomialPartitionDistribution
+CustomInclusionPartitionDistribution
+RandomProcessPartitionDistribution
 ```
 
 Aside from the interface for multivariate distributions, the following methods are also defined.
