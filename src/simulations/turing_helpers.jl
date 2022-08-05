@@ -51,11 +51,7 @@ end
 #endregion
 
 get_eq_ind_nms(samples::MCMCChains.Chains) = filter(x->startswith(string(x), "partition"), samples.name_map.parameters)
-function get_eq_samples(samples::MCMCChains.Chains)
-	eq_ind_nms = get_eq_ind_nms(samples)
-	s = size(samples[eq_ind_nms])
-	return reshape(samples[eq_ind_nms].value.data, :, s[2])
-end
+get_eq_samples(samples::MCMCChains.Chains) = Array(samples[get_eq_ind_nms(samples)])
 
 
 """

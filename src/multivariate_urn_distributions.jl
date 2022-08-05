@@ -180,6 +180,10 @@ end
 
 #region CustomInclusionPartitionDistribution
 """
+```
+CustomInclusionPartitionDistribution(k::T, logpdf::NTuple{N, Float64})
+```
+
 CustomInclusionPartitionDistribution is similar to the BetaBinomialPartitionDistribution in that the model probabilities are completely determined by the size of the partition.
 Whereas the BetaBinomialPartitionDistribution uses a BetaBinomial distribution to obtain the probabilities, the CustomInclusionPartitionDistribution can be used to specify any vector of probabilities.
 This distribution is particularly useful to sample uniformly from partitions of a given size.

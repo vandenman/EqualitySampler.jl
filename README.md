@@ -48,18 +48,19 @@ The main reason for this is that in a Gibbs sampling scheme, a transition from `
 `proportion_test`
 
 ```julia
-using EqualitySampler, Distributions
+using EqualitySampler, EqualitySampler.Simulations
 n_groups  = 5
 true_partition     = rand(UniformPartitionDistribution(n_groups))
 true_probabilities = average_equality_constraints
 obs_counts    = rand(100:200, n_groups)
-obs_successes =
+obs_successes = rand(product_distribution(Binomial.()))
+chn = proportion_test(obs_counts, obs_successes)
 ```
 
 # Use in Turing models
 
 The distributions over partitions can be used in Turing models.
-For example, one could do
+For example, to test equalities among multiple groups with the same variance one could do the following:
 ```julia
 @model function hotellingsT(x)
 
@@ -71,6 +72,7 @@ For example, one could do
     μ ~ Turing.Flat()
     logσ ~ Turing.Flat()
 
+    # transform to standard deviation
     σ = exp(logσ)
 
     # prior on unconstrained offsets
@@ -83,4 +85,8 @@ For example, one could do
 
 end
 ```
-Note: there is a better way than `θ .- mean(θ)`!
+Note that there is a better way than `θ .- mean(θ)` by sampling from a `p-1` dimensional unconstrained space and afterward transforming to a constrained `p` dimensional space with mean zero.
+
+# Supplementary Analyses
+The simulations and analyses for the manuscript 'Flexible Bayesian Multiple Comparison Adjustment Using Dirichlet Process and Beta-Binomial Model Priors' are in the folder "simulations".
+Note that this folders is a Julia project, so in order to rerun the simulations it's necessary to first activate and instantiate the project.

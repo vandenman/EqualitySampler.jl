@@ -9,8 +9,6 @@ import JLD2, KernelDensity, Printf, ColorSchemes, Colors
 round_2_decimals(x::Number) = Printf.@sprintf "%.2f" x
 round_2_decimals(x) = x
 
-include("../anovaFunctions.jl")
-
 journal_data = DF.DataFrame(CSV.File(joinpath("simulations", "demos", "data", "journal_data.csv")))
 
 scatter(journal_data[!, :journal], journal_data[!, :errors], ylims = (0, 1), ylab = "Proportion of statistical reporting errors", label = nothing)

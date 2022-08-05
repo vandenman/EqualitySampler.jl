@@ -1,14 +1,15 @@
-DynamicPPL.@model function proportion_model_full(no_errors, total_counts, partition = nothing, ::Type{T} = Float64) where T
+DynamicPPL.@model function proportion_model_full(successes, observations, partition = nothing, ::Type{T} = Float64) where T
 
-	p_raw ~ DistributionsAD.filldist(Distributions.Beta(1.0, 1.0), length(no_errors))
+	# Distributions.Beta() defaults to Distributions.Beta(1.0, 1.0)
+	p_raw ~ DistributionsAD.filldist(Distributions.Beta(), length(successes))
 	p_constrained = isnothing(partition) ? p_raw : average_equality_constraints(p_raw, partition)
-	no_errors ~ Distributions.Product(Distributions.Binomial.(total_counts, p_constrained))
+	successes ~ Distributions.product_distribution(Distributions.Binomial.(observations, p_constrained))
 	return p_constrained
 end
 
-DynamicPPL.@model function proportion_model_equality_selector(no_errors, total_counts, partition_prior)
+DynamicPPL.@model function proportion_model_equality_selector(successes, observations, partition_prior)
 	partition ~ partition_prior
-	DynamicPPL.@submodel prefix="inner" p = proportion_model_full(no_errors, total_counts, partition)
+	DynamicPPL.@submodel prefix="inner" p = proportion_model_full(successes, observations, partition)
 	return p
 end
 
@@ -22,12 +23,12 @@ function get_p_constrained(model, samps)
 	return vec(mean(clean_result, dims = 2)), clean_result
 end
 
-function get_proportion_model(no_errors, total_counts, partition_prior)
+function get_proportion_model(successes, observations, partition_prior)
 
 	if isnothing(partition_prior)
-		model = proportion_model_full(no_errors, total_counts)
+		model = proportion_model_full(successes, observations)
 	else
-		model = proportion_model_equality_selector(no_errors, total_counts, partition_prior)
+		model = proportion_model_equality_selector(successes, observations, partition_prior)
 	end
 
 	return model
@@ -36,14 +37,20 @@ end
 get_proportion_sampler(model, spl::Symbol, ϵ::Float64, n_leapfrog::Int) = get_sampler(model, spl, ϵ, n_leapfrog)
 get_proportion_sampler(model, spl::Turing.Inference.InferenceAlgorithm, ::Float64, ::Int) = spl
 
+"""
+$(TYPEDSIGNATURES)
 
+Fit independent binomials to the successes and observations.
+If `partition_prior === nothing` then no constraints are imposed on the probabilities.
+Otherwise, the model samples equalities among the proportions using the `partition_prior` as prior distribution.
+"""
 function proportion_test(
 		successes::AbstractVector{T}, observations::AbstractVector{T},
 		partition_prior::Union{Nothing, AbstractPartitionDistribution}
 		;
 		spl::Union{Symbol, Turing.Inference.InferenceAlgorithm} = :custom,
 		mcmc_settings::MCMCSettings = MCMCSettings(),
-		ϵ::Float64 = 0.0,
+		ϵ::Float64 = 0.05,
 		n_leapfrog::Int = 20,
 		kwargs...
 	) where T<:Integer
@@ -57,6 +64,10 @@ function proportion_test(
 	sampler = get_proportion_sampler(model, spl, ϵ, n_leapfrog)
 
 	chain = sample_model(model, sampler, mcmc_settings; kwargs...);
-	return combine_chain_with_generated_quantities(model, chain, "p_constrained")
+	if isnothing(partition_prior)
+		return chain
+	else
+		return combine_chain_with_generated_quantities(model, chain, "p_constrained")
+	end
 
 end

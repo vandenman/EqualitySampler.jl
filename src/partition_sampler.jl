@@ -58,7 +58,6 @@ function sample_next_values(c, o)
 
 		probvec_normalized = exp.(probvec .- LogExpFunctions.logsumexp(probvec))
 		if !Distributions.isprobvec(probvec_normalized)
-			@show probvec, probvec_normalized
 			@warn "probvec condition not satisfied! trying to normalize once more"
 			probvec_normalized ./= sum(probvec_normalized)
 		end
@@ -70,10 +69,10 @@ function sample_next_values(c, o)
 			# increment the occurence of the newly sampled value
 			present_labels[nextValues[j]] += 1
 
-			if !all(>=(0), present_labels) || sum(present_labels) != length(present_labels)
-				@show present_labels
-				error("This should be impossible!")
-			end
+			# if !all(>=(0), present_labels) || sum(present_labels) != length(present_labels)
+			# 	@show present_labels
+			# 	error("This should be impossible!")
+			# end
 
 		elseif all(isinf, probvec) # not possible to recover from this
 			return nextValues

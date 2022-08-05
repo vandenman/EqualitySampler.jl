@@ -297,7 +297,8 @@ DynamicPPL.@model function one_way_anova_mv_ss_submodel(suff_stats_vec, Q, parti
 	θ_cs = isnothing(partition) ? θ_s : average_equality_constraints(θ_s, partition)
 
 	# definition from Rouder et. al., (2012) eq 6.
-	@inbounds for i in eachindex(suff_stats_vec)
+	# @inbounds
+	for i in eachindex(suff_stats_vec)
 		Turing.@addlogprob! loglikelihood_suffstats(Distributions.Normal(μ_grand + sqrt(σ²) * θ_cs[i], sqrt(σ²)), suff_stats_vec[i])
 	end
 
@@ -463,7 +464,7 @@ function fit_full_model(
 	end
 
 	mcmc_sampler = get_mcmc_sampler_anova(spl, model)
-	chain = sample_model(model, mcmc_sampler, mcmc_settings, rng; init_params = init_params)::MCMCChains.Chains
+	chain = sample_model(model, mcmc_sampler, mcmc_settings; init_params = init_params)::MCMCChains.Chains
 
 	if modeltype === :old
 		return combine_chain_with_generated_quantities(model, chain, "θ_cs")
@@ -524,8 +525,15 @@ function combine_chain_with_generated_quantities(model, chain, parameter_name::A
 	constrained_samples = get_generated_quantities(model, chain)
 	new_dims = (size(chain, 1), size(constrained_samples, 2), size(chain, 3))
 
+	# my reshape-foo is not good enough to avoid this
+	reshaped_constrained_samples = Array{Float64}(undef, new_dims)
+	for i in 1:size(chain, 3)
+		idx = 1 + size(chain, 1) * (i - 1) : size(chain, 1) * i
+		reshaped_constrained_samples[:, :, i] .= view(constrained_samples, idx, :)
+	end
+
 	constrained_chain = MCMCChains.setrange(
-		MCMCChains.Chains(reshape(constrained_samples, new_dims), collect(Symbol(parameter_name, "["* string(i) * "]") for i in axes(constrained_samples, 2))),
+		MCMCChains.Chains(reshaped_constrained_samples, collect(Symbol(parameter_name, "["* string(i) * "]") for i in axes(constrained_samples, 2))),
 		range(chain)
 	)
 
