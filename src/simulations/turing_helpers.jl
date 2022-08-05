@@ -3,7 +3,7 @@ function get_logπ(model)
 	vari = DynamicPPL.VarInfo(model)
 	mt = vari.metadata
 	return function logπ(partition, nt)
-		DynamicPPL.setval!(vari, partition, DynamicPPL.VarName(:partition))
+		DynamicPPL.setval!(vari, partition, DynamicPPL.VarName{:partition}())
 		for (key, val) in zip(keys(nt), nt)
 			if key !== :partition
 				indices = mt[key].vns
