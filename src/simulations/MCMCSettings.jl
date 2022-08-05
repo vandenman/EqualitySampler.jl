@@ -19,7 +19,7 @@ struct MCMCSettings{T<:Integer, U<:AbstractMCMC.AbstractMCMCEnsemble}
 
 	Internal constructor.
 	"""
-	function MCMCSettings(iterations::T, burnin::T, chains::T, thinning::T, ::U; check_args::Bool=true) where {T<:Integer, U<:AbstractMCMC.AbstractMCMCEnsemble}
+	function MCMCSettings(iterations::T, burnin::T, chains::T, thinning::T, ::Type{U}; check_args::Bool=true) where {T<:Integer, U<:AbstractMCMC.AbstractMCMCEnsemble}
 		if check_args
 			iterations <= zero(T)	&& throw(DomainError(iterations, "iterations must be positive!"))
 			burnin <= zero(T)		&& throw(DomainError(burnin, "burnin must be positive!"))
@@ -33,7 +33,7 @@ end
 """
 $(TYPEDSIGNATURES)
 """
-function MCMCSettings(iterations::Integer, burnin::Integer, chains::Integer, thinning::Integer, parallel::AbstractMCMC.AbstractMCMCEnsemble=AbstractMCMC.MCMCSerial())
+function MCMCSettings(iterations::Integer, burnin::Integer, chains::Integer, thinning::Integer, parallel::Type{U}=AbstractMCMC.MCMCSerial) where U<:AbstractMCMC.AbstractMCMCEnsemble
 	iterations, burnin, chains, thinning = promote(iterations, burnin, chains, thinning)
 	return MCMCSettings(iterations, burnin, chains, thinning, parallel)
 end
@@ -41,7 +41,7 @@ end
 """
 $(TYPEDSIGNATURES)
 """
-function MCMCSettings(;iterations::Integer=10_000, burnin::Integer=1_000, chains::Integer=3, thinning::Integer=1, parallel::AbstractMCMC.AbstractMCMCEnsemble=AbstractMCMC.MCMCSerial())
+function MCMCSettings(;iterations::Integer=10_000, burnin::Integer=1_000, chains::Integer=3, thinning::Integer=1, parallel::Type{U}=AbstractMCMC.MCMCSerial) where U<:AbstractMCMC.AbstractMCMCEnsemble
 	iterations, burnin, chains, thinning = promote(iterations, burnin, chains, thinning)
 	return MCMCSettings(iterations, burnin, chains, thinning, parallel)
 end

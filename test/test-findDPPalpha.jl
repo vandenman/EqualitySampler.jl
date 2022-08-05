@@ -1,4 +1,3 @@
-using Test
 import Turing
 
 @testset "test find_dpp_α" begin

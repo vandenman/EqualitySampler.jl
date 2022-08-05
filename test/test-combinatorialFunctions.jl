@@ -1,4 +1,3 @@
-using Test
 import Combinatorics
 
 @testset "combinatorialFunctions" begin

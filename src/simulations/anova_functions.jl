@@ -71,7 +71,7 @@ function simulate_data_one_way_anova(
 	for (i, idx) in enumerate(g)
 		g_big[idx] .= i
 	end
-	D = Distributions.MvNormal(μ .+ σ .* view(θc, g_big), σ)
+	D = Distributions.MvNormal(μ .+ σ .* view(θc, g_big), abs2(σ) * LinearAlgebra.I)
 	y = rand(rng, D)
 
 	dat = SimpleDataSet(y, g)
