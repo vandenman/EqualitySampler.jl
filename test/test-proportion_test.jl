@@ -1,4 +1,4 @@
-import Random, Distributions, MCMCChains, AbstractMCMC, Statistics
+import Random, Distributions, MCMCChains, AbstractMCMC, Statistics, Turing
 import EqualitySampler.Simulations
 
 function partition_to_equality_matrix(partition)
@@ -6,6 +6,7 @@ function partition_to_equality_matrix(partition)
 end
 
 on_ci = haskey(ENV, "CI") ? ENV["CI"] == "true" : false
+Turing.setprogress!(!on_ci)
 
 @testset "proportion_test" begin
 

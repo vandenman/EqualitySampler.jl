@@ -32,7 +32,6 @@ Suppressor = "fd094767-a336-5f1f-9728-57cf17d0bbfb"
 Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
 
 [compat]
-julia = "1.6"
 AbstractMCMC = "4"
 AdvancedHMC = "0.3"
 Bijectors = "0.10"
@@ -55,3 +54,4 @@ StatsBase = "0.33"
 StatsModels = "0.6"
 Suppressor = "0.2"
 Turing = "0.21"
+julia = "1.6"
