@@ -309,7 +309,7 @@ end
 DynamicPPL.@model function one_way_anova_mv_ss_eq_submodel(suff_stats_vec, Q, partition_prior::D, ::Type{T} = Float64) where {T, D<:AbstractPartitionDistribution}
 
 	partition ~ partition_prior
-	DynamicPPL.@submodel prefix="one_way_anova_mv_ss_submodel" θ_cs = one_way_anova_mv_ss_submodel(suff_stats_vec, Q, partition, T)
+	DynamicPPL.@submodel prefix=false θ_cs = one_way_anova_mv_ss_submodel(suff_stats_vec, Q, partition, T)
 	return θ_cs
 
 end
@@ -546,7 +546,6 @@ end
 	$(TYPEDSIGNATURES)
 
 Using the formula `f` and data frame `df` fit a one-way ANOVA.
-If `partition_prior` is specified as a keyword argument then equalities among the levels of the grouping variable are sampled.
 """
 anova_test(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame, args...; kwargs...) = anova_test(SimpleDataSet(f, df), args...; kwargs...)
 
@@ -554,7 +553,6 @@ anova_test(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame, args...; kwargs
 	$(TYPEDSIGNATURES)
 
 Using the vector `y` and grouping variable `g` fit a one-way ANOVA.
-If `partition_prior` is specified as a keyword argument then equalities among the levels of the grouping variable are sampled.
 """
 anova_test(y::AbstractVector{<:AbstractFloat}, g::AbstractVector{<:Integer}, args...; kwargs...) = anova_test(SimpleDataSet(y, g), args...; kwargs...)
 
@@ -563,24 +561,21 @@ anova_test(y::AbstractVector{<:AbstractFloat}, g::AbstractVector{<:Integer}, arg
 
 Using the vector `y` and grouping variable `g` fit a one-way ANOVA.
 Here `g` is a vector of UnitRanges where each element indicates the group membership of `y`.
-
-If `partition_prior` is specified as a keyword argument then equalities among the levels of the grouping variable are sampled.
 """
 anova_test(y::AbstractVector{<:AbstractFloat}, g::AbstractVector{<:UnitRange{<:Integer}}, args...; kwargs...) = anova_test(SimpleDataSet(y, g), args...; kwargs...)
 
 """
 	$(TYPEDSIGNATURES)
 
-positional arguments:
+# Arguments:
+- `df` a DataFrame or SimpleDataSet.
 - `partition_prior::Union{Nothing, AbstractPartitionDistribution}`, either nothing (i.e., fit the full model) or a subtype of `AbstractPartitionDistribution`.
 
-keyword arguments:
-
-- `spl = nothing`, a custom Turing sampler. `nothing` implies a default sampler is used which for the the full model defaults to `NUTS()` and for the equality selector to a Gibbs sampler with HMC for continuous parameters and Metropolis for discrete parameters.
-- `mcmc_iterations::Integer = 10_000`, the number of post warmup MCMC samples.
-- `mcmc_burnin::Integer = 1_000`, the number of initial MCMC samples to discard.
-- `mcmc_chains::Integer = 3`, the number of MCMC chains to sample.
-- `parallel::AbstractMCMC.AbstractMCMCEnsemble = Turing.MCMCSerial`, should the chains be sampled in parallel? Possible values are, No parallization (`Turing.MCMCSerial``), paralellization through multiple julia processes (`Turing.MCMCDistributed`), and paralellization through multithreading (`Turing.MCMCThreads`).
+# Keyword arguments
+- `spl`, overwrite the sampling algorithm passed to Turing. It's best to look at the source code for the parameter names and so on.
+- `mcmc_settings`, settings for sampling.
+- `modeltype`, `:old` indicated all parameters are sampled whereas `reduced` indicates only `g` and the partitions are sampled using an integrated representation of the posterior.
+- `rng` a random number generator.
 """
 function anova_test(
 	df::Union{SimpleDataSet, DataFrames.DataFrame},

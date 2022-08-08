@@ -9,7 +9,7 @@ end
 
 DynamicPPL.@model function proportion_model_equality_selector(successes, observations, partition_prior)
 	partition ~ partition_prior
-	DynamicPPL.@submodel prefix="inner" p = proportion_model_full(successes, observations, partition)
+	DynamicPPL.@submodel prefix=false p = proportion_model_full(successes, observations, partition)
 	return p
 end
 
@@ -40,9 +40,19 @@ get_proportion_sampler(model, spl::Turing.Inference.InferenceAlgorithm, ::Float6
 """
 $(TYPEDSIGNATURES)
 
-Fit independent binomials to the successes and observations.
-If `partition_prior === nothing` then no constraints are imposed on the probabilities.
-Otherwise, the model samples equalities among the proportions using the `partition_prior` as prior distribution.
+Fit independent binomials to the successes and observations and explore equality constraints among the probabilities.
+
+# Arguments
+- `successes`, vector of successes.
+- `observations` vector of no trials.
+- `partition_prior`, the prior to use over partitions or `nothing`, which implies sampling from the full model.
+
+# Keyword arguments
+- `spl`, overwrite the sampling algorithm passed to Turing. It's best to look at the source code for the parameter names and so on.
+- `mcmc_settings`, settings for sampling.
+- `ϵ`, passed to `Turing.HMC`, only used when `partition_prior !== nothing`.
+- `n_leapfrog`, passed to `Turing.HMC`, only used when `partition_prior !== nothing`.
+- `kwargs...`, passed to `AbstractMCMC.sample`.
 """
 function proportion_test(
 		successes::AbstractVector{T}, observations::AbstractVector{T},

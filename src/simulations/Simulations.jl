@@ -38,10 +38,12 @@ export
 	SimpleDataSet,
 	simulate_data_one_way_anova,
 	normalize_θ,
-	compute_post_prob_eq,
 	anova_test,
 	westfall_test,
-	proportion_test
+	proportion_test,
+	compute_post_prob_eq,
+	compute_model_probs,
+	compute_model_counts
 
 include("partition_sampler.jl")
 include("MCMCSettings.jl")
