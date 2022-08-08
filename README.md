@@ -1,7 +1,9 @@
-# EqualitySampler.jl - a Julia package for sampling equality constraints
+# EqualitySampler.jl
 
 [![Docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://vandenman.github.io/EqualitySampler/dev/)
 [![Build Status](https://github.com/vandenman/EqualitySampler/workflows/runtests/badge.svg)](https://github.com/vandenman/EqualitySampler/EqualitySampler/actions)
+
+EqualitySampler.jl is a Julia library for considering all possible equality constraints across parameters and sampling fromt the posterior distribution over equality constraints.
 
 # Installation
 
@@ -39,7 +41,7 @@ While a partition is usually defined without duplicates, the methods here do ass
 However, we also consider `[2, 2, 2]` and `[3, 3, 3]` to be valid and identical to `[1, 1, 1]`.
 The main reason for this is that in a Gibbs sampling scheme, a transition from `[1, 2, 2]` to `[1, 1, 1]` would be a natural but impossible without duplicated partitions. The default `logpdf` accounts for duplicated partitions, use `logpdf_model_distinct` to evaluate the logpdf without duplicated partitions.
 
-# Built in tests
+# Built-in tests
 
 The package contains two functions to explore equality constraints in specific models.
 Both use [Turing.jl](github.com/TuringLang/Turing.jl) under the hood and return a Chains object with posterior samples from [MCMCChains.jl](github.com/TuringLang/MCMCChains.jl).
