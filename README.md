@@ -39,7 +39,7 @@ While a partition is usually defined without duplicates, the methods here do ass
 | `{{θ₁}, {θ₂}, {θ₃}}` | `θ₁ != θ₂ != θ₃`  | `[1, 2, 3]`    |
 
 However, we also consider `[2, 2, 2]` and `[3, 3, 3]` to be valid and identical to `[1, 1, 1]`.
-The main reason for this is that in a Gibbs sampling scheme, a transition from `[1, 2, 2]` to `[1, 1, 1]` would be a natural but impossible without duplicated partitions. The default `logpdf` accounts for duplicated partitions, use `logpdf_model_distinct` to evaluate the logpdf without duplicated partitions.
+The main reason for this is that in a Gibbs sampling scheme, a transition from `[1, 2, 2]` to `[1, 1, 1]` by updating only the first element would be a natural but impossible without duplicated partitions. The default `logpdf` accounts for duplicated partitions, use `logpdf_model_distinct` to evaluate the logpdf without duplicated partitions.
 
 # Built-in tests
 
