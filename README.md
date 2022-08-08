@@ -59,7 +59,7 @@ true_partition     = rand(UniformPartitionDistribution(n_groups))
 temp_probabilities = rand(n_groups)
 true_probabilities = average_equality_constraints(temp_probabilities, true_partition)
 # total no. trials
-observations       = rand(100:200, n_groups)
+observations = rand(100:200, n_groups)
 # no. successes
 successes = rand(product_distribution(Binomial.(observations, true_probabilities)))
 
@@ -76,7 +76,7 @@ obs_proportions = successes ./ observations
 mcmc_settings = MCMCSettings(;iterations = 15_000, chains = 4, parallel = AbstractMCMC.MCMCThreads)
 
 # nothing indicates no equality sampling is done and instead the full model is sampled from
-chn_full = proportion_test(successes, observations, nothing;         mcmc_settings = mcmc_settings)
+chn_full = proportion_test(successes, observations, nothing; mcmc_settings = mcmc_settings)
 # use a BetaBinomial(1, k) over the partitions
 partition_prior = BetaBinomialPartitionDistribution(n_groups, 1, n_groups)
 chn_eqs  = proportion_test(successes, observations, partition_prior; mcmc_settings = mcmc_settings)
@@ -166,7 +166,7 @@ obs_offset = ([mean(y[g .== i]) for i in unique(g)] .- mean(y)) / std(y)
 mcmc_settings = MCMCSettings(;iterations = 15_000, chains = 4, parallel = AbstractMCMC.MCMCThreads)
 
 # nothing indicates no equality sampling is done and instead the full model is sampled from
-chn_full = anova_test(y, g, nothing;         mcmc_settings = mcmc_settings)
+chn_full = anova_test(y, g, nothing; mcmc_settings = mcmc_settings)
 # use a BetaBinomial(1, k) over the partitions
 partition_prior = BetaBinomialPartitionDistribution(n_groups, 1, n_groups)
 chn_eqs  = anova_test(y, g, partition_prior; mcmc_settings = mcmc_settings)
