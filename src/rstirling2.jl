@@ -83,10 +83,4 @@ function logstirlings2r(n::T, k::T, r::T) where T <: Integer
 
 end
 
-# TODO: did the definition get deleted?
-# """
-# 	stirlings2r_recursive(n::T, k::T, r::T) where T <: Integer
-
-# Computes the r-stirling numbers with a recursive method. Uses memoization for efficiency.
-# """
 #endregion

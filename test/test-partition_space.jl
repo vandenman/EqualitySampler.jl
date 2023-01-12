@@ -8,7 +8,6 @@
 	"""
 	function generate_distinct_models(k::Int)
 		# based on https://stackoverflow.com/a/30898130/4917834
-		# TODO: return a generator rather than directly all results
 		current = ones(Int, k)
 		no_models = bellnum(k)
 		result = Matrix{Int}(undef, k, no_models)
