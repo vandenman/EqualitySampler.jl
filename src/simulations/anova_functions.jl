@@ -83,7 +83,7 @@ function simulate_data_one_way_anova(
 end
 
 function fit_lm(X::AbstractMatrix, y::AbstractVector)
-	fit = GLM.lm(X, y)::GLM.LinearModel{GLM.LmResp{Vector{Float64}}, GLM.DensePredChol{Float64, LinearAlgebra.CholeskyPivoted{Float64, Matrix{Float64}}}}
+	fit = GLM.lm(X, y)#::GLM.LinearModel{GLM.LmResp{Vector{Float64}}, GLM.DensePredChol{Float64, LinearAlgebra.CholeskyPivoted{Float64, Matrix{Float64}}}}
 	return GLM.coef(fit), GLM.confint(fit), fit
 end
 
@@ -98,7 +98,7 @@ end
 function fit_lm(df, formula = StatsModels.@formula(y ~ 1 + g))
 
 	# TODO: don't use a dataframe but use the X, y directly?
-	fit = GLM.lm(formula, df)::StatsModels.TableRegressionModel{GLM.LinearModel{GLM.LmResp{Vector{Float64}}, GLM.DensePredChol{Float64, LinearAlgebra.CholeskyPivoted{Float64, Matrix{Float64}}}}, Matrix{Float64}}
+	fit = GLM.lm(formula, df)#::StatsModels.TableRegressionModel{GLM.LinearModel{GLM.LmResp{Vector{Float64}}, GLM.DensePredChol{Float64, LinearAlgebra.CholeskyPivoted{Float64, Matrix{Float64}}}}, Matrix{Float64}}
 	#, contrasts = Dict(:g => StatsModels.FullDummyCoding()))
 	# transform the coefficients to a grand mean and offsets
 	coefs = GLM.coef(fit)
