@@ -275,10 +275,6 @@ function make_all_plots(dfg, dfg_incl;
 			y[:, j] .= subdf_incl[j, :value]
 		end
 
-		if subdf[1, :distribution] <: RandomProcessPartitionDistribution{DirichletProcess{Float64}, Int64}
-			y = y[:, [2, 1, 3]]
-		end
-
 		plt = plot(repeat(eachindex(x), size(y, 2)), vec(y), group = repeat(axes(y, 2), inner = size(y, 1)),
 				markershape = repeat(shapes, inner = length(x)),
 				color = repeat(colors, inner = length(x)),
