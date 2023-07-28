@@ -33,7 +33,7 @@ Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
 
 [compat]
 AbstractMCMC = "4"
-AdvancedHMC = "0.3, 0.4"
+AdvancedHMC = "0.3, 0.4, 0.5"
 Bijectors = "0.10"
 Combinatorics = "1"
 DataFrames = "1.3"
