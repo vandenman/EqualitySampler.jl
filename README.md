@@ -1,7 +1,7 @@
 # EqualitySampler.jl
 
-[![Docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://vandenman.github.io/EqualitySampler/dev/)
-[![Build Status](https://github.com/vandenman/EqualitySampler/workflows/runtests/badge.svg)](https://github.com/vandenman/EqualitySampler/EqualitySampler/actions)
+[![Docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://vandenman.github.io/EqualitySampler.jl/dev/)
+[![Build Status](https://github.com/vandenman/EqualitySampler/workflows/runtests/badge.svg)](https://github.com/vandenman/EqualitySampler.jl/actions)
 
 EqualitySampler.jl is a Julia library for considering all possible equality constraints across parameters and sampling fromt the posterior distribution over equality constraints.
 
