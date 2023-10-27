@@ -15,15 +15,15 @@ jobs:
       matrix:
         version:
           - '1.6'
-          - '1.8'
+          - '1.9'
         os:
           - ubuntu-latest
           - macOS-latest
         arch:
           - x64
     steps:
-      - uses: actions/checkout@v3
-      - uses: julia-actions/setup-julia@v1.8
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v1.9
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}

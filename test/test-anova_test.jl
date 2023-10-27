@@ -1,3 +1,4 @@
+using EqualitySampler, Test
 import Random, Distributions, MCMCChains, AbstractMCMC, Statistics, Turing
 import EqualitySampler.Simulations
 
