@@ -2,9 +2,9 @@ name: runtests
 
 on:
   push:
-    paths: ['**.jl', '!docs/**']
+    paths: ['Project.toml', '**.jl', '!docs/**']
   pull_request:
-    paths: ['**.jl', '!docs/**']
+    paths: ['Project.toml', '**.jl', '!docs/**']
 
 
 jobs:
