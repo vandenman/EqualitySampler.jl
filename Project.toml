@@ -1,7 +1,7 @@
 name = "EqualitySampler"
 uuid = "78feedfb-ee96-4c5d-801a-e07e5d165ffd"
 authors = ["Don van den Bergh <d.vandenbergh@uva.nl> and Fabian Dablander"]
-version = "0.1.1"
+version = "0.1.2"
 
 [deps]
 AbstractMCMC = "80f14c24-f653-4e6a-9b94-39d6b0f70001"
@@ -50,6 +50,7 @@ OrderedCollections = "1.4"
 PDMats = "0.11"
 QuadGK = "2"
 SpecialFunctions = "2"
+Statistics = "1"
 StatsBase = "0.33, 0.34"
 StatsModels = "0.6, 0.7"
 Suppressor = "0.2"
