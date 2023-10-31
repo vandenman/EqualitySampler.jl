@@ -2,9 +2,9 @@ name: runtests
 
 on:
   push:
-    paths: ['Project.toml', '**.jl', '!docs/**']
+    paths: ['Project.toml', '**.jl', '!docs/**', '.github/workflows/runtests.yml']
   pull_request:
-    paths: ['Project.toml', '**.jl', '!docs/**']
+    paths: ['Project.toml', '**.jl', '!docs/**', '.github/workflows/runtests.yml']
 
 
 jobs:
