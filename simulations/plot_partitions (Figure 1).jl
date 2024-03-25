@@ -262,3 +262,13 @@ function ordering2(x)
 	res += lexicographic_order(x)
 	return res
 end
+
+
+k = 5
+models = Matrix(PartitionSpace(k))
+order = sortperm(ordering.(eachcol(models)), lt = !isless)
+plots = [plot_model(view(models, :, i)) for i in order]
+layout, max_rows, max_cols = make_grid(k, false)
+
+w = 100
+plt = plot(plots..., layout = layout, size = (max_cols*w, max_rows*w))

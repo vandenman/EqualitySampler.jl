@@ -106,9 +106,13 @@ function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, ::UniformPartitio
 
 	urns_set = Set(urns)
 	r = length(urns_set)
-	num = bellnumr(k - index , r + 1)
-	den = r * bellnumr(k - index, r)
-	prob_new_label = num / (num + den)
+	# num = bellnumr(k - index , r + 1)
+	# den = r * bellnumr(k - index, r)
+	# prob_new_label = num / (num + den)
+
+	lognum = logbellnumr(k - index, r + 1)
+	logden = log(r) + logbellnumr(k - index, r)
+	prob_new_label = exp(lognum - LogExpFunctions.logsumexp([lognum, logden]))
 
 	@inbounds for i in eachindex(result)
 		if i in urns_set
@@ -122,7 +126,7 @@ function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, ::UniformPartitio
 end
 
 function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, d::T, index::U, complete_urns::AbstractVector{U}) where
-	{U<:Integer, T<:Union{BetaBinomialPartitionDistribution{U}, CustomInclusionPartitionDistribution}}
+	{U<:Integer, T<:Union{BetaBinomialPartitionDistribution{U}, CustomInclusionPartitionDistribution, PrecomputedCustomInclusionPartitionDistribution}}
 
 	k = length(result)
 	if isone(index)
@@ -138,11 +142,26 @@ function _pdf_helper!(result::AbstractVector{<:AbstractFloat}, d::T, index::U, c
 	r = length(v_known_set)
 	n = k - (index - r - 1)
 
-	model_probs_by_incl = exp.(log_model_probs_by_incl(d))
+	r = oftype(n, r)
+	k = oftype(n, k)
+
+	# model_probs_by_incl = exp.(log_model_probs_by_incl(d))
 
 	# no. parameters k j m
-	num = r * sum(@inbounds model_probs_by_incl[i] * stirlings2r(n - 1, i, r    ) for i in 1:k)
-	den =     sum(@inbounds model_probs_by_incl[i] * stirlings2r(n    , i, r + 1) for i in 1:k)
+	# num = r * sum(@inbounds model_probs_by_incl[i] * stirlings2r(n - 1, i, r    ) for i in 1:k)
+	# den =     sum(@inbounds model_probs_by_incl[i] * stirlings2r(n    , i, r + 1) for i in 1:k)
+
+	log_incl_probs = log_model_probs_by_incl(d)
+	log_num = LogExpFunctions.logsumexp(
+		log_incl_probs[i] + logstirlings2r(n - 1, i, r    )
+		for i in 1:k
+	)
+	log_den = LogExpFunctions.logsumexp(
+		log_incl_probs[i] + logstirlings2r(n    , i, r + 1)
+		for i in 1:k
+	)
+	num = r * exp(log_num)
+	den = 	  exp(log_den)
 
 	prob_new_label = den / (den + num)
 	@inbounds for i in eachindex(result)

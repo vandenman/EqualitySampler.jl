@@ -53,7 +53,7 @@ Turing.setprogress!(!on_ci)
 			else
 				estimated_post_probs[i, j] < 0.1
 			end
-			for i in axes(true_eqs_mat, 1) for j in i+1:size(true_eqs_mat, 1)
+			for j in axes(true_eqs_mat, 1) for i in j+1:size(true_eqs_mat, 1)
 		)
 
 	end

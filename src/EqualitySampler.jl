@@ -47,6 +47,7 @@ export
 	UniformPartitionDistribution,
 	BetaBinomialPartitionDistribution,
 	CustomInclusionPartitionDistribution,
+	PrecomputedCustomInclusionPartitionDistribution,
 	RandomProcessPartitionDistribution,
 	DirichletProcessPartitionDistribution,
 

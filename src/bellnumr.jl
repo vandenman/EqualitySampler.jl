@@ -29,8 +29,14 @@ Computes the logarithm of the ``r``-Bell numbers.
 """
 function logbellnumr(n::T, r::T) where T <: Integer
 
-	succes, value = bellnumr_base_cases(n, r)
-	succes && return Float64(log(value))
+	succes, value = bellnumr_base_cases_big(n, r)
+	if succes
+		if T === BigInt
+			return log(value)
+		else
+			return Float64(log(value))
+		end
+	end
 
 	return LogExpFunctions.logsumexp(logstirlings2r(n+r, k+r, r) for k in 0:n)
 
@@ -64,6 +70,20 @@ function bellnumr_base_cases(n::T, r::T) where T <: Integer
 
 	return (false, zero(T))
 end
+
+function bellnumr_base_cases_big(n::T, r::T) where T <: Integer
+
+	# base cases
+	(b, value) = bellnumr_base_cases_inner(n, r)
+	b && return (b, BigInt(value))
+
+	if 0 <= r < size(_bellnumr_table_BigInt, 1) && 5 <= n < size(_bellnumr_table_BigInt, 2)
+		return (true, _bellnumr_table_BigInt[r+1, n-4])
+	end
+
+	return (false, zero(BigInt))
+end
+
 
 """
 $(TYPEDSIGNATURES)

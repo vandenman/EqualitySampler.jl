@@ -12,7 +12,8 @@ Distributions.insupport(::AbstractJeffreysPrior, x::Real)			= x > zero(x)
 Distributions.pdf(d::AbstractJeffreysPrior, x::Real) = exp(Distributions.logpdf(d, x))
 
 # required for compatability with Turing
-Bijectors.bijector(::AbstractJeffreysPrior) = Bijectors.Log{0}()
+# Bijectors.bijector(::AbstractJeffreysPrior) = Bijectors.Log{0}()
+Bijectors.bijector(::AbstractJeffreysPrior) = Bijectors.elementwise(log)
 
 struct JeffreysPriorStandardDeviation <: AbstractJeffreysPrior end
 Distributions.logpdf(d::JeffreysPriorStandardDeviation, x::Real) = Distributions.insupport(d, x) ? -log(x) : -Inf

@@ -297,7 +297,6 @@ DynamicPPL.@model function one_way_anova_mv_ss_submodel(suff_stats_vec, Q, parti
 	θ_cs = isnothing(partition) ? θ_s : average_equality_constraints(θ_s, partition)
 
 	# definition from Rouder et. al., (2012) eq 6.
-	# @inbounds
 	for i in eachindex(suff_stats_vec)
 		Turing.@addlogprob! loglikelihood_suffstats(Distributions.Normal(μ_grand + sqrt(σ²) * θ_cs[i], sqrt(σ²)), suff_stats_vec[i])
 	end

@@ -1,191 +1,232 @@
 using  Test
-import Distributions, Turing, StatsBase, Statistics
+import Distributions, StatsBase, Statistics
 #=
 
-	TODO:
+    TODO:
 
-	separate this into two parts:
-		- tests on the properties of the distinct model space
-		- tests on the properties of the nondistinct model space
+    - would be nice if it runs a little bit faster?
 
 =#
 
 function reduce_model_dpp(x::AbstractVector{<:Integer})
 
-	y = similar(x)
-	currentMax = 0
-	visited = Set{Int}()
-	for i in eachindex(y)
-		if x[i] ∉ visited
-			currentMax += 1
-			y[i] = currentMax
-			for j in i+1:length(x)
-				if x[i] == x[j]
-					y[j] = currentMax
-				end
-			end
-			push!(visited, x[i])
-		end
-	end
-	return y
+    y = similar(x)
+    currentMax = 0
+    visited = Set{Int}()
+    for i in eachindex(y)
+        if x[i] ∉ visited
+            currentMax += 1
+            y[i] = currentMax
+            for j in i+1:length(x)
+                if x[i] == x[j]
+                    y[j] = currentMax
+                end
+            end
+            push!(visited, x[i])
+        end
+    end
+    return y
 end
 
 @testset "Multivariate urn distributions" begin
 
-	noSamples = 15_000
+    no_samples = 15_000
 
-	ks = 2:5
-	αs = 0.5:0.5:2
-	βs = 0.5:0.5:2
+    ks = 2:5
+    αs = 0.5:0.5:2
+    βs = 0.5:0.5:2
 
-	αs2 = (1.0, 1.877, 2.0)
+    αs2 = (1.0, 1.877, 2.0)
 
-	Dset = (
-		(
-			dist = UniformPartitionDistribution,
-			args = ks
-		),
-		(
-			dist = BetaBinomialPartitionDistribution,
-			args = Iterators.product((ks, αs, βs)...)
-		),
-		(
-			dist = (k, α) -> RandomProcessPartitionDistribution(k, Turing.RandomMeasures.DirichletProcess(α)),
-			args = Iterators.product((ks, αs2)...)
-		)
-	)
+    log_probs = [
+        log.(rand(Distributions.Dirichlet(ones(k) ./ k)))
+        for k in ks
+    ]
+    log_counts = EqualitySampler.log_expected_equality_counts.(ks)
 
-	for dist in Dset
+    Dset = (
+        (
+            dist = UniformPartitionDistribution,
+            args = ks
+        ),
+        (
+            dist = BetaBinomialPartitionDistribution,
+            args = Iterators.product((ks, αs, βs)...)
+        ),
+        (
+            # dist = (k, α) -> RandomProcessPartitionDistribution(k, Turing.RandomMeasures.DirichletProcess(α)),
+            dist = DirichletProcessPartitionDistribution,
+            args = Iterators.product((ks, αs2)...)
+        ),
+        (
+            dist = CustomInclusionPartitionDistribution,
+            args = ks
+        ),
+        (
+            dist = PrecomputedCustomInclusionPartitionDistribution,
+            args = ks
+        )
+    )
 
-		@testset "Distribution $(dist[:dist])" begin
+    for dist in Dset
 
-			for args in dist.args
+        @testset "Distribution $(dist[:dist])" begin
 
-				k = first(args)
-				d = dist.dist(args...)
-				m = PartitionSpace(k, EqualitySampler.DuplicatedPartitionSpace)
+            args = first(dist.args)
+            for args in dist.args
 
-				@testset "args: $args" begin
+                k = first(args)
+                d = if dist.dist == CustomInclusionPartitionDistribution
+                    d = dist.dist(k, log_probs[k - 1])
+                elseif dist.dist == PrecomputedCustomInclusionPartitionDistribution
+                    d = dist.dist(k, log_probs[k - 1], log_counts[k - 1])
+                else
+                    d = dist.dist(args...)
+                end
+                m = PartitionSpace(k, EqualitySampler.DuplicatedPartitionSpace)
 
-					@testset "pdf sums to 1, inclusion probabilities match, model probabilities match " begin
+                @testset "args: $args" begin
 
-						s = vec([count_parameters(col) for col in m])
-						indices = [findall(==(i), s) for i in 1:k]
+                    @testset "pdf sums to 1, inclusion probabilities match, model probabilities match " begin
 
-						probs = vec([Distributions.pdf(d, col) for col in m])
-						# pdf over all models sums to 1.0
-						@test sum(probs) ≈ 1.0
+                        s = vec([count_parameters(col) for col in m])
+                        indices = [findall(==(i), s) for i in 1:k]
 
-						brute_force_incl_probs = [sum(probs[indices[i]]) for i in 1:k]
-						efficient_incl_probs = [pdf_incl(d, i) for i in 1:k]
+                        probs = vec([Distributions.pdf(d, col) for col in m])
+                        # pdf over all models sums to 1.0
+                        @test sum(probs) ≈ 1.0
 
-						# direct computation of inclusion probabilities (which is more efficient) equals brute force computation of inclusion probabilities
-						@test efficient_incl_probs ≈ brute_force_incl_probs
+                        brute_force_incl_probs = [sum(probs[indices[i]]) for i in 1:k]
+                        efficient_incl_probs = [pdf_incl(d, i) for i in 1:k]
 
-						# no. equalities is insufficient for model probabilities for DPP
-						if !(d isa RandomProcessPartitionDistribution)
-							model_probs  = pdf_model.(Ref(d), 1:k)
-							model_counts = stirlings2.(k, 1:k) .* EqualitySampler.count_combinations.(k, 1:k)
+                        # direct computation of inclusion probabilities (which is more efficient) equals brute force computation of inclusion probabilities
+                        @test efficient_incl_probs ≈ brute_force_incl_probs
 
-							# dividing inclusion probabilities by model size frequency gives the model probabilities
-							@test efficient_incl_probs ./ model_counts ≈ model_probs
-						end
-					end
+                        # no. equalities is insufficient for model probabilities for DPP
+                        if !(d isa RandomProcessPartitionDistribution)
+                            model_probs  = pdf_model.(Ref(d), 1:k)
+                            model_counts = stirlings2.(k, 1:k) .* EqualitySampler.count_combinations.(k, 1:k)
 
-					@testset "simulated properties match theoretical results" begin
+                            # dividing inclusion probabilities by model size frequency gives the model probabilities
+                            @test efficient_incl_probs ./ model_counts ≈ model_probs
+                        end
+                    end
 
-						# TODO: this test should NOT use reduce_model but just call rand!
-						# samples = Distributions.rand(d, noSamples)
+                    @testset "simulated properties match theoretical results" begin
 
-						samples = Matrix{Int}(undef, k, noSamples)
-						for i in axes(samples, 2)
-							v = view(samples, :, i)
-							Distributions.rand!(d, v)
-							v .= EqualitySampler.reduce_model(v)
-						end
+                        # TODO: this test should NOT use reduce_model but just call rand!
+                        # samples = Distributions.rand(d, noSamples)
 
-						if !(d isa RandomProcessPartitionDistribution)
+                        samples = Matrix{Int}(undef, k, no_samples)
+                        for i in axes(samples, 2)
+                            v = view(samples, :, i)
+                            Distributions.rand!(d, v)
+                            v .= EqualitySampler.reduce_model(v)
+                        end
 
-							empirical_model_probs     = collect(values(EqualitySampler.empirical_model_probabilities(samples)))
-							expected_model_probs      = EqualitySampler.expected_model_probabilities(d)
-						else # for the DirichletProcess this method doesn't exist (yet) so we brute force it
-							tmp                       = EqualitySampler.empirical_model_probabilities(samples)
-							empirical_model_probs     = collect(values(tmp))
-							expected_model_probs      = [exp(EqualitySampler.logpdf_model_distinct(d, reduce_model_dpp(parse.(Int, split(model, ""))))) for model in keys(tmp)]
-						end
+                        if !(d isa RandomProcessPartitionDistribution)
+                            empirical_model_probs_dict = EqualitySampler.empirical_model_probabilities(samples)
+                            # add any missing models
+                            modelspace_distinct = PartitionSpace(k, EqualitySampler.DistinctPartitionSpace)
+                            if length(empirical_model_probs_dict) != length(modelspace_distinct)
+                                for model in modelspace_distinct
+                                    key = join(EqualitySampler.reduce_model(model))
+                                    if !haskey(empirical_model_probs_dict, key)
+                                        empirical_model_probs_dict[key] = 0.0
+                                    end
+                                end
+                                sort!(empirical_model_probs_dict, by=x->count_parameters(x))
+                            end
+                            empirical_model_probs = collect(values(empirical_model_probs_dict))
+                            expected_model_probs  = EqualitySampler.expected_model_probabilities(d)
+                        else # for the DirichletProcess this method doesn't exist (yet) so we brute force it
+                            tmp                       = EqualitySampler.empirical_model_probabilities(samples)
+                            empirical_model_probs     = collect(values(tmp))
+                            expected_model_probs      = [exp(EqualitySampler.logpdf_model_distinct(d, reduce_model_dpp(parse.(Int, split(model, ""))))) for model in keys(tmp)]
+                        end
 
-						empirical_inclusion_probs = collect(values(EqualitySampler.empirical_no_parameters_probabilities(samples)))
-						expected_inclusion_probs  = EqualitySampler.expected_inclusion_probabilities(d)
+                        empirical_inclusion_probs_dict = EqualitySampler.empirical_no_parameters_probabilities(samples)
+                        if length(empirical_inclusion_probs_dict) != k + 1
+                            for i in 1:k
+                                if !haskey(empirical_inclusion_probs_dict, i)
+                                    empirical_inclusion_probs_dict[i] = 0.0
+                                end
+                            end
+                            sort!(empirical_inclusion_probs_dict, by=values)
+                        end
 
-						rtol = 0.15 + 0.02k # TODO: something better than this.
-						@test isapprox(empirical_model_probs, expected_model_probs, rtol = rtol)
-						@test isapprox(empirical_inclusion_probs, expected_inclusion_probs, rtol = rtol)
+                        empirical_inclusion_probs = collect(values(empirical_inclusion_probs_dict))
+                        expected_inclusion_probs  = EqualitySampler.expected_inclusion_probabilities(d)
 
-					end
+                        rtol = 0.15 + 0.02k # TODO: something better than this.
+                        @test isapprox(empirical_model_probs, expected_model_probs, rtol = rtol)
+                        @test isapprox(empirical_inclusion_probs, expected_inclusion_probs, rtol = rtol)
 
-					if !(d isa RandomProcessPartitionDistribution)
-						@testset "Batch computations match individual ones" begin
+                    end
 
-							expected = EqualitySampler.log_expected_inclusion_probabilities(d)
-							observed = logpdf_incl.(Ref(d), 1:length(d))
+                    if !(d isa RandomProcessPartitionDistribution)
+                        @testset "Batch computations match individual ones" begin
 
-							@test isapprox(expected, observed)
+                            expected = EqualitySampler.log_expected_inclusion_probabilities(d)
+                            observed = logpdf_incl.(Ref(d), 1:length(d))
 
-						end
-					end
-				end
-			end
-		end
-	end
+                            @test isapprox(expected, observed)
 
-	@testset "logpdf_model_distinct works with DPP" begin
+                        end
+                    end
+                end
+            end
+        end
+    end
 
-		for k in 2:10
-			d = DirichletProcessPartitionDistribution(k, .5)
-			m = Matrix(PartitionSpace(k))
+    @testset "logpdf_model_distinct works with DPP" begin
 
-			lpdfs = mapslices(x->logpdf_model_distinct(d, x), m, dims = 1)
-			manual_sizes = [sort!(collect(values(StatsBase.countmap(x))); rev = true) for x in eachcol(m)]
-			counts, sizes = EqualitySampler.count_set_partitions_given_partition_size(k)
+        for k in 2:10
+            d = DirichletProcessPartitionDistribution(k, .5)
+            m = Matrix(PartitionSpace(k))
 
-			for i in eachindex(sizes)
+            lpdfs = mapslices(x->logpdf_model_distinct(d, x), m, dims = 1)
+            manual_sizes = [sort!(collect(values(StatsBase.countmap(x))); rev = true) for x in eachcol(m)]
+            counts, sizes = EqualitySampler.count_set_partitions_given_partition_size(k)
 
-				idx = findall(==(sizes[i]), manual_sizes)
+            for i in eachindex(sizes)
 
-				@test length(idx) == counts[i]
-				@test sum(lpdfs[idx]) ≈ counts[i] * lpdfs[idx[1]]
+                idx = findall(==(sizes[i]), manual_sizes)
 
-			end
+                @test length(idx) == counts[i]
+                @test sum(lpdfs[idx]) ≈ counts[i] * lpdfs[idx[1]]
 
-			parameter_counts = [count_parameters(x) for x in eachcol(m)]
-			unique_parameter_counts = unique(parameter_counts)
-			expected = [Statistics.mean(lpdfs[unique_parameter_counts_i .== parameter_counts]) for unique_parameter_counts_i in unique_parameter_counts]
-			computed = logpdf_model_distinct.(Ref(d), unique_parameter_counts)
-			@test expected ≈ computed
+            end
 
-		end
-	end
+            parameter_counts = [count_parameters(x) for x in eachcol(m)]
+            unique_parameter_counts = unique(parameter_counts)
+            expected = [Statistics.mean(lpdfs[unique_parameter_counts_i .== parameter_counts]) for unique_parameter_counts_i in unique_parameter_counts]
+            computed = logpdf_model_distinct.(Ref(d), unique_parameter_counts)
+            @test expected ≈ computed
 
-	@testset "logpdf_model_distinct is equal for value and models" begin
+        end
+    end
 
-		for k in 3:6
+    @testset "logpdf_model_distinct is equal for value and models" begin
 
-			d_u  = UniformPartitionDistribution(k)
-			d_bb = BetaBinomialPartitionDistribution(k, k, 1)
-			models = Matrix(PartitionSpace(k))
-			parameters = count_parameters.(eachcol(models))
+        for k in 3:6
 
-			logprob_d_bb_models     = logpdf_model_distinct.(Ref(d_bb), eachcol(models))
-			logprob_d_bb_parameters = logpdf_model_distinct.(Ref(d_bb), parameters)
+            d_u  = UniformPartitionDistribution(k)
+            d_bb = BetaBinomialPartitionDistribution(k, k, 1)
+            models = Matrix(PartitionSpace(k))
+            parameters = count_parameters.(eachcol(models))
 
-			logprob_d_u_models     = logpdf_model_distinct.(Ref(d_u), eachcol(models))
-			logprob_d_u_parameters = logpdf_model_distinct.(Ref(d_u), parameters)
+            logprob_d_bb_models     = logpdf_model_distinct.(Ref(d_bb), eachcol(models))
+            logprob_d_bb_parameters = logpdf_model_distinct.(Ref(d_bb), parameters)
 
-			@test logprob_d_bb_models ≈ logprob_d_bb_parameters
-			@test logprob_d_u_models ≈ logprob_d_u_parameters
+            logprob_d_u_models     = logpdf_model_distinct.(Ref(d_u), eachcol(models))
+            logprob_d_u_parameters = logpdf_model_distinct.(Ref(d_u), parameters)
 
-		end
-	end
+            @test logprob_d_bb_models ≈ logprob_d_bb_parameters
+            @test logprob_d_u_models ≈ logprob_d_u_parameters
+
+        end
+    end
 end
 
 

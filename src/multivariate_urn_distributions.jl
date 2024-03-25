@@ -134,6 +134,26 @@ logpdf_model_distinct(d::UniformPartitionDistribution, ::T) where T <: Integer =
 
 #endregion
 
+#=
+
+	TODO:
+	Create an abstract type AbstractSizePartitionDistribution that
+
+	BetaBinomialPartitionDistribution    				<: AbstractSizePartitionDistribution
+	CustomInclusionPartitionDistribution 				<: AbstractSizePartitionDistribution
+	PrecomputedCustomInclusionPartitionDistribution    	<: AbstractSizePartitionDistribution
+
+	and then we can do:
+
+	idx = rand(Categorical(pdf_incl_probs(d)))
+	iter = Combinatorics.partitions(1:length(d), idx)
+	idx2 = rand(eachindex(iter))
+	# idx2 = rand(1:stirlings2(length(d), idx))
+	first(Iterators.drop(iter, idx-1))
+
+
+=#
+
 #region BetaBinomialPartitionDistribution
 """
 ```
@@ -206,7 +226,7 @@ end
 CustomInclusionPartitionDistribution(k::Integer, logpdf::AbstractVector) = CustomInclusionPartitionDistribution(k, Tuple(logpdf))
 
 log_model_probs_by_incl(d::CustomInclusionPartitionDistribution) = d.logpdf .- log_expected_equality_counts(d.k)
-log_model_probs_by_incl(d::CustomInclusionPartitionDistribution, no_parameters::Integer) = d.logpdf[no_parameters] - log_expected_equality_counts(d.k)
+log_model_probs_by_incl(d::CustomInclusionPartitionDistribution, no_parameters::Integer) = d.logpdf[no_parameters] - log_expected_equality_counts(d.k, no_parameters)#log_expected_equality_counts(d.k)
 logpdf_model_distinct(d::CustomInclusionPartitionDistribution, x::AbstractVector{<:Integer}) = logpdf_model_distinct(d, count_parameters(x))
 function logpdf_model_distinct(d::CustomInclusionPartitionDistribution, no_parameters::Integer)
 	in_eqsupport(d, no_parameters) || return -Inf
@@ -215,7 +235,62 @@ end
 
 function logpdf_incl(d::CustomInclusionPartitionDistribution, no_parameters::Integer)
 	in_eqsupport(d, no_parameters) || return -Inf
-	@inbounds d.logpdf[no_parameters - 1]
+	@inbounds d.logpdf[no_parameters]
+end
+
+
+#=
+	TODO:
+
+	- [ ] documentation/ docstring
+	- [ ] add helper to convert any PartitionDistribution to a PrecomputedCustomInclusionPartitionDistribution
+	- [ ] tests
+		- [ ] use both CustomInclusionPartitionDistribution & PrecomputedCustomInclusionPartitionDistribution
+		- [ ] verify all methods using the BetabinomialPartitionDistribution
+
+=#
+struct PrecomputedCustomInclusionPartitionDistribution{T <: Integer, N} <: AbstractPartitionDistribution{T}
+	k::T
+	logpdf::NTuple{N, Float64}
+	log_expected_equality_counts::NTuple{N, Float64}
+	function PrecomputedCustomInclusionPartitionDistribution(k::T, logpdf::NTuple{N, Float64}, log_expected_equality_counts::NTuple{N, Float64}) where {T<:Integer, N}
+		k != length(logpdf) 					  && throw(DomainError(logpdf, 						 "length(logpdf) must match k"))
+		k != length(log_expected_equality_counts) && throw(DomainError(log_expected_equality_counts, "length(log_expected_equality_counts) must match k"))
+		new{T, N}(k, logpdf, log_expected_equality_counts)
+	end
+end
+PrecomputedCustomInclusionPartitionDistribution(k::Integer, logpdf::AbstractVector, log_expected_equality_counts::AbstractVector) = PrecomputedCustomInclusionPartitionDistribution(k, Tuple(logpdf), Tuple(log_expected_equality_counts))
+
+log_model_probs_by_incl(d::PrecomputedCustomInclusionPartitionDistribution) = d.logpdf .- d.log_expected_equality_counts
+log_model_probs_by_incl(d::PrecomputedCustomInclusionPartitionDistribution, no_parameters::Integer) = d.logpdf[no_parameters] - d.log_expected_equality_counts[no_parameters]
+logpdf_model_distinct(d::PrecomputedCustomInclusionPartitionDistribution, x::AbstractVector{<:Integer}) = logpdf_model_distinct(d, count_parameters(x))
+function logpdf_model_distinct(d::PrecomputedCustomInclusionPartitionDistribution, no_parameters::Integer)
+	in_eqsupport(d, no_parameters) || return -Inf
+	log_model_probs_by_incl(d, no_parameters)
+end
+
+function logpdf_incl(d::PrecomputedCustomInclusionPartitionDistribution, no_parameters::Integer)
+	in_eqsupport(d, no_parameters) || return -Inf
+	@inbounds d.logpdf[no_parameters]
+end
+
+log_expected_inclusion_probabilities( d::Union{CustomInclusionPartitionDistribution, PrecomputedCustomInclusionPartitionDistribution}) = collect(d.logpdf)
+expected_inclusion_probabilities(     d::Union{CustomInclusionPartitionDistribution, PrecomputedCustomInclusionPartitionDistribution}) = exp.(log_expected_inclusion_probabilities(d))
+function expected_model_probabilities(d::Union{CustomInclusionPartitionDistribution, PrecomputedCustomInclusionPartitionDistribution})
+
+	incl_probs  = expected_inclusion_probabilities(d)
+	no_models_with_incl = expected_inclusion_counts(length(d))
+	probs = incl_probs ./ no_models_with_incl
+
+	# probability of j equalities for j in 1...k
+	result = similar(incl_probs, sum(no_models_with_incl))
+	index = 1
+	for i in eachindex(probs)
+		result[index:index + no_models_with_incl[i] - 1] .= probs[i]
+		index += no_models_with_incl[i]
+	end
+
+	return result
 end
 
 
