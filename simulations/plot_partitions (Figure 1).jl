@@ -1,8 +1,13 @@
-using EqualitySampler, Plots#, LazySets#, Measures
-import StatsBase: countmap
+using EqualitySampler
+import CairoMakie as CM
+import Colors
+import DelaunayTriangulation
+import StatsBase as SB
 import OrderedCollections
 import Colors
-import LazySets
+
+
+#=
 
 """
 	adjacency_mat_from_model(model::AbstractVector{T}) where T<:Integer
@@ -59,7 +64,7 @@ function plot_model_data(model::AbstractVector{T}) where T<:Integer
 	x, y = get_xy(k)
 	# plt = plot(background_color_inside = plot_color(:lightgrey, 0.15), margin = 0.01mm)
 	# TODO: not sure wheter all this OrderedDict is necessary
-	tb = sort(OrderedCollections.OrderedDict(countmap(model)), byvalue=true, lt = !isless)
+	tb = sort(OrderedCollections.OrderedDict(SB.countmap(model)), byvalue=true, lt = !isless)
 	shapes = [make_shape(model, k, x, y) for (k, v) in tb if v > 1]
 	return A, x, y, shapes
 
@@ -79,7 +84,7 @@ function plot_model!(plt, model::AbstractVector{T}; markersize = 3, markerstroke
 
 	x, y = get_xy(k)
 	# TODO: not sure wheter all this OrderedDict is necessary
-	tb = sort(OrderedCollections.OrderedDict(countmap(model)), byvalue=true, lt = !isless)
+	tb = sort(OrderedCollections.OrderedDict(SB.countmap(model)), byvalue=true, lt = !isless)
 	count = 1
 
 	# @show kwargs
@@ -205,7 +210,7 @@ end
 
 function ordering(x)
 	# TODO: ensure this is the actual ordering like on wikipedia
-	d = countmap(x)
+	d = SB.countmap(x)
 	res = Float64(length(x) - length(d))
 
 	v = sort!(collect(values(d)), lt = !isless)
@@ -250,7 +255,7 @@ end
 
 function ordering2(x)
 	# TODO: ensure this is the actual ordering like on wikipedia
-	d = countmap(x)
+	d = SB.countmap(x)
 	res = Float64(length(x) - length(d))
 
 	v = sort!(collect(values(d)), lt = !isless)
@@ -262,13 +267,144 @@ function ordering2(x)
 	res += lexicographic_order(x)
 	return res
 end
+=#
 
+# Makie version
+function get_xy(k::Integer)
+	offset = k == 4 ? pi / 4 : 0.0
+	return [CM.Point2f(sincos(i * 2pi / k + offset)) for i in 1:k]
+end
+get_adj_colors(k::Int) = Colors.distinguishable_colors(k, [Colors.RGB(128/255,128/255,128/255)])
 
+function get_convex_hulls(model::AbstractVector{<:Integer}, coords::AbstractVector{<:CM.Point2f};
+		no_points = 128, pointscale = .15)
+
+	k = length(model)
+	u = unique(model)
+
+	all_ch_points = Vector{Vector{CM.Point2f}}()
+	for i in eachindex(u)
+
+		isone(sum(==(u[i]), model)) && continue
+
+		idx = findall(==(i), model)
+		centers = view(coords, idx)
+
+		expanded_ch_points = Vector{CM.Point2f}(undef, length(idx) * no_points)
+		circle_points = get_xy(no_points)
+		for i in eachindex(centers)
+			for j in eachindex(circle_points)
+				expanded_ch_points[j + (i-1) * no_points] = centers[i] + circle_points[j] * pointscale
+			end
+		end
+		unique!(expanded_ch_points)
+		ch = DelaunayTriangulation.convex_hull(unique(expanded_ch_points))
+		tri = DelaunayTriangulation.triangulate(unique(expanded_ch_points))
+
+		ch_points = [DelaunayTriangulation.get_point(tri, i) for i in DelaunayTriangulation.get_vertices(ch)]
+		push!(all_ch_points, ch_points)
+	end
+
+	return all_ch_points
+end
+
+function setup_axis(indexed_figure)
+	ax = CM.Axis(indexed_figure, aspect = CM.DataAspect(), backgroundcolor = :lightgrey)
+	CM.hidedecorations!(ax)
+	CM.hidespines!(ax)
+	return ax
+end
+
+function plot_one_model(model::AbstractVector{<:Integer})
+	fig = CM.Figure()
+	ax = setup_axis(fig[1, 1])
+	plot_one_model!(ax, model)
+	fig
+end
+
+function plot_one_model!(ax, model::AbstractVector{<:Integer}; markersize = 3, strokewidth = 6, strokecolor = :black, color = :white, kwargs...)
+
+	k = length(model)
+	coords = get_xy(k)
+	hulls  = get_convex_hulls(model, coords)
+	colors = get_adj_colors(k)[eachindex(hulls)]
+
+	tmp0 = extrema(Iterators.flatten(coords))
+	tmp1 = 1.3 * maximum(abs, tmp0)
+	lims = (-tmp1, tmp1)
+
+	CM.limits!(ax, lims, lims)
+
+	# (reverse(colors)[eachindex(hulls)])
+
+	for (col, h) in zip(reverse(colors), hulls)
+		CM.poly!(ax, h, color = (col, .5))
+	end
+
+	CM.scatter!(ax, coords;
+		markersize = markersize,
+		color = color,
+		strokewidth = strokewidth,
+		strokecolor = strokecolor,
+		kwargs...
+	)
+
+	return
+
+end
+
+function plot_modelspace(k::Integer)
+
+	models = Matrix(PartitionSpace(k))
+	order = sortperm(ordering.(eachcol(models)), lt = !isless)
+
+	fig = CM.Figure()
+
+	gl = CM.GridLayout(fig[1, 1])
+
+	if k == 5
+
+		plot_one_model!(setup_axis(gl[3, 1]), @view models[:, first(order)])
+		for i in 2:size(models, 2) - 1
+			col_index, row_index = fldmod1(i-1, 5)
+			plot_one_model!(setup_axis(gl[row_index, col_index + 1]), @view models[:, order[i]])
+		end
+		plot_one_model!(setup_axis(gl[3, 12]), @view models[:, last(order)])
+
+	else
+
+		for i in axes(models, 2)
+			col_index, row_index = fldmod1(i, 5)
+			plot_one_model!(setup_axis(gl[row_index, col_index]), @view models[:, order[i]])
+		end
+
+	end
+
+	return fig
+end
+
+function main(; results_dir::AbstractString)
+
+end
+#=
+# to plot individual models
 k = 5
 models = Matrix(PartitionSpace(k))
 order = sortperm(ordering.(eachcol(models)), lt = !isless)
-plots = [plot_model(view(models, :, i)) for i in order]
-layout, max_rows, max_cols = make_grid(k, false)
+plot_one_model(models[:, order[10]])
+plot_one_model(models[:, order[51]])
+
+# k == 5 has some specific settings, other values fill the grid
+k = 5
+fig = plot_modelspace(k)
+max_rows = 5
+max_cols = k == 5 ? 12 : ceil(Int, bellnum(5) / max_rows)
 
 w = 100
-plt = plot(plots..., layout = layout, size = (max_cols*w, max_rows*w))
+resize!(fig, max_cols * w, max_rows * w)
+gl = contents(fig[1, 1])[1]
+rowgap!(gl, 30)
+colgap!(gl, 30)
+
+fig
+=#
