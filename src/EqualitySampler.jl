@@ -137,29 +137,4 @@ include("westfall_functions.jl")
 include("find_initial_partition.jl")
 include("postprocess_samples.jl")
 
-
-# include("simulations/Simulations.jl")
-# import .Simulations: anova_test, proportion_test,
-# 	compute_model_probs2,
-# 	simulate_proportions,
-# 	proportions_sample,
-# 	proportions_sample_integrated,
-# 	proportions_enumerate
-
-# export
-# 	anova_test,
-# 	proportion_test,
-# 	average_equality_constraints,
-# 	MCMCSettings,
-
-# 	# anova_sample, anova_sample_integrated, anova_enumerate,
-# 	compute_model_probs2,
-# 	simulate_proportions,
-# 	proportions_sample,
-# 	proportions_sample_integrated,
-# 	proportions_enumerate
-
-
-
 end
-

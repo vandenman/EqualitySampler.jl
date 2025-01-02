@@ -89,8 +89,6 @@ function sample_next_values(c, o)
 		end
 		new_label_log_posterior_computed = false
 	end
-
-	@show oldValues, nextValues
 	return nextValues
 
 end
