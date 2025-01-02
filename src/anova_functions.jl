@@ -608,8 +608,10 @@ function anova_test(
 
         end
 
-        θ_u_v = view(θ_u, range(; stop = partition_size - 1))
-        θ_c_v = view(θ_c, range(; stop = partition_size))
+        # θ_u_v = view(θ_u, range(; stop = partition_size - 1))
+        # θ_c_v = view(θ_c, range(; stop = partition_size))
+        θ_u_v = view(θ_u, 1:partition_size - 1)
+        θ_c_v = view(θ_c, 1:partition_size)
 
         sample_conditional_θ_u_v!(θ_u_v, obj, Q, μ, σ², g)
 
