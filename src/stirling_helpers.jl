@@ -18,6 +18,7 @@ function alternating_logsumexp_batch(x::AbstractVector{T}) where T <: Number
 	end
 	# TODO: come up with something better than this fallback!
 	if result < zero(T)
+		@show x
 		@warn "alternating_logsumexp_batch failed which likely introduced numerical errors."
 		return T(log(sum(value->exp(BigFloat(value)), x)))
 	else

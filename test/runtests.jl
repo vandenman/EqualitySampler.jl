@@ -7,7 +7,7 @@ const tests = joinpath.(test_dir, filter!(x->startswith(x, "test-") && endswith(
 
 const on_ci = haskey(ENV, "CI") ? ENV["CI"] == "true" : false
 
-@testset "EqualitySampler" begin
+@testset verbose = true "EqualitySampler" begin
 
 	for t in tests
 		@testset "Test $t" begin

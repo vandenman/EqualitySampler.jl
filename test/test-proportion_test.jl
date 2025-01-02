@@ -1,50 +1,45 @@
-import Random, Distributions, MCMCChains, AbstractMCMC, Statistics, Turing
-import EqualitySampler.Simulations
+using Test
+import Random, Distributions, StatsBase as SB
 
-function partition_to_equality_matrix(partition)
-	[i > j && p == q for (i, p) in enumerate(partition), (j, q) in enumerate(partition)]
-end
+nth(iter, idx) = first(Iterators.drop(iter, idx-1))
+Random.seed!(42)
+range_n_groups = 3:5
+@testset "proportion_test_new" for n_groups in range_n_groups
 
-on_ci = haskey(ENV, "CI") ? ENV["CI"] == "true" : false
-Turing.setprogress!(!on_ci)
+    # n_groups = 5
+    n_obs_per_group = 1000
+    true_partition = rand(UniformPartitionDistribution(n_groups))
 
-@testset "proportion_test" begin
+    # to test against
+    ref_partition = EqualitySampler.reduce_model_2(true_partition)
 
-	Random.seed!(42)
-	n_groups = 5
-	true_partition     = rand(UniformPartitionDistribution(n_groups))
-	temp_probabilities = rand(n_groups)
-	true_probabilities = average_equality_constraints(temp_probabilities, true_partition)
-	observations    = rand(100:200, n_groups)
-	successes = rand(Distributions.product_distribution(Distributions.Binomial.(observations, true_probabilities)))
-	partition_prior = BetaBinomialPartitionDistribution(n_groups, 1, n_groups)
+    data_object = simulate_proportions(true_partition, fill(n_obs_per_group, n_groups))
 
-	mcmc_settings = Simulations.MCMCSettings(;iterations = 15_000, chains = 4, parallel = on_ci ? AbstractMCMC.MCMCSerial : AbstractMCMC.MCMCThreads)
+    partition_prior = BetaBinomialPartitionDistribution(n_groups, 1, n_groups)
 
-	chn_full = proportion_test(successes, observations, nothing;         mcmc_settings = mcmc_settings)
-	chn_eqs  = proportion_test(successes, observations, partition_prior; mcmc_settings = mcmc_settings)
+    enumerate_results  = proportion_test(data_object.n, data_object.k, EqualitySampler.Enumerate(), partition_prior, verbose = false)
+    hpm_partition_enumerate = get_hpm_partition(enumerate_results)
+    @test hpm_partition_enumerate == ref_partition
 
-	estimated_probabilities_full = Statistics.mean(chn_full).nt.mean
-	estimated_probabilities_eqs = Statistics.mean(MCMCChains.group(chn_eqs, :p_constrained)).nt.mean
+    # TODO: double check why these are different!
+    # enumerate_results0 = proportions_enumerate(data_object.n, data_object.k, partition_prior)
+    # enumerate_results.log_posterior_probs ≈ enumerate_results0.log_posterior_probs
 
-	# comparison with population proportions
-	@test isapprox(true_probabilities, estimated_probabilities_full; atol = 0.1)
-	@test isapprox(true_probabilities, estimated_probabilities_eqs; atol = 0.1)
+    results_sample_integrated  = proportion_test(data_object.n, data_object.k, EqualitySampler.SampleIntegrated(), partition_prior, verbose = false)
+    hpm_partition_sample_integrated = get_hpm_partition(results_sample_integrated)
+    @test hpm_partition_sample_integrated == ref_partition
 
-	# comparison with observed proportions
-	obs_proportions = successes ./ observations
-	@test isapprox(obs_proportions, estimated_probabilities_full; atol = 0.1)
-	@test isapprox(obs_proportions, estimated_probabilities_eqs; atol = 0.1)
+    results_enumerate_then_sample  = proportion_test(data_object.n, data_object.k, EqualitySampler.EnumerateThenSample(), partition_prior, verbose = false)
+    hpm_partition_enumerate_then_sample = get_hpm_partition(results_enumerate_then_sample)
+    @test hpm_partition_enumerate_then_sample == ref_partition
 
-	estimated_post_probs = Simulations.compute_post_prob_eq(chn_eqs)
-	true_eqs_mat = partition_to_equality_matrix(true_partition)
-	@test all(
-		if isone(true_eqs_mat[i, j])
-			estimated_post_probs[i, j] > 0.9
-		else
-			estimated_post_probs[i, j] < 0.1
-		end
-		for i in axes(true_eqs_mat, 1) for j in i+1:size(true_eqs_mat, 1)
-	)
+    results_sample = proportion_test(data_object.n, data_object.k, EqualitySampler.SampleRJMCMC(), partition_prior, verbose = false)
+    hpm_partition_sample = get_hpm_partition(results_sample)
+    @test hpm_partition_sample == ref_partition
+
+    tol = 0.01n_groups
+
+    @test SB.mean(results_sample.parameter_samples.θ_p_samples, dims = 2) ≈ data_object.p[data_object.partition] atol = tol
+
 
 end
