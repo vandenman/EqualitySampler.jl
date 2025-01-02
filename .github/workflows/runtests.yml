@@ -21,8 +21,9 @@ jobs:
     strategy:
       matrix:
         version:
-          - '1.6'
-          - '1.10'
+          - 'min'
+          - 'lts'
+          - '1'
         os:
           - ubuntu-latest
           - macOS-latest
@@ -30,10 +31,10 @@ jobs:
           - x64
     steps:
       - uses: actions/checkout@v4
-      - uses: julia-actions/setup-julia@v1.9
+      - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
-      - uses: julia-actions/cache@v1
+      - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@latest
       - uses: julia-actions/julia-runtest@latest
