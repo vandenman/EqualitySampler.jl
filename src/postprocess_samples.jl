@@ -74,7 +74,7 @@ function compute_model_counts(partition_samples::AbstractMatrix{T}, add_missing_
             end
         end
     end
-    return sort!(OrderedCollections.OrderedDict(res); byvalue=true, rev = true)
+    return sort!(OrderedCollections.OrderedDict(res); byvalue = true, rev = true)
 end
 
 function compute_model_counts(x::Union{IntegratedResult, RJMCMCResult, EnumerateThenSampleResult},
@@ -121,7 +121,7 @@ function compute_incl_counts(partition_samples::AbstractMatrix{T}; add_missing_i
             get!(res, T(i), zero(Int))
         end
     end
-    return sort(res; rev = true)
+    return sort!(OrderedCollections.OrderedDict(res); byvalue = true, rev = true)
 end
 
 """
