@@ -295,7 +295,7 @@ end
 
 # using EqualitySampler
 # import StatsModels, DataFrames
-
+#
 """
 ```julia
 anova_test(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame, args..., ; kwargs...)
@@ -309,7 +309,7 @@ Conduct a one way anova test.
 
 Data can be input in four ways.
 1. using a formula and dataframe (`@formula(outcome ~ 1 + grouping), df`).
-2. vector of rawdata and vector of group membership (`y = randn(6), g = [1, 1, 2, 2, 3, 3]`).
+2. rawdata and vector of group membership (`y = randn(6), g = [1, 1, 2, 2, 3, 3]`).
 3. rawdata and group ranges (`y = randn(6), g = [1:2, 3:4, 5:6]`)
 4. means, variances, and group sizes (`y_means = randn(3), y_vars = randexp(3), ns  = rand(2:2, 3)`).
 

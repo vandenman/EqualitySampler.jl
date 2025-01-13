@@ -27,7 +27,9 @@ function _interpret_max_cache_size(max_cache_size::Integer, initial_partition::A
     return num_keys
 end
 
-
+"""
+Enumerate the space of partitions
+"""
 struct Enumerate{T, U} <: AbstractSamplingMethod{T, U}
     integral_type::Type{T}
     initial_partition::U # TODO: this could also just store a type?
@@ -40,7 +42,9 @@ function Enumerate(; integral_type::Type{T} = Float64, initial_partition::U = In
     Enumerate(integral_type, initial_partition)
 end
 
-
+"""
+Enumerate the space of partitions, then sample from the model averaged posterior distribution by resampling from the enumerated space.
+"""
 struct EnumerateThenSample{T, U} <: AbstractSamplingMethod{T, U}
     integral_type::Type{T}
     initial_partition::U # TODO: this could also just store a type?
@@ -56,7 +60,9 @@ function EnumerateThenSample(; integral_type::Type{T} = Float64, initial_partiti
     EnumerateThenSample(integral_type, initial_partition, iter)
 end
 
-
+"""
+Sample only across partitions after integrating out all the parameters.
+"""
 struct SampleIntegrated{T, U} <: AbstractSamplingMethod{T, U}
     integral_type::Type{T}
     initial_partition::U
@@ -75,7 +81,9 @@ function SampleIntegrated(; integral_type::Type{T} = Float64, initial_partition:
     SampleIntegrated(integral_type, initial_partition, iter, max_cache_size, split_merge_prob)
 end
 
-
+"""
+Sample simultaneously from the space of partitions and the parameters.
+"""
 struct SampleRJMCMC{T, U} <: AbstractSamplingMethod{T, U}
     integral_type::Type{T}
     initial_partition::U

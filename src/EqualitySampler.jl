@@ -88,6 +88,11 @@ export
     westfall_test,
     proportion_test,
 
+    Enumerate,
+    EnumerateThenSample,
+    SampleIntegrated,
+    SampleRJMCMC,
+
     # simulate data
     simulate_data_one_way_anova,
     simulate_proportions,

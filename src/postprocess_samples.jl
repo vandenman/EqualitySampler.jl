@@ -1,6 +1,8 @@
 
 """
-    compute the proportion of samples where partition[i] == partition[j] ∀i, j
+$(TYPEDSIGNATURES)
+
+Compute the proportion of samples where partition[i] == partition[j] ∀i, j
 """
 function compute_post_prob_eq(partition_samples::AbstractMatrix)
     # n_samps, n_groups = size(partition_samples)
@@ -57,7 +59,9 @@ compute_post_prob_eq(x::EnumerateThenSampleResult) = compute_post_prob_eq(x.enum
 
 
 """
-    compute how often each partition is visited
+$(TYPEDSIGNATURES)
+
+Compute how often each partition is visited
 """
 function compute_model_counts(partition_samples::AbstractMatrix{T}, add_missing_models::Bool = true) where T<:Integer
     res = Dict{Vector{T}, Int}()
@@ -83,7 +87,9 @@ function compute_model_counts(x::Union{IntegratedResult, RJMCMCResult, Enumerate
 end
 
 """
-    compute the posterior probability of each partition
+$(TYPEDSIGNATURES)
+
+Compute the posterior probability of each partition
 """
 function compute_model_probs(chn::AbstractMatrix, add_missing_models::Bool = true)
     count_models = compute_model_counts(chn, add_missing_models)
@@ -108,7 +114,9 @@ end
 
 
 """
-    compute the many  models with posterior probability of including 0, ..., k-1 equalities in the model
+$(TYPEDSIGNATURES)
+
+Compute the number of models with posterior probability of including 0, ..., k-1 equalities in the model
 """
 function compute_incl_counts(x::Union{IntegratedResult, RJMCMCResult}; add_missing_inclusions::Bool = false)
     compute_incl_counts(x.partition_samples, add_missing_inclusions = add_missing_inclusions)
@@ -125,7 +133,9 @@ function compute_incl_counts(partition_samples::AbstractMatrix{T}; add_missing_i
 end
 
 """
-    compute the posterior probability of including 0, ..., k-1 equalities in the model
+$(TYPEDSIGNATURES)
+
+Compute the posterior probability of including 0, ..., k-1 equalities in the model
 """
 function compute_incl_probs(partition_samples::AbstractMatrix{T}; add_missing_inclusions::Bool = false) where T <:Integer
     return counts2probs(compute_incl_counts(partition_samples, add_missing_inclusions = add_missing_inclusions))
@@ -141,6 +151,8 @@ function counts2probs(counts::AbstractDict{T, U}) where {T, U}
 end
 
 """
+$(TYPEDSIGNATURES)
+
 Compute the median posterior probability model/ partition.
 Note that this is not the same as the median model/ partition in regression.
 For partitions, we find the partition `p` that minimizes `sum(abs2(eq_probs[i, j] - (p[i] == p[j])) for i in eachindex(p), j in eachindex(p))`.

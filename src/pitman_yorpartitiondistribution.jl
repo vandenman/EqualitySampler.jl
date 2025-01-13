@@ -33,6 +33,14 @@ function DirichletProcessPartitionDistribution(k::T, α::U; check_args::Bool = t
 	DirichletProcessPartitionDistribution{T, U}(k, α)
 end
 
+"""
+```
+PitmanYorProcessPartitionDistribution(k::Integer, d::Float64, α::Float64)
+```
+
+Pitman-Yor process distribution over partitions.
+The main constraints are `0 <= d < 1` and `θ > -d`.
+"""
 struct PitmanYorProcessPartitionDistribution{T<:Integer, U<:Number} <: AbstractProcessPartitionDistribution{T}
 	k::T
 	d::U

@@ -57,40 +57,23 @@ Base.@kwdef struct ProportionPriors{T<:AbstractPartitionDistribution, U<:Number}
     end
 end
 
-#=
+"""
+```julia
+proportion_test(ns::AbstractVector{<:Integer}, ks::AbstractVector{<:Integer}, args...; kwargs...)
+proportion_test(obj::SuffstatsProportions, method::AbstractSamplingMethod, partition_prior::AbstractPartitionDistribution;
+    α::Number = 1.0, β::Number = 1.0, verbose::Bool = true, threaded::Bool = true)
+```
 
+Conduct a proportion test for a given set of data.
 
-function extract_suffstats_one_way_anova(y_mean_by_group::AbstractVector, y_var_by_group::AbstractVector, ns::AbstractVector{<:Integer})
+    The method should be one of `Enumerate`, `EnumerateThenSample`, `SampleIntegrated`, or `SampleRJMCMC`.
+The return type depends on the method used. Specifically, `Enumerate` returns an `EnumerateResult`,
+`EnumerateThenSample` returns an `EnumerateThenSampleResult`, `SampleIntegrated` returns an `IntegratedResult`, and
+`SampleRJMCMC` returns an `RJMCMCResult`.
+These different types do not really matter and are mostly used to make various extractor functions work.
 
-    n = sum(ns)
-    y_mean = LinearAlgebra.dot(y_mean_by_group, ns) / n
-    y_var = sum(i-> ns[i] * (y_var_by_group[i] + abs2(y_mean_by_group[i])), eachindex(ns)) / n - abs2(y_mean)
-
-    return SuffstatsANOVA(y_mean, y_var, n, y_mean_by_group, y_var_by_group, ns)
-end
-
-function extract_suffstats_one_way_anova(y::AbstractVector, g::AbstractVector)
-
-    ns     = [count(==(i), g) for i in unique(g)]
-    y_mean_by_group = [StatsBase.mean(y[g .== i]) for i in unique(g)]
-    y_var_by_group  = [StatsBase.var(y[g .== i], corrected = false) for i in unique(g)]
-
-    return extract_suffstats_one_way_anova(y_mean_by_group, y_var_by_group, ns)
-
-end
-
-function extract_suffstats_one_way_anova(y::AbstractVector, g::AbstractVector{<:UnitRange})
-
-    ns     = length.(g)
-    y_mean_by_group = [StatsBase.mean(y[gᵢ]) for gᵢ in g]
-    y_var_by_group  = [StatsBase.var(y[gᵢ], corrected = false) for gᵢ in g]
-
-    return extract_suffstats_one_way_anova(y_mean_by_group, y_var_by_group, ns)
-
-end
-
-
-=#
+`α` and `β` correspond to the hyperparameters of the Beta prior distribution for the proportions.
+"""
 function proportion_test(
     ns::AbstractVector{<:Integer}, ks::AbstractVector{<:Integer}, args...; kwargs...
     )

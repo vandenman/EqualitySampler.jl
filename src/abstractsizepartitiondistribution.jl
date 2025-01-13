@@ -15,6 +15,13 @@ For example [1, 1, 1] implies one parameter and [1, 1, 2, 3, 4] implies four par
 """
 abstract type AbstractSizePartitionDistribution{T} <: AbstractPartitionDistribution{T} end
 
+"""
+```
+logpdf_incl(d::AbstractPartitionDistribution, no_parameters::Integers)
+```
+
+Log probability of the sum of all partitions with that number of parameters.
+"""
 function logpdf_incl(d::AbstractSizePartitionDistribution, no_parameters::Integer)
     Distributions.insupport(d, no_parameters) || return -Inf
     logpdf_incl_no_check(d, no_parameters)

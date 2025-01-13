@@ -6,7 +6,10 @@ AbstractPartitionDistribution
 UniformPartitionDistribution
 BetaBinomialPartitionDistribution
 CustomInclusionPartitionDistribution
-RandomProcessPartitionDistribution
+DirichletProcessPartitionDistribution
+PitmanYorProcessPartitionDistribution
+PrecomputedCustomInclusionPartitionDistribution
+DuplicatedPartitionDistribution
 ```
 
 Aside from the interface for multivariate distributions, the following methods are also defined.
