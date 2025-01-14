@@ -1,12 +1,10 @@
-import Turing
-
 @testset "test find_dpp_α" begin
 
 	ks = 2:10
 
 	function evaluate_α(α, k)
 
-		d_test = RandomProcessPartitionDistribution(k, Turing.RandomMeasures.DirichletProcess(α))
+		d_test = DirichletProcessPartitionDistribution(k, α)
 
 		null_model = fill(1, k)
 		full_model = collect(1:k)

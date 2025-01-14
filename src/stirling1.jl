@@ -8,6 +8,11 @@ The `EqualitySampler.RecursiveStrategy` uses recursion and is mathematically ele
 unsignedstirlings1(n::T, k::T) where T <: Integer = unsignedstirlings1(n, k, ExplicitStrategy)
 unsignedstirlings1(n::T, k::U) where {T<:Integer, U<:Integer} = unsignedstirlings1(promote(n, k)...)
 
+function stirlings1(n::Integer, k::Integer)
+	sign = iseven(n - k) ? one(n) : -one(n)
+	return sign * unsignedstirlings1(n, k)
+end
+
 """
 $(TYPEDSIGNATURES)
 
@@ -28,10 +33,10 @@ function unsignedstirlings1_base_cases(n::T, k::T) where T <: Integer
 	k == n - 2							&& return (true, T(div((3 * n - 1) * binomial(n, 3), 4)))
 	k == n - 3							&& return (true, T(binomial(n, 2) * binomial(n, 4)))
 
-	if 7 <= n <= _stirling1_N_MAX && 3 <= k <= n - 3
-		index = _stirling1_index(n, k)
-		return (true, T(_stirlings1_table_BigInt[index]))
-	end
+	# if 7 <= n <= _stirling1_N_MAX && 3 <= k <= n - 3
+	# 	index = _stirling1_index(n, k)
+	# 	return (true, T(_stirlings1_table_BigInt[index]))
+	# end
 
 	return(false, zero(T))
 end

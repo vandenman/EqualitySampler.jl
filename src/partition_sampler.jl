@@ -8,9 +8,11 @@ struct PartitionSampler <: Distributions.DiscreteMultivariateDistribution
 	PartitionSampler(size::Int, logposterior::Function) = new(size, ones(Int, size), logposterior)
 end
 
-Base.rand(::Random.AbstractRNG, d::PartitionSampler) = d.nextValues
+function Base.rand(::Random.AbstractRNG, d::PartitionSampler)
+	d.nextValues
+end
 
-function (o::PartitionSampler)(c)
+function(o::PartitionSampler)(c)
 	o.nextValues .= sample_next_values(c, o)
 	return o
 end
@@ -27,6 +29,7 @@ function sample_next_values(c, o)
 	new_label_log_posterior_computed = false
 	present_labels = fast_countmap_partition_incl_zero(nextValues)
 
+	oldValues = copy(nextValues)
 	# O(k^2) with at worst k*(k-1) likelihood evaluations if all labels are distinct and at best 2k likelihood evaluations
 	@inbounds for j in eachindex(probvec)
 

@@ -7,19 +7,17 @@ import Combinatorics
 	rvals = 6
 	@testset "comparison with Combinatorics" begin
 
-		for strategy in (EqualitySampler.ExplicitStrategy, EqualitySampler.RecursiveStrategy)
-			@testset "stirlings2, StirlingStrategy: $strategy" begin
-				for n in 1:nvals, k in 1:kvals
-					@test Combinatorics.stirlings2(n, k) == stirlings2(n, k, strategy)
-				end
-			end
+        @testset "stirlings2, StirlingStrategy: $strategy" for strategy in (EqualitySampler.ExplicitStrategy, EqualitySampler.RecursiveStrategy)
+            for n in 1:nvals, k in 1:kvals
+                @test Combinatorics.stirlings2(n, k) == stirlings2(n, k, strategy)
+            end
+        end
 
-			@testset "stirlings1, StirlingStrategy: $strategy" begin
-				for n in 1:nvals, k in 1:kvals
-					@test Combinatorics.stirlings1(n, k) == unsignedstirlings1(n, k, strategy)
-				end
-			end
-		end
+        @testset "stirlings1, StirlingStrategy: $strategy"  for strategy in (EqualitySampler.ExplicitStrategy, EqualitySampler.RecursiveStrategy)
+            for n in 1:nvals, k in 1:kvals
+                @test Combinatorics.stirlings1(n, k) == unsignedstirlings1(n, k, strategy)
+            end
+        end
 
 		@testset "bell numbers" begin
 			for n in 1:12
@@ -112,6 +110,33 @@ import Combinatorics
 		end
 	end
 
+	@testset "compare logbellnumr(Float64, Float64) against log(bellnumr(BigInt, BigInt)) for large n and r" begin
+
+		large_nvals = [40, 60, 80, 100, 150, 200]
+		large_rvals = [20, 45, 60, 80, 100, 150]
+
+		# BigInt is pretty costly and creating the array below takes a few minutes.
+		# hence it's created up front and then stored inline.
+		# we care for the accuracy at Float64 level, so that is the precision stored
+		# reference = zeros(Float64, length(large_nvals), length(large_rvals))
+		# for (i, n) in enumerate(large_nvals), (j, r) in enumerate(view(large_rvals, 1:findlast(<=(n), large_rvals)))
+		# 	reference[i, j] = log(bellnumr(big(n), big(r)))
+		# end
+		# show(IOContext(stdout, :compact=>false), "text/plain", reference)
+		reference = [
+			124.57081404566938    0.0                 0.0                 0.0                 0.0                 0.0
+			190.06474003537974  230.9678330446572   247.30225411645964    0.0                 0.0                 0.0
+			258.10842489646456  308.8418208736561   330.16520928876986  352.22160752903795    0.0                 0.0
+			328.5868873335278   387.39147538068573  413.3499636139951   440.5818275303084   462.1876117244162     0.0
+			514.0615381832629   587.4942198483028   623.2201465131886   662.3524728084016   694.0914061920556   753.2811843088359
+			710.466118437233    793.6597313151536   836.6746001372359   885.8566323737772   926.9082375961624  1004.8445505260463
+		]
+		for (i, n) in enumerate(large_nvals), (j, r) in enumerate(view(large_rvals, 1:findlast(<=(n), large_rvals)))
+			@test logbellnumr(n, r) ≈ reference[i, j]
+		end
+	end
+
+
 	@testset "compare logstirlings2 against log(stirlings2)" begin
 		for n in 1:nvals, k in 1:kvals
 			@test logstirlings2(n, k) ≈ log(stirlings2(n, k))
@@ -174,8 +199,39 @@ import Combinatorics
 			@inferred stirlings2(n, k)
 			@inferred stirlings2r(n, k, r)
 			@inferred bellnumr(n, r)
+			@inferred logbellnumr(n, r)
 			@inferred unsignedstirlings1(n, k)
 
 		end
 	end
+
+	@testset "Generalized stirgling numbers" begin
+
+		αs = randn(5)
+		βs = randn(5)
+		ns = 1:4
+		ks = 1:4
+
+		# reference_fun implements the table above eq 1.22 in
+		# Pitman, J. (2006). Combinatorial stochastic processes: Ecole d'eté de probabilités de saint-flour xxxii-2002. Springer.
+		function reference_fun(α, β)
+			[
+				1								0								0				0
+				β - α							1								0				0
+				(β - α) * (β - 2α)				3(β - α)						1				0
+				(β - α) * (β - 2α) * (β - 3α)	4(β - α)*(β - 2α) + 3(β - α)^2	6(β - α)		1
+			]
+		end
+
+		replication = zeros(4, 4)
+		for (α, β) in Iterators.product(αs, βs)
+			reference   = reference_fun(α, β)
+			for n in ns, k in ks
+				replication[n, k] = EqualitySampler.generalized_stirling_number(α, β, n, k)
+			end
+			@test reference ≈ replication
+		end
+
+	end
 end
+

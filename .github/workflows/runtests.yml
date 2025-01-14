@@ -3,9 +3,16 @@ name: runtests
 on:
   push:
     paths: ['Project.toml', '**.jl', '!docs/**', '.github/workflows/runtests.yml']
+    branches:
+        - main
+        - revision
   pull_request:
     paths: ['Project.toml', '**.jl', '!docs/**', '.github/workflows/runtests.yml']
 
+# needed to allow julia-actions/cache to delete old caches that it has created
+permissions:
+    actions: write
+    contents: read
 
 jobs:
   test:
@@ -14,8 +21,9 @@ jobs:
     strategy:
       matrix:
         version:
-          - '1.6'
-          - '1.9'
+          - 'min'
+          - 'lts'
+          - '1'
         os:
           - ubuntu-latest
           - macOS-latest
@@ -23,9 +31,10 @@ jobs:
           - x64
     steps:
       - uses: actions/checkout@v4
-      - uses: julia-actions/setup-julia@v1.9
+      - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
+      - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@latest
       - uses: julia-actions/julia-runtest@latest

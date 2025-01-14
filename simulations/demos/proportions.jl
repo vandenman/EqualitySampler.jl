@@ -1,250 +1,134 @@
-using EqualitySampler, Turing, Plots, FillArrays, Plots.PlotMeasures, Colors
+using EqualitySampler
+import AlgebraOfGraphics as AOG
+import Distributions
+import CairoMakie as CM
 import	DataFrames		as DF,
 		StatsBase 		as SB,
 		LinearAlgebra	as LA,
 		NamedArrays		as NA,
 		CSV
-import DynamicPPL: @submodel
-import JLD2, KernelDensity, Printf, ColorSchemes, Colors
+import Printf, ColorSchemes, Colors, OrderedCollections
 round_2_decimals(x::Number) = Printf.@sprintf "%.2f" x
 round_2_decimals(x) = x
 
-journal_data = DF.DataFrame(CSV.File(joinpath("simulations", "demos", "data", "journal_data.csv")))
-
-scatter(journal_data[!, :journal], journal_data[!, :errors], ylims = (0, 1), ylab = "Proportion of statistical reporting errors", label = nothing)
-
-@assert journal_data[!, :errors] ≈ journal_data[!, :perc_articles_with_errors] ./ 100
-
-make_title(d::BetaBinomial) = "Beta-binomial α=$(round_2_decimals(d.α)) β=$(round_2_decimals(d.β))"
-make_title(::UniformPartitionDistribution) = "Uniform"
-make_title(d::BetaBinomialPartitionDistribution) = "Beta-binomial α=$(round_2_decimals(d.α)) β=$(round_2_decimals(d.β))"
-make_title(d::RandomProcessPartitionDistribution) = "Dirichlet Process α=$(round_2_decimals(d.rpm.α))"
-make_title(::Nothing) = "Full model"
-
-function get_p_constrained(model, samps)
-
-	default_result = generated_quantities(model, MCMCChains.get_sections(samps, :parameters))
-	clean_result = Matrix{Float64}(undef, length(default_result[1][1]), size(default_result, 1))
-	for i in eachindex(default_result)
-		clean_result[:, i] .= default_result[i][1]
-	end
-	return vec(mean(clean_result, dims = 2)), clean_result
-end
-
-@model function proportion_model_full(no_errors, total_counts, partition = nothing, ::Type{T} = Float64) where T
-
-	p_raw ~ filldist(Beta(1.0, 1.0), length(no_errors))
-	p_constrained = isnothing(partition) ? p_raw : average_equality_constraints(p_raw, partition)
-	no_errors ~ Distributions.Product(Binomial.(total_counts, p_constrained))
-	return (p_constrained, )
-end
-
-@model function proportion_model_equality_selector(no_errors, total_counts, partition_prior)
-	partition ~ partition_prior
-	DynamicPPL.@submodel prefix="inner" p = proportion_model_full(no_errors, total_counts, partition)
-	return p
-end
-
-function equality_prob_table(journal_data, samples)
-	maxsize = maximum(length, journal_data[!, :journal])
+function equality_prob_table(journal_data, eq_prob_mat)
+	maxsize = maximum(length, journal_data.journal)
 	rawnms = ["$(rpad(journal, maxsize)) ($(round(prob, digits=3)))" for (journal, prob) in eachrow(journal_data[!, [:journal, :errors]])]
-	nms = OrderedDict(rawnms .=> axes(journal_data, 1))
+	nms = OrderedCollections.OrderedDict(rawnms .=> axes(journal_data, 1))
 	return NA.NamedArray(
-		collect(LA.UnitLowerTriangular(compute_post_prob_eq(samples))),
+		collect(LA.UnitLowerTriangular(eq_prob_mat)),
 		(nms, nms), ("Rows", "Cols")
 	)
 end
+#endregion
 
-function plot_observed_against_estimated(observed, estimated, label; markersize = 1, legend = :topleft, color = permutedims(distinguishable_colors(8, [RGB(1,1,1), RGB(0,0,0)], dropseed=true)), xlab = "Observed proportion", ylab = "Posterior mean", kwargs...)
-	plt = plot(;kwargs...);
-	Plots.abline!(plt, 1, 0, legend = false, color = "black", label = nothing);
-	scatter!(plt, observed', estimated', legend = legend, label = label, ylim = (0, 1), xlim = (0, 1), xlab = xlab, ylab = ylab, color = color, markersize = markersize)
-	return plt
-end
+# working directory is assumed to be the root of the GitHub repository
+journal_data = DF.DataFrame(CSV.File(joinpath("simulations", "demos", "data", "journal_data.csv")))
 
-total_counts = journal_data[!, :n]
-no_errors = round.(Int, journal_data[!, :x])
+# bar graph of the errors by journal
+AOG.data(journal_data) *
+	AOG.visual(CM.BarPlot) *
+	AOG.mapping(:journal, :errors) |> AOG.draw()
 
-priors = (
-	full = nothing,
-	DPP1 = DirichletProcessPartitionDistribution(length(no_errors), 0.5),
-	DPP2 = DirichletProcessPartitionDistribution(length(no_errors), 1.0),
-	DPP3 = DirichletProcessPartitionDistribution(length(no_errors), 2.0),
-	Betabinomial1 = BetaBinomialPartitionDistribution(length(no_errors), 1, 1),
-	Betabinomial2 = BetaBinomialPartitionDistribution(length(no_errors), 1, length(no_errors)),
-	Betabinomial3 = BetaBinomialPartitionDistribution(length(no_errors), 1, binomial(length(no_errors), 2)),
-	Uniform = UniformPartitionDistribution(length(no_errors))
+# @assert journal_data[!, :errors] ≈ journal_data[!, :perc_articles_with_errors] ./ 100
+
+# no. possible errors
+total_counts = journal_data.n
+
+# no. errors
+no_errors = round.(Int, journal_data.x)
+
+# no. MCMC iterations
+no_iter = 200_000
+
+# no. groups, i.e., K
+no_journals = length(journal_data.journal)
+
+partition_prior = BetaBinomialPartitionDistribution(no_journals, 1, no_journals)
+
+# with EqualitySampler.EnumerateThenSample first enumerates the model space
+# and then resamples to obtain model averaged parameter distributions.
+prop_samples_eq   = proportion_test(total_counts, no_errors, EqualitySampler.EnumerateThenSample(iter = no_iter), partition_prior)
+
+# compute the posterior probability of equality
+eq_prop_mat = compute_post_prob_eq(prop_samples_eq)
+
+# the posterior probability that two journals are equal
+NA.NamedArray(
+  LA.UnitLowerTriangular(round.(eq_prop_mat; digits = 2)),
+  (journal_data.journal, journal_data.journal)
 )
 
-fits_file = joinpath(pwd(), "simulations", "demos", "saved_objects", "proportions_fits.jld2")
-if !isfile(fits_file)
-	fits = map(priors) do prior
+# a prettier table with names along the axes
+eq_prob_table = equality_prob_table(journal_data, eq_prop_mat)
+eq_prob_table
+# 8×8 Named Matrix{Float64}
+#  Rows ╲ Cols │ JAP  (0.336)  PS   (0.397)  JCCP (0.489)  PLOS (0.497)  FP   (0.508)  DP   (0.509)  JEPG (0.548)  JPSP (0.576)
+# ─────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────
+# JAP  (0.336) │          1.0           0.0           0.0           0.0           0.0           0.0           0.0           0.0
+# PS   (0.397) │     0.097201           1.0           0.0           0.0           0.0           0.0           0.0           0.0
+# JCCP (0.489) │  7.38333e-20    6.66749e-8           1.0           0.0           0.0           0.0           0.0           0.0
+# PLOS (0.497) │  6.16726e-23     1.4969e-9      0.904766           1.0           0.0           0.0           0.0           0.0
+# FP   (0.508) │  4.61693e-12    3.15509e-6      0.849854      0.860222           1.0           0.0           0.0           0.0
+# DP   (0.509) │  3.93733e-27   2.74948e-11      0.852721      0.876882      0.870441           1.0           0.0           0.0
+# JEPG (0.548) │  2.03908e-20   2.12541e-11     0.0692283     0.0749236      0.102925     0.0939783           1.0           0.0
+# JPSP (0.576) │   2.8586e-57   7.04563e-32     2.886e-10     6.1213e-9    0.00611677    1.84968e-6      0.805901           1.0
 
-		if isnothing(prior)
-			model = proportion_model_full(no_errors, total_counts)
-			spl = NUTS()
-		else
-			model = proportion_model_equality_selector(no_errors, total_counts, prior)
-			spl = Gibbs(
-				HMC(0.05, 10, Symbol("inner.p_raw")),
-				GibbsConditional(:partition, EqualitySampler.PartitionSampler(length(no_errors), get_logπ(model)))
-			)
-		end
+# plot the posterior samples of the error probabilities
+samples_df = DF.DataFrame(
+    sample    = vcat(vec(prop_samples_full.parameter_samples.θ_p_samples), vec(prop_samples_eq.parameter_samples.θ_p_samples)),
+    parameter = repeat(journal_data.journal, outer = 2no_iter),
+    method    = repeat(["Full model", "Model averaged"], inner = no_iter * length(total_counts))
+)
 
-		all_samples = sample(model, spl, 100_000);
-		posterior_means, posterior_samples = get_p_constrained(model, all_samples)
+cols = Colors.parse.(Colors.Colorant, [
+    "#009afa", "#e36f47", "#3da44e", "#c371d2",
+    "#ac8e18", "#00aaae", "#ed5e93", "#c68225"
+])
+w = 650
+f = CM.Figure(size = (2w, w), fontsize = 20)
+left_panel  = f[1, 1] = CM.GridLayout()
+right_panel = f[1, 2] = CM.GridLayout()
 
-		return (posterior_means=posterior_means, posterior_samples=posterior_samples, all_samples=all_samples, model=model)
-	end
-	JLD2.save_object(fits_file, fits)
-else
-	fits = JLD2.load_object(fits_file)
+left_panel_aog = AOG.data(samples_df) *
+    AOG.mapping(:sample => "Error probability", color = :parameter, layout = :method) *
+    AOG.density()
+# AOG.draw(left_panel_aog, axis = (ylabel = "Density", ))
+
+legend_info = AOG.draw!(left_panel, left_panel_aog,
+    axis = (ylabel = "Density", rightspinevisible = false, topspinevisible = false, titlefont = :regular,
+    limits = ((.25, .7), nothing)),
+    AOG.scales(
+        Layout = (; palette = [(1, 1), (2, 1)]),
+        Color = (;  palette = cols, categories = journal_data.journal)
+    ))
+
+AOG.legend!(f[1, 1], legend_info; tellwidth = false, tellheight = false,
+    framevisible = false, backgroundcolor = :transparent,
+    halign = :right, valign = :top, titlevisible = false, titlesize = 0.0f0)
+
+centers_x = (axes(eq_prob_table, 1))
+centers_y = reverse(axes(eq_prob_table, 2))
+data      = Matrix(eq_prob_table)
+for i in axes(data, 1), j in i:size(data, 2)
+    data[i, j] = NaN
 end
+data = permutedims(data)
 
-trace_plots = map(zip(priors, fits)) do (prior, fit)
-	plot(fit[:posterior_samples]', xlab = "iteration", ylab = "proportions", legend = false, ylim = (0, 1), title = make_title(prior))
+color_gradient = CM.cgrad(CM.cgrad(ColorSchemes.magma)[0.15:0.01:1.0])
+ax = CM.Axis(right_panel[1, 1],
+    title = "Posterior probability of pairwise equality", titlefont = :regular,
+    xticks = (axes(eq_prob_table, 1), journal_data.journal),
+    yticks = (axes(eq_prob_table, 1), reverse(journal_data.journal)),
+    xgridvisible = false, ygridvisible = false)
+    CM.hidespines!(ax)
+hm = CM.heatmap!(ax, centers_x, centers_y, data, colormap = color_gradient, colorrange = (0, 1))
+for i in axes(data, 2), j in i+1:size(data, 1)
+    CM.text!(ax, centers_x[i], centers_y[j], text = round_2_decimals(data[i, j]), align = (:center, :center),
+        color = color_gradient[1 - data[i, j]])
 end
+CM.Colorbar(right_panel[1, 2], limits = (0, 1), colormap = color_gradient, ticks = 0:.1:1)
 
-l = (isqrt(length(priors)), ceil(Int, length(priors) / isqrt(length(priors))))
-joint_trace_plots = plot(trace_plots..., layout = l, size = 400 .* reverse(l))
+f
 
-cols = permutedims(distinguishable_colors(8, [RGB(1,1,1), RGB(0,0,0)], dropseed=true)[1:8])
-retrieval_plots = map(zip(priors, fits)) do (prior, fit)
-	plot_observed_against_estimated(journal_data[!, :errors], fit[:posterior_means], permutedims(journal_data[!, :journal]); title = make_title(prior),
-		legend = isnothing(prior) ? :topleft : nothing, foreground_color_legend = nothing, background_color_legend = nothing,
-		markersize = 5, color = cols
-	)
-end
-joint_retrieval_plots = plot(retrieval_plots..., layout = (1, length(priors)), size = (400length(priors), 400))
-joint_retrieval_plots_2x2 = plot(retrieval_plots..., layout = (2, 2), size = (800, 800))
-joint_retrieval_plots_full_bb = plot(retrieval_plots[[1, 3]]..., layout = (1, 2), size = (400*2, 400), bottom_margin = 5mm, left_margin = 5mm)
-
-savefig(joint_trace_plots, "figures/demo_proportions_trace_plots.pdf")
-savefig(joint_retrieval_plots, "figures/demo_proportions_retrieval_plots.pdf")
-savefig(joint_retrieval_plots_2x2, "figures/demo_proportions_retrieval_plots_2x2.pdf")
-savefig(joint_retrieval_plots_full_bb, "figures/demo_proportions_retrieval_plots_full_bb.pdf")
-
-# count visited models
-visited = map(zip(priors, fits)) do (prior, fit)
-
-	isnothing(prior) && return nothing
-
-	all_samples = fit[:all_samples]
-	mp = sort(compute_model_probs(all_samples),  byvalue=true, rev=true)
-	mc = sort(compute_model_counts(all_samples), byvalue=true, rev=true)
-
-	return (
-		count(!iszero, values(mp)),
-		count(>(0), values(mc)), # number of models visited
-		equality_prob_table(journal_data, all_samples)
-	)
-
-end
-
-visited[4][1]
-
-density_data = map(fits) do fit
-
-	npoints = 2^12
-	no_groups = size(fit.posterior_samples, 1)
-
-	x = Matrix{Float64}(undef, npoints, no_groups)
-	y = Matrix{Float64}(undef, npoints, no_groups)
-
-	for (i, row) in enumerate(eachrow(fit.posterior_samples))
-		k = KernelDensity.kde(row; npoints = npoints, boundary = (0, 1))
-		x[:, i] .= k.x
-		y[:, i] .= k.density
-	end
-	return (x = x, y = y)
-end
-
-nms = NamedTuple{keys(fits)}(keys(fits))
-
-density_plots = map(nms) do (key)
-
-	x, y = density_data[key]
-	plt = plot(x, y, legend = false, title = make_title(priors[key]), xlim = (.25, .65))
-
-end
-
-legend_plot = plot(zeros(1, 8); showaxis = false, grid = false, axis = nothing,
-	foreground_color_legend = nothing, background_color_legend = nothing,
-	label = permutedims(journal_data[!, :journal]));
-joined_density_plots = plot(density_plots..., legend_plot, size = (4, 2) .* 400, layout = @layout [grid(2,4) a{0.1w}]);
-savefig(joined_density_plots, "figures/demo_proportions_joined_density_plots.pdf")
-
-densityFull = deepcopy(density_data.full)
-densityBB   = deepcopy(density_data.Betabinomial2)
-
-# do not plot very small density values
-densityFull.y .= ifelse.(densityFull.y .<= 0.1, NaN, densityFull.y)
-densityBB.y   .= ifelse.(densityBB.y   .<= 0.1, NaN, densityBB.y)
-
-my_theme = PlotThemes.PlotTheme(linewidth = 1.5)
-PlotThemes.add_theme(:test, my_theme)
-# Plots.showtheme(:test)
-Plots.theme(:test)
-
-
-axis_line_x = 0:0.01:1
-axis_line_y = fill(0.0, length(axis_line_x))
-xlim = (.25, .71)
-ylim = (0, 70)
-cols = permutedims(1:8)
-plt1 = plot(densityFull.x, densityFull.y; xlim = xlim, ylim = ylim, title = make_title(priors.full), color = cols, label = permutedims(journal_data[!, :journal]), foreground_color_legend = nothing, background_color_legend = nothing);
-plt2 = plot(densityBB.x, densityBB.y;     xlim = xlim, ylim = ylim, title = "Model averaged",        color = cols, legend = false, xlab = "Error probability");
-# plot!(plt1, axis_line_x, axis_line_y, color = "black", linewidth = 1.0);
-# plot!(plt2, axis_line_x, axis_line_y, color = "black", linewidth = 1.0);
-left_panel = plot(plt1, plt2, layout = (2, 1));
-
-plt_ylabel = plot([0 0]; ylab = "Density", showaxis = false, grid = false, axis = nothing, legend = false, left_margin = -6mm, right_margin = 6mm, ymirror=true)
-plt_legend = plot(zeros(1, 8); showaxis = false, grid = false, axis = nothing, foreground_color_legend = nothing, background_color_legend = nothing, label = permutedims(journal_data[!, :journal]), legendtitle = "Journal",
-	left_margin = 0mm);
-
-left_panel = plot(plt_ylabel, plot(plt1, legend = false), plt2, plt_legend,
-	bottom_margin = 3mm,
-	layout = @layout [a{0.00001w} grid(2, 1) a{0.1w}]
-);
-
-left_panel = plot(plt_ylabel, plot(plt1, legend = (.95, .95), legendtitle = "Journal"), plt2,
-	bottom_margin = 3mm,
-	layout = @layout [a{0.00001w} grid(2, 1)]
-);
-
-
-eq_table = equality_prob_table(journal_data, fits.Betabinomial2.all_samples)
-for i in 1:8, j in i:8
-	eq_table[i, j] = NaN
-end
-
-x_nms = journal_data[!, :journal]# names(eq_table)[1]
-color_gradient = cgrad(cgrad(ColorSchemes.magma)[0.15:0.01:1.0])
-annotations = []
-for i in 1:7, j in i+1:8
-	z = eq_table[9-i, 9-j]
-	col = color_gradient[1 - z]
-	push!(annotations,
-		(
-			8 - j + 0.5,
-			i - 0.5,
-			Plots.text(
-				round_2_decimals(z),
-				8, col, :center
-			)
-		)
-	)
-end
-
-right_panel = heatmap(x_nms, reverse(x_nms), Matrix(eq_table)[8:-1:1, :],
-	aspect_ratio = 1, showaxis = false, grid = false, color = color_gradient,
-	clims = (0, 1),
-	title = "Posterior probability of pairwise equality",
-	#=colorbar_ticks = 0:.2:1, <- only works with pyplot =#
-	annotate = annotations,
-	xmirror = false);
-
-
-joined_plot = plot(left_panel, right_panel, layout = (1, 2), size = (2, 1) .* 500);
-savefig(joined_plot, "figures/demo_proportions_2panel_plot.pdf")
-
+CM.save("simulations/revision_figures/proportions_side_by_side.pdf", f)

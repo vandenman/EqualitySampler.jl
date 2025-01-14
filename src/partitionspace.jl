@@ -22,7 +22,7 @@ struct PartitionSpace{T<:Integer, P<:AbstractPartitionSpace}
 end
 
 function Base.iterate(iter::PartitionSpace{T, P}) where {T, P}
-	return ones(Int, iter.k), ones(Int, iter.k)
+	return ones(T, iter.k), ones(T, iter.k)
 end
 
 @inbounds function manual_findfirst(current)
@@ -51,8 +51,8 @@ end
 
 	idx = manual_findfirst(current)
 	isnothing(idx) && return nothing
-	current[idx] += 1
-	current[idx + 1 : end] .= 1
+	current[idx] += one(T)
+	current[idx + 1 : end] .= one(T)
 
 	return (current, copy(current))
 
@@ -63,15 +63,15 @@ function Base.iterate(iter::PartitionSpace{T, DuplicatedPartitionSpace}, states)
 	@inbounds begin
 
 		current = copy(states)
-		i = 1
+		i = one(T)
 		while i <= iter.k && current[i] == iter.k
-			i += 1
+			i += one(T)
 		end
 
 		i > iter.k && return nothing
 
-		current[i] += 1
-		current[1:i-1] .= 1
+		current[i] += one(T)
+		current[1:i-1] .= one(T)
 
 	end
 
@@ -79,14 +79,19 @@ function Base.iterate(iter::PartitionSpace{T, DuplicatedPartitionSpace}, states)
 
 end
 
-Base.length(iter::PartitionSpace{T, DistinctPartitionSpace})   where T = bellnum(iter.k)
-Base.length(iter::PartitionSpace{T, DuplicatedPartitionSpace}) where T = iter.k^iter.k
+Base.length(iter::PartitionSpace{<:Any, DistinctPartitionSpace}) = bellnum(iter.k)
+Base.length(iter::PartitionSpace{<:Any, DuplicatedPartitionSpace}) = iter.k^iter.k
 
-Base.eltype(::Type{PartitionSpace{T, P}}) where {T, P} = Vector{Int}
-Base.IteratorSize(::Type{PartitionSpace{T, P}}) where {T, P} = Base.HasLength()
+Base.eltype(::Type{<:PartitionSpace{T}}) where T = Vector{T}
+# Base.eltype(::PartitionSpace{T}) where T = Vector{T}
 
-function Base.Matrix(iter::PartitionSpace{T, P}) where {T, P}
-	res = Matrix{Int}(undef, iter.k, length(iter))
+# default
+# Base.IteratorSize(::Type{PartitionSpace}) = Base.HasLength()
+
+function Base.Matrix(iter::PartitionSpace{T, <:Any}) where T
+    # T may be to small to represent bellnum(iter.k)
+    k_int = promote_type(Int, T)(iter.k)
+	res = Matrix{T}(undef, iter.k, bellnum(k_int))
 	for (i, m) in enumerate(iter)
 		res[:, i] .= m
 	end

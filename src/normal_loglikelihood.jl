@@ -1,7 +1,7 @@
 function loglikelihood_suffstats(d::Distributions.Normal, ss::Distributions.NormalStats)
 	μ, σ = Distributions.params(d)
 	x̄, s, n = ss.m, ss.s2, ss.tw
-	return -n / 2.0 * (log(2pi) + 2log(σ)) - 1 / 2.0σ^2 * (s + n * (x̄ .- μ)^2)
+	return -n / 2.0 * (log(2pi) + 2log(σ)) - 1 / 2.0σ^2 * (s + n * abs2(x̄ .- μ))
 end
 
 function loglikelihood_suffstats(d::Distributions.AbstractMvNormal, ss::Distributions.MvNormalStats)

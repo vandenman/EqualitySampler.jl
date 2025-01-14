@@ -58,10 +58,10 @@ function stirlings2r_base_cases(n::T, k::T, r::T) where T <: Integer
 	k == r + 1						&& return (true, (r + 1)^(n - r) - r^(n - r)) # <- fix me!
 	iszero(r) 						&& return (true, stirlings2(n, k))
 
-	if n <= _r_stirling2r_N_MAX && r <= _r_stirling2r_R_MAX
-		index = _stirling2r_index(n, k, r)
-		return (true, T(@inbounds _stirlings2r_table_BigInt[index]))
-	end
+	# if n <= _r_stirling2r_N_MAX && r <= _r_stirling2r_R_MAX
+	# 	index = _stirling2r_index(n, k, r)
+	# 	return (true, T(@inbounds _stirlings2r_table_BigInt[index]))
+	# end
 
 	return (false, zero(T))
 end

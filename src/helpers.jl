@@ -1,11 +1,11 @@
-function counts2probs(counts::Dict{T, Int}) where T
-	total_visited = sum(values(counts))
-	probs = Dict{T, Float64}()
-	for (model, count) in counts
-		probs[model] = count / total_visited
-	end
-	return probs
-end
+# function counts2probs(counts::Dict{T, Int}) where T
+# 	total_visited = sum(values(counts))
+# 	probs = Dict{T, Float64}()
+# 	for (model, count) in counts
+# 		probs[model] = count / total_visited
+# 	end
+# 	return probs
+# end
 
 function count_equalities(sampled_models::AbstractMatrix{<:Integer})
 	map(count_equalities, eachcol(sampled_models))
