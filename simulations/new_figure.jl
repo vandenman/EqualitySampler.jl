@@ -10,6 +10,8 @@ using CairoMakie
 import AlgebraOfGraphics as AOG
 import CairoMakie as CM
 import Colors
+import Combinatorics
+import Chain: @chain
 
 include("priors_plot_colors_shapes_labels_new.jl")
 
@@ -163,6 +165,18 @@ function compute_one_equals_two(d::Union{BetaBinomialPartitionDistribution, Unif
     return probvec[1]
 end
 
+"""
+prior partition odds for `d` evaluated at (1 cluster / 2 cluster)
+
+for `d <: AbstractPartitionProcess`, uses the average probability of 2 cluster partitions.
+"""
+function compute_logprior_odds_ratio(d)
+    k = length(d)
+    log_incl_probs = logpdf_incl.(Ref(d), 1:2)
+    log_model_counts = logstirlings2.(k, 1:2)
+    return (log_incl_probs[1] - log_model_counts[1]) - (log_incl_probs[2] - log_model_counts[2])
+end
+
 # d_dp = DirichletProcessPartitionDistribution(5, 0.3)
 # v0 = sample_one_equals_two(d_dp, 1_000_000)
 # v1 = compute_one_equals_two(d_dp)
@@ -308,7 +322,8 @@ results_df = DF.DataFrame(
     prob_null            = Vector{Float64}(undef, nresults),
     prob_one_equals_two  = Vector{Float64}(undef, nresults),
     expected_no_clusters = Vector{Float64}(undef, nresults),
-    median_no_clusters   = Vector{Int}(undef, nresults)
+    median_no_clusters   = Vector{Int}(undef, nresults),
+    logprior_odds_ratio  = Vector{Float64}(undef, nresults),
 )
 
 ProgressMeter.@showprogress for (row_idx, (k, (modelname, modelfun))) in enumerate(iter)
@@ -332,9 +347,33 @@ ProgressMeter.@showprogress for (row_idx, (k, (modelname, modelfun))) in enumera
     results_df.expected_no_clusters[row_idx] = mean(d_cat)
     results_df.median_no_clusters[row_idx]   = median(d_cat)
 
+    results_df.logprior_odds_ratio[row_idx] = compute_logprior_odds_ratio(d)
+
 end
 
 results_df.prob_big_normalized = results_df.prob_big ./ (results_df.prob_big .+ results_df.prob_small)
+
+logprior_odds_ratio_df = @chain results_df begin
+    DF.subset(:model => x -> x .== "BetaBinomial11" .|| x .== "DirichletProcessDecr")
+    DF.select(:model, :k, :logprior_odds_ratio)
+    DF.unstack(:k, :model, :logprior_odds_ratio)
+end
+
+# logprior_odds_ratio for BetaBinomial(1, 1) and DirichletProcess(1 / H(k-1)) converge to the same value
+# kvals_extra = 2:100
+# bb11_vals_extra = map(k -> compute_logprior_odds_ratio(BetaBinomialPartitionDistribution(k, 1, 1)), kvals_extra)
+# dppdecr_vals_extra = map(k -> compute_logprior_odds_ratio(DirichletProcessPartitionDistribution(k, :harmonic)), kvals_extra)
+
+# fig, _, _ = scatter(kvals_extra, bb11_vals_extra - dppdecr_vals_extra,
+#     axis = (
+#         title = "Log prior odds\nBB(α = 1, β = 1) - DPP(α = H(K-1)⁻¹",
+#         titlefont = :regular, titlesize = 24,
+#         xlabel = "K", ylabel = "log prior odds ratio",
+#     ),
+#     figure = (; size = (650, 650))
+# )
+# figures_dir = joinpath(pwd(), "simulations", "revision2_figures")
+# save(joinpath(figures_dir, "extra_log_prior_odds_fig.pdf"), fig)
 
 # prediction_rule_df = DF.DataFrame(
 #     model        = collect(string.(first.(models))),
@@ -479,15 +518,20 @@ fig2 = aog_data *
 fig3 = aog_data *
     AOG.mapping(:k, :expected_no_clusters, linestyle = :model_sym, color = :model_sym) *
     AOG.visual(CM.Lines, linewidth = 4, alpha = .8)
+fig4 = aog_data *
+    AOG.mapping(:k, :logprior_odds_ratio, linestyle = :model_sym, color = :model_sym) *
+    AOG.visual(CM.Lines, linewidth = 4, alpha = .8)
 
 
-color_scale     = (; palette = collect(pairs(color_palette)))
+    color_scale     = (; palette = collect(pairs(color_palette)))
 linestyle_scale = (; palette = collect(pairs(linestyle_dict)))
 
 xticks = [3, 5, 10, 15, 20, 25, 30]
 yticks = [0, 0.25, 0.5, 0.75, 1]
 lims = (2.9, 30.1, 0.00, 1.02)
-axis_args_no_yticks = (xlabel = "K", xticks = xticks, rightspinevisible = false, topspinevisible = false)
+labelfontsize = 24
+
+axis_args_no_yticks = (xlabel = "K", xticks = xticks, rightspinevisible = false, topspinevisible = false, titlefont = :regular, titlesize = labelfontsize)
 axis_args = (axis_args_no_yticks..., limits = lims, yticks = yticks)
 
 # AOG.draw(fig11, AOG.scales(Color = color_scale, LineStyle = linestyle_scale), axis = (title = "Probability of a new cluster", axis_args...))
@@ -498,29 +542,60 @@ axis_args = (axis_args_no_yticks..., limits = lims, yticks = yticks)
 
 fig = Figure(fontsize = 20)
 gl1 = fig[1, 1] = GridLayout()
-ax1 = Axis(gl1[1, 1], title = "Probability of the null model"; ylabel = "Probability", axis_args...)
-ax2 = Axis(gl1[1, 2], title = "Probability θᵢ = θⱼ"; axis_args...)
-ax3 = Axis(gl1[2, 1], title = "Expected number of clusters", limits = ((lims[1], lims[2]), nothing); axis_args_no_yticks...)
+# ax1 = Axis(gl1[1, 1], title = "Probability of the null model"; ylabel = "Probability", axis_args...)
+# ax2 = Axis(gl1[1, 2], title = "Probability θᵢ = θⱼ"; axis_args...)
+# ax3 = Axis(gl1[2, 1], title = "Expected number of clusters", limits = ((lims[1], lims[2]), nothing); axis_args_no_yticks...)
+# ax4 = Axis(gl1[2, 2], title = "Log prior odds of 1 cluster vs 2 cluster", limits = ((lims[1], lims[2]), nothing); axis_args_no_yticks...)
+
+ax1 = Axis(gl1[2, 1], title = "Probability of the null model"; ylabel = "Probability", axis_args...)
+ax2 = Axis(gl1[2, 2], title = "Probability θᵢ = θⱼ"; axis_args...)
+ax3 = Axis(gl1[1, 2], title = "Expected number of inequalities", limits = ((lims[1], lims[2]), nothing); axis_args_no_yticks...)
+ax4 = Axis(gl1[1, 1], title = "Log prior odds of 0 inequalities over 1 inequality", limits = ((lims[1], lims[2]), nothing); axis_args_no_yticks...)
+
+
 AOG.draw!(ax1, fig1, AOG.scales(Color = color_scale, LineStyle = linestyle_scale))
 AOG.draw!(ax2, fig2, AOG.scales(Color = color_scale, LineStyle = linestyle_scale))
 AOG.draw!(ax3, fig3, AOG.scales(Color = color_scale, LineStyle = linestyle_scale))
+AOG.draw!(ax4, fig4, AOG.scales(Color = color_scale, LineStyle = linestyle_scale))
+fig
 
-ord = [2, 3, 1]
-CM.Legend(gl1[2, 2], legend_elems[ord], legend_contents[ord], legend_titles[ord], 
-    tellwidth = false, tellheight = false,
-    halign = :center, valign = :center, titlehalign = :left,
-    labelhalign = :left,
-    gridshalign = :left,
-    position = :ct, framevisible = false, backgroundcolor = :transparent, margin = (0, 0, 0, -5))
+# ord = [2, 3, 1]
+# CM.Legend(gl1[:, 3], legend_elems[ord], legend_contents[ord], legend_titles[ord],
+#     tellwidth = true, tellheight = false,
+#     halign = :left, valign = :center, titlehalign = :left,
+#     labelhalign = :left,
+#     gridshalign = :left,
+#     titlefont = :regular,
+
+#     position = :ct, framevisible = false, backgroundcolor = :transparent, margin = (0, 0, 0, -5))
+
+# CM.Legend(gl1[2, 2], legend_elems[ord], legend_contents[ord], legend_titles[ord],
+#     tellwidth = false, tellheight = false,
+#     halign = :center, valign = :center, titlehalign = :left,
+#     labelhalign = :left,
+#     gridshalign = :left,
+#     position = :ct, framevisible = false, backgroundcolor = :transparent, margin = (0, 0, 0, -5))
 
 # make_legend!(gl1, legend_elems, legend_contents, legend_titles, 2, 2, 2:3)
+
+ord = [2, 3, 1]
+CM.Legend(gl1[0, :], legend_elems[ord], legend_contents[ord], legend_titles[ord],
+    tellwidth = false, tellheight = true,
+    halign = :left, valign = :center, titlehalign = :left,
+    labelhalign = :left,
+    gridshalign = :left,
+    titlefont = :regular,
+    orientation = :horizontal,
+    # nbanks = 3,
+    position = :ct, framevisible = false, backgroundcolor = :transparent, margin = (0, 0, 0, -5))
+
 
 w = 650
 CM.resize!(fig, 2w, 800)
 fig
 
-figures_dir = joinpath(pwd(), "simulations", "revision_figures")
-save(joinpath(figures_dir, "new_figure_1x3_2.pdf"), fig)
+figures_dir = joinpath(pwd(), "simulations", "revision2_figures")
+save(joinpath(figures_dir, "new_figure_1x3_3.pdf"), fig)
 
 
 # TODO: group per prior

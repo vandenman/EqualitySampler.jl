@@ -155,6 +155,9 @@ ms = 18 # markersize
 lw = 2  # linewidth
 
 fig = CM.Figure(fontsize = 20)#size = ww .* (length(unique_colnames), 2), fontsize = 45)
+labelfontsize = 24
+rightspinevisible = topspinevisible = false
+
 # (i, u) = first(enumerate(unique_colnames))
 xautolimitmargin = (0.07f0, 0.07f0)
 for (i, u) in enumerate(unique_colnames)
@@ -163,12 +166,14 @@ for (i, u) in enumerate(unique_colnames)
     markers = [marker_palette[results.prior[j]] for j in idx_u]
     colors  = [color_palette[results.prior[j]] for j in idx_u]
 
-    CM.Label(fig[0, i], legend_titles[i], tellwidth = false, font = :bold)
+    CM.Label(fig[0, i], legend_titles[i], tellwidth = false, fontsize = labelfontsize)
 
     ax = CM.Axis(fig[1, i], #limits = ((0.5, length(first_idx) + .5), (-10, 0)),
         xlabelvisible = i==2,
         xticks = (1:7, ["" for _ in 1:7]), yticks = yticks, limits = (nothing, ylimits),
-        xlabel = i == 2 ? "Model type" : "", xautolimitmargin = xautolimitmargin)
+        xlabel = i == 2 ? "Model type" : "", xautolimitmargin = xautolimitmargin,
+        rightspinevisible = rightspinevisible, topspinevisible = topspinevisible
+        )
     yvals = reduce(hcat, results.pdf_model[idx_u])
     # CM.series!(ax, permutedims(yvals), markersize = 30, marker = markers, color = colors)
 
@@ -188,7 +193,8 @@ for (i, u) in enumerate(unique_colnames)
     superimpose_networks!(ax, view(modelspace, first_idx), width = 1.3, y_start = -8.75, markersize = 7, strokewidth = 1.2)
 
     ax = CM.Axis(fig[2, i], xticks = (1:5, string.(0:4)), yticks = yticks, limits = (nothing, ylimits),
-        xlabel = i == 2 ? "No. inequalities" : "", xautolimitmargin = xautolimitmargin)
+        xlabel = i == 2 ? "No. inequalities" : "", xautolimitmargin = xautolimitmargin,
+        rightspinevisible = rightspinevisible, topspinevisible = topspinevisible)
     yvals = reduce(hcat, results.pdf_incl[idx_u])
     # CM.series!(ax, permutedims(yvals), markersize = 30, marker = markers, color = colors)
     for j in eachindex(idx_u)
@@ -206,7 +212,7 @@ w = 650
 resize!(fig, 1300, 800)
 fig
 
-figures_dir = joinpath(pwd(), "simulations", "revision_figures")
+figures_dir = joinpath(pwd(), "simulations", "revision2_figures")
 CM.save(joinpath(figures_dir, "prior_comparison_pdfs_incl.pdf"), fig)
 
 #=

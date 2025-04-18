@@ -29,9 +29,14 @@ function reduce_model_dpp(x::AbstractVector{<:Integer})
     return y
 end
 
+function compute_empirical_tie_prob(samples, i, j)
+    sum(xy -> xy[1] == xy[2], zip(view(samples, i, :), view(samples, j, :))) / size(samples, 2)
+end
+
 @testset "Multivariate urn distributions" begin
 
-    no_samples = 15_000
+    # no_samples = 15_000
+    no_samples = 50_000
 
     ks = 2:5
     αs = 0.5:0.5:2
@@ -40,6 +45,10 @@ end
     αs2 = (0.1, 0.5, 0.9)
     θs = (0.1, 0.2, 1.4)
 
+    # samples_dict = Dict{Int, Matrix{Int}}(
+    #     k => Matrix{Int}(undef, k, no_samples)
+    #     for k in ks
+    # )
 
     log_probs = [
         log.(rand(Distributions.Dirichlet(ones(k) ./ k)))
@@ -129,10 +138,29 @@ end
                 # TODO: this test should NOT use reduce_model but just call rand!
                 # samples = Distributions.rand(d, no_samples)
 
+                # samples = samples_dict[k]
+                # Distributions.rand!(d, samples)
                 samples = Distributions.rand(d, no_samples)
+
                 if !(d isa DuplicatedPartitionDistribution)
                     @test all(col == EqualitySampler.reduce_model_2(col) for col in eachcol(samples))
                 end
+
+                # tie probabilities
+                # @show d
+                theoretical_tie_prob = tie_probability(d)
+
+                empirical_tie_probs  = compute_empirical_tie_prob(samples, 1, 2)
+                @test isapprox(theoretical_tie_prob, empirical_tie_probs, atol = 0.01)
+                if k == 4
+                    empirical_tie_probs34  = compute_empirical_tie_prob(samples, 3, 4)
+                    @test isapprox(theoretical_tie_prob, empirical_tie_probs34, atol = 0.01)
+                end
+                if k > 4
+                    empirical_tie_probs45  = compute_empirical_tie_prob(samples, 4, 5)
+                    @test isapprox(theoretical_tie_prob, empirical_tie_probs45, atol = 0.01)
+                end
+
 
                 # samples = Matrix{Int}(undef, k, no_samples)
                 # ds = Distributions.sampler(d)
@@ -252,6 +280,7 @@ end
 
         end
     end
+
 end
 
 

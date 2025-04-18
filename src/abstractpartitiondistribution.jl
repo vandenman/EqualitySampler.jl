@@ -28,11 +28,11 @@ Distributions.maximum(d::AbstractPartitionDistribution{T}) where T = T(length(d)
 Distributions.eltype(::AbstractPartitionDistribution{T}) where T = T
 
 function Distributions.insupport(d::AbstractPartitionDistribution, x::AbstractVector{T}) where T<:Integer
-	length(x) == length(d) || return false
-	for elem in x
-		Distributions.insupport(d, elem) || return false
-	end
-	return true
+    length(x) == length(d) || return false
+    for elem in x
+        Distributions.insupport(d, elem) || return false
+    end
+    return true
 end
 Distributions.insupport(d::AbstractPartitionDistribution, no_parameters::T) where T<:Integer = one(T) <= no_parameters <= length(d)
 
@@ -54,18 +54,18 @@ Distributions.insupport(d::AbstractPartitionDistribution, no_parameters::T) wher
 # end
 
 struct PartitionSampler{D<:AbstractPartitionDistribution, T<:Number, U<:Integer} <: Distributions.Sampleable{Distributions.Multivariate,Distributions.Discrete}
-	d::D
-	probvec::Vector{T}
-	partition_sizes::Vector{U}
+    d::D
+    probvec::Vector{T}
+    partition_sizes::Vector{U}
 end
 
 Base.length(s::PartitionSampler) = length(s.d)
 
 function Distributions.sampler(d::AbstractPartitionDistribution)
-	k = length(d)
-	T = typeof(k)
-	U = float(T)
-	PartitionSampler(d, Vector{U}(undef, k), Vector{T}(undef, k))
+    k = length(d)
+    T = typeof(k)
+    U = float(T)
+    PartitionSampler(d, Vector{U}(undef, k), Vector{T}(undef, k))
 end
 
 """
@@ -74,23 +74,23 @@ Special implementation because the naive fill!(x, 1/length(x)) is numerically in
 e.g., `fill!(x, 1/length(x))` is not the same as `fill!(x, inv(BigFloat(length(x))))`, only the latter sums to 1.
 """
 function fill_uniform!(x)
-	fill!(x, inv(convert(eltype(x), length(x))))
-	return x
+    fill!(x, inv(convert(eltype(x), length(x))))
+    return x
 end
 
 _pdf_helper!(s::PartitionSampler, i::Integer, x::AbstractVector{<:Integer}) = _pdf_helper!(s.probvec, s.d, i, x, s.partition_sizes)
 
 function Distributions._rand!(rng::Random.AbstractRNG, d::Union{AbstractPartitionDistribution, PartitionSampler}, x::AbstractVector{T}) where {T<:Integer}
 
-	s = Distributions.sampler(d)
-	for i in eachindex(x)
+    s = Distributions.sampler(d)
+    for i in eachindex(x)
 
-		probvec = _pdf_helper!(s, T(i), x)
-		x[i] = rand(rng, Distributions.Categorical(probvec))
+        probvec = _pdf_helper!(s, T(i), x)
+        x[i] = rand(rng, Distributions.Categorical(probvec))
 
-	end
+    end
     maybe_reduce_model!(x, d)
-	x
+    x
 end
 
 function maybe_reduce_model!(x::AbstractVector{<:Integer}, ::AbstractPartitionDistribution)
@@ -140,8 +140,8 @@ logpdf_model(d::AbstractPartitionDistribution, x::AbstractVector{<:Integer})
 Synonym for `logpdf(d::AbstractPartitionDistribution, x)`, computes the log probability of a partition.
 """
 function logpdf_model(d::AbstractPartitionDistribution, x::T) where T <: Integer
-	Distributions.insupport(d, x) || return convert(float(T), -Inf)
-	logpdf_model_distinct(d, x) - log_count_combinations(d, x)
+    Distributions.insupport(d, x) || return convert(float(T), -Inf)
+    logpdf_model_distinct(d, x) - log_count_combinations(d, x)
 end
 logpdf_model(d::AbstractPartitionDistribution, x::AbstractVector{T}) where T <: Integer = logpdf_model_distinct(d, x) - log_count_combinations(d, x)
 
@@ -168,13 +168,13 @@ Distributions.logpdf(d::AbstractPartitionDistribution, x::AbstractVector{T}) whe
 # TODO: these are probably not a good idea, methods should define
 # the probabilities directly?
 function expected_inclusion_probabilities(d::AbstractPartitionDistribution)
-	counts = expected_inclusion_counts(d)
-	return counts ./ sum(counts)
+    counts = expected_inclusion_counts(d)
+    return counts ./ sum(counts)
 end
 
 function log_expected_inclusion_probabilities(d::AbstractPartitionDistribution)
-	log_counts = log_expected_equality_counts(d)
-	return log_counts .- LogExpFunctions.logsumexp(log_counts)
+    log_counts = log_expected_equality_counts(d)
+    return log_counts .- LogExpFunctions.logsumexp(log_counts)
 end
 
 
@@ -196,8 +196,9 @@ function prediction_rule(d::AbstractPartitionDistribution, r::Integer)
     partition[k-r+1:k-1] .= 2:r
     probvec = zeros(k)
     EqualitySampler._pdf_helper!(probvec, d, k, partition, zeros(Int, k))
-	# NOTE: could avoid allocating an intermediate array here
-    return sum(probvec[eachindex(probvec) .∉ Ref(1:r)])
+    # return sum(probvec[eachindex(probvec) .∉ Ref(1:r)])
+    # same as the above but without allocations
+    return sum(view(probvec, r + one(r):lastindex(probvec)))
 
 end
 

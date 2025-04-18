@@ -13,6 +13,23 @@ include("../utilities.jl")
 round_2_decimals(x::Number) = Printf.@sprintf "%.2f" x
 round_2_decimals(x) = x
 
+function get_theme()
+    CM.Theme(
+        Axis = (
+            titlesize = 28,
+            titlefont = :regular,
+            rightspinevisible = false,
+            topspinevisible = false
+        ),
+        Lines = (
+            linewidth = 1,
+        ),
+        Legend = (
+            titlefont = :regular,
+        ),
+    )
+end
+
 function run_analyses(results_dir, data_file, force)
 
     pisa_data = CSV.read(data_file, DF.DataFrame)
@@ -65,7 +82,7 @@ end
 function produce_figures(figures_dir, results_obj)
 
     log_message("Creating figures for pisa analysis")
-    (; samples_full, samples_eq, samples_mpm, mpm_partition) = results_obj
+    (; pisa_data, samples_eq, samples_full, samples_mpm, mpm_partition) = results_obj
 
     cell_samples_full = samples_full.parameter_samples.θ_cp .+ samples_full.parameter_samples.μ'
     cell_samples_eq   = samples_eq.parameter_samples.θ_cp   .+ samples_eq.parameter_samples.μ'
@@ -103,16 +120,20 @@ function produce_figures(figures_dir, results_obj)
             AOG.visual(CM.Scatter; alpha = .75))
     )
 
-    fig = CM.Figure();
-    ax_top    = CM.Axis(fig[1, 1], title = "Full model",               titlefont = :regular)
-    ax_middle = CM.Axis(fig[2, 1], title = "Model Averaged",           titlefont = :regular, ylabel = "Posterior mean + 95% CRI")
-    ax_bottom = CM.Axis(fig[3, 1], title = "Median Probability Model", titlefont = :regular, xlabel = "Observed + 95% CI")
-    CM.linkaxes!(ax_top, ax_middle)
-    CM.linkaxes!(ax_top, ax_bottom)
-    AOG.draw!(ax_top, top)
-    AOG.draw!(ax_middle, middle)
-    AOG.draw!(ax_bottom, bottom)
-    CM.resize!(fig, 1200, 800)
+    fig = CM.with_theme(get_theme(); fontsize = 20) do
+
+        fig = CM.Figure();
+        ax_top    = CM.Axis(fig[1, 1], title = "Full model",               titlefont = :regular)
+        ax_middle = CM.Axis(fig[2, 1], title = "Model Averaged",           titlefont = :regular, ylabel = "Posterior mean + 95% CRI")
+        ax_bottom = CM.Axis(fig[3, 1], title = "Median Probability Model", titlefont = :regular, xlabel = "Observed + 95% CI")
+        CM.linkaxes!(ax_top, ax_middle)
+        CM.linkaxes!(ax_top, ax_bottom)
+        AOG.draw!(ax_top, top)
+        AOG.draw!(ax_middle, middle)
+        AOG.draw!(ax_bottom, bottom)
+        CM.resize!(fig, 1200, 800)
+        fig
+    end
     CM.save(joinpath(figures_dir, "pisa_full_vs_eq_vs_mpm.pdf"), fig)
 
 
@@ -159,103 +180,109 @@ function produce_figures(figures_dir, results_obj)
     xlimits = [0.5, 28.0]#collect(extrema(xticks))
     colors = CM.Makie.wong_colors()[1:2]
 
-    fig = CM.Figure(fontsize = 15)
-    ax = CM.Axis(fig[1, 1], title = "Median Posterior Model", xlabel = "Rank", ylabel = "PISA score",
-        xticks = xticks, yticks = yticks, limits = (xlimits[1], xlimits[2], ylimits[1], ylimits[2]))
-    CM.scatter!(ax, axes(summary_df, 1), summary_df.posterior_mean)
-    CM.errorbars!(ax, axes(summary_df, 1), summary_df.posterior_mean, summary_df.posterior_mean - summary_df.lower_cri, summary_df.upper_cri - summary_df.posterior_mean)
+    fig = CM.with_theme(get_theme(); linewidth = 1, fontsize = 20) do
+        fig = CM.Figure()#fontsize = 15)
+        ax = CM.Axis(fig[1, 1], title = "Median Posterior Model", xlabel = "Rank", ylabel = "PISA score",
+            xticks = xticks, yticks = yticks, limits = (xlimits[1], xlimits[2], ylimits[1], ylimits[2]))
+        CM.scatter!(ax, axes(summary_df, 1), summary_df.posterior_mean)
+        CM.errorbars!(ax, axes(summary_df, 1), summary_df.posterior_mean, summary_df.posterior_mean - summary_df.lower_cri, summary_df.upper_cri - summary_df.posterior_mean)
 
-    ttt=reduce(vcat, summary_df.point_ests)
-    yyy=reduce(vcat, fill.(axes(summary_df, 1), length.(summary_df.point_ests)))
-    CM.scatter!(ax, yyy .+ .2, ttt, color = (colors[2], .4))
+        ttt=reduce(vcat, summary_df.point_ests)
+        yyy=reduce(vcat, fill.(axes(summary_df, 1), length.(summary_df.point_ests)))
+        CM.scatter!(ax, yyy .+ .2, ttt, color = (colors[2], .4))
 
-    isdiv3(i) = iszero(i % 3)
-    isdiv4(i) = iszero(i % 4)
-    offsets = [
-        fill((10, 15),  4)  ;
-        [
-            iseven(i) ? (5, isdiv4(i) ? 15 : 20) : (-5, isdiv3(i) ? -15 : -20)
-            for i in 1:11
-        ] ;
-        fill((10, 15), 10)  ;
-        (8, 15)
-    ]
+        isdiv3(i) = iszero(i % 3)
+        isdiv4(i) = iszero(i % 4)
+        offsets = [
+            fill((10, 15),  4)  ;
+            [
+                iseven(i) ? (5, isdiv4(i) ? 15 : 20) : (-5, isdiv3(i) ? -15 : -20)
+                for i in 1:11
+            ] ;
+            fill((10, 15), 10)  ;
+            (8, 15)
+        ]
 
-    aligns = [
-        fill((:center, :bottom),  4) ;
-        [
-            iseven(i) ? (:center, :bottom) : (:center, :top)
-            for i in 1:11
-        ] ;
-        fill((:center, :bottom),  10);
-        (:center, :bottom)
-    ]
-    points = CM.Point2.(axes(summary_df, 1), summary_df.posterior_mean)
-    istart = 1
-    for i in eachindex(summary_df.countries)
-        istop = istart + length(summary_df.countries[i]) - 1
-        # CM.text!(ax, i, summary_df.posterior_mean[i], text = first(sort(summary_df.countries[i])), align = aligns[i],
-            # offset = offsets[i])
+        aligns = [
+            fill((:center, :bottom),  4) ;
+            [
+                iseven(i) ? (:center, :bottom) : (:center, :top)
+                for i in 1:11
+            ] ;
+            fill((:center, :bottom),  10);
+            (:center, :bottom)
+        ]
+        points = CM.Point2.(axes(summary_df, 1), summary_df.posterior_mean)
+        istart = 1
+        for i in eachindex(summary_df.countries)
+            istop = istart + length(summary_df.countries[i]) - 1
+            # CM.text!(ax, i, summary_df.posterior_mean[i], text = first(sort(summary_df.countries[i])), align = aligns[i],
+                # offset = offsets[i])
 
-        otherpoint = CM.Point2(i + offsets[i][1] / 10, summary_df.posterior_mean[i] + offsets[i][2])
-        # CM.text!(ax, otherpoint, text = first(sort(summary_df.countries[i])), align = aligns[i])
+            otherpoint = CM.Point2(i + offsets[i][1] / 10, summary_df.posterior_mean[i] + offsets[i][2])
+            # CM.text!(ax, otherpoint, text = first(sort(summary_df.countries[i])), align = aligns[i])
 
-        txt = istart == istop ? string(istart) : (string(istart) * "-" * string(istop))
-        CM.text!(ax, otherpoint, text = txt, align = aligns[i])
-        # CM.scatter!(ax, i + offsets[i][1] / 25, summary_df.posterior_mean[i] + offsets[i][2], color = :grey)
-        CM.lines!(ax, [points[i], otherpoint], color = :grey, linestyle = :dash)
+            txt = istart == istop ? string(istart) : (string(istart) * "-" * string(istop))
+            CM.text!(ax, otherpoint, text = txt, align = aligns[i])
+            # CM.scatter!(ax, i + offsets[i][1] / 25, summary_df.posterior_mean[i] + offsets[i][2], color = :grey)
+            CM.lines!(ax, [points[i], otherpoint], color = :grey, linestyle = :dash)
 
-        istart = istop + 1
+            istart = istop + 1
 
+        end
+
+        resize!(fig, 1200, 700)
+        fig
+
+        ucolors = [col for (col, _) in zip(Iterators.cycle(Colors.distinguishable_colors(8)), 1:26)]
+
+        # colors = ucolors[mpm_partition2]
+        colors = ucolors[mpm_partition]
+        labels = [string(i, ". ", replace(mpm_partition_countries[i], "_" => " ")) for i in eachindex(mpm_partition_countries)]
+        legend_elements = [CM.MarkerElement(marker = :circle, markersize = 0) for label in labels]
+
+        legend = CM.Legend(
+            fig[1, 1],
+            # gl[1, 2],
+            legend_elements[1:50],
+            labels[1:50],
+            # "Legend",
+            # labelcolor = colors,
+            labelsize = 15,
+            nbanks = 10,
+            tellwidth = false,
+            tellheight = false,
+            orientation = :horizontal,  # Horizontal layout for columns
+            framevisible = false,
+            margin = ntuple(_->5, 4),
+            padding = (0.0f0, 0.0f0, 0.0f0, 0.0f0),
+            patchlabelgap = 0,
+            halign = :left,
+            valign = :bottom,
+            rowgap = 2
+        )
+        legend = CM.Legend(
+            fig[1, 1],
+            # gl[1, 2],
+            legend_elements[51:end],
+            labels[51:end],
+            # "Legend",
+            # labelcolor = colors,
+            labelsize = 15,
+            nbanks = 7,
+            tellwidth = false,
+            tellheight = false,
+            orientation = :horizontal,  # Horizontal layout for columns
+            framevisible = false,
+            margin = ntuple(_->5, 4),
+            padding = (0.0f0, 0.0f0, 0.0f0, 0.0f0),
+            patchlabelgap = 0,
+            halign = :right,
+            valign = :top,
+            rowgap = 2
+        )
+        fig
     end
-
-    resize!(fig, 1200, 700)
-    fig
-
-    ucolors = [col for (col, _) in zip(Iterators.cycle(Colors.distinguishable_colors(8)), 1:26)]
-    colors = ucolors[mpm_partition2]
-    labels = [string(i, ". ", replace(mpm_partition_countries[i], "_" => " ")) for i in eachindex(mpm_partition_countries)]
-    legend_elements = [CM.MarkerElement(marker = :circle, markersize = 0) for label in labels]
-
-    legend = CM.Legend(
-        fig[1, 1],
-        # gl[1, 2],
-        legend_elements[1:50],
-        labels[1:50],
-        # "Legend",
-        # labelcolor = colors,
-        nbanks = 10,
-        tellwidth = false,
-        tellheight = false,
-        orientation = :horizontal,  # Horizontal layout for columns
-        framevisible = false,
-        margin = ntuple(_->5, 4),
-        padding = (0.0f0, 0.0f0, 0.0f0, 0.0f0),
-        patchlabelgap = 0,
-        halign = :left,
-        valign = :bottom,
-        rowgap = 2
-    )
-    legend = CM.Legend(
-        fig[1, 1],
-        # gl[1, 2],
-        legend_elements[51:end],
-        labels[51:end],
-        # "Legend",
-        # labelcolor = colors,
-        nbanks = 7,
-        tellwidth = false,
-        tellheight = false,
-        orientation = :horizontal,  # Horizontal layout for columns
-        framevisible = false,
-        margin = ntuple(_->5, 4),
-        padding = (0.0f0, 0.0f0, 0.0f0, 0.0f0),
-        patchlabelgap = 0,
-        halign = :right,
-        valign = :top,
-        rowgap = 2
-    )
-    fig
 
     CM.save(joinpath(figures_dir, "pisa_mpm_with_names.pdf"), fig, pt_per_unit = 1)
 
@@ -264,14 +291,14 @@ end
 function main(; data_file::String, results_dir::String, figures_dir::String, force::Bool = false)
 
     !isfile(data_file) && error("Data file not found: $data_file")
-    analysis_results = run_analyses(results_dir, figures_dir, force)
+    analysis_results = run_analyses(results_dir, data_file, force)
     produce_figures(figures_dir, analysis_results)
 end
 
 main(
-    data_file   = "simulations/demos/data/pisa.csv",
+    data_file   = joinpath(pwd(), "simulations", "demos", "data", "pisa.csv"),
     results_dir = joinpath(pwd(), "simulations", "saved_objects"),
-    figures_dir = joinpath(pwd(), "simulations", "revision_figures")
+    figures_dir = joinpath(pwd(), "simulations", "revision2_figures")
 )
 
 #=

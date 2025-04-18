@@ -154,7 +154,7 @@ function get_legend_contents(color_palette0, marker_palette0, skip_westfall = fa
         )[idx]
     ]
 
-    legend_titles = ["Uniform", "Pairwise BFs", "Dirichlet", "Beta-binomial"][idx]
+    legend_titles = ["Uniform", "Pairwise BFs", "Dirichlet Process", "Beta-binomial"][idx]
     legend_contents = [
         ["Uniform"],
         ["Westfall", "Uncorrected"],

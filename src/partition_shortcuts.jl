@@ -49,7 +49,11 @@ end
 
 function fast_countmap_partition_incl_zero(partition::SubArray{T, 1}) where {T<:Integer}
 	# TODO: this does not work properly!
-	fast_countmap_partition_incl_zero!(zero(parent(partition)), partition)
+	# fast_countmap_partition_incl_zero!(zero(parent(partition)), partition)
+	# TODO: why didn't we use similar?
+	res = similar(partition)
+	fill!(res, zero(T))
+	fast_countmap_partition_incl_zero!(res, partition)
 end
 
 function fast_countmap_partition_incl_zero!(res::AbstractVector{T}, partition::AbstractVector{T}) where {T<:Integer}
