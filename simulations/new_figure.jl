@@ -559,15 +559,15 @@ AOG.draw!(ax3, fig3, AOG.scales(Color = color_scale, LineStyle = linestyle_scale
 AOG.draw!(ax4, fig4, AOG.scales(Color = color_scale, LineStyle = linestyle_scale))
 fig
 
-# ord = [2, 3, 1]
-# CM.Legend(gl1[:, 3], legend_elems[ord], legend_contents[ord], legend_titles[ord],
-#     tellwidth = true, tellheight = false,
-#     halign = :left, valign = :center, titlehalign = :left,
-#     labelhalign = :left,
-#     gridshalign = :left,
-#     titlefont = :regular,
+ord = [2, 3, 1]
+CM.Legend(gl1[:, 3], legend_elems[ord], legend_contents[ord], legend_titles[ord],
+    tellwidth = true, tellheight = false,
+    halign = :left, valign = :center, titlehalign = :left,
+    labelhalign = :left,
+    gridshalign = :left,
+    titlefont = :regular,
 
-#     position = :ct, framevisible = false, backgroundcolor = :transparent, margin = (0, 0, 0, -5))
+    position = :ct, framevisible = false, backgroundcolor = :transparent, margin = (0, 0, 0, -5))
 
 # CM.Legend(gl1[2, 2], legend_elems[ord], legend_contents[ord], legend_titles[ord],
 #     tellwidth = false, tellheight = false,
@@ -578,16 +578,16 @@ fig
 
 # make_legend!(gl1, legend_elems, legend_contents, legend_titles, 2, 2, 2:3)
 
-ord = [2, 3, 1]
-CM.Legend(gl1[0, :], legend_elems[ord], legend_contents[ord], legend_titles[ord],
-    tellwidth = false, tellheight = true,
-    halign = :left, valign = :center, titlehalign = :left,
-    labelhalign = :left,
-    gridshalign = :left,
-    titlefont = :regular,
-    orientation = :horizontal,
-    # nbanks = 3,
-    position = :ct, framevisible = false, backgroundcolor = :transparent, margin = (0, 0, 0, -5))
+# ord = [2, 3, 1]
+# CM.Legend(gl1[0, :], legend_elems[ord], legend_contents[ord], legend_titles[ord],
+#     tellwidth = false, tellheight = true,
+#     halign = :left, valign = :center, titlehalign = :left,
+#     labelhalign = :left,
+#     gridshalign = :left,
+#     titlefont = :regular,
+#     orientation = :horizontal,
+#     # nbanks = 3,
+#     position = :ct, framevisible = false, backgroundcolor = :transparent, margin = (0, 0, 0, -5))
 
 
 w = 650
@@ -595,7 +595,7 @@ CM.resize!(fig, 2w, 800)
 fig
 
 figures_dir = joinpath(pwd(), "simulations", "revision2_figures")
-save(joinpath(figures_dir, "new_figure_1x3_3.pdf"), fig)
+save(joinpath(figures_dir, "new_figure_1x3_4.pdf"), fig)
 
 
 # TODO: group per prior
