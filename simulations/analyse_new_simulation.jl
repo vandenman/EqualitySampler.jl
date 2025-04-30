@@ -25,9 +25,18 @@ end
 
 function get_theme()
     CM.Theme(
+        Axis = (
+            titlesize = 24,
+            titlefont = :regular,
+            rightspinevisible = false,
+            topspinevisible = false
+        ),
         Lines = (
             linewidth = 4,
-        )
+        ),
+        Legend = (
+            titlefont = :regular,
+        ),
     )
 end
 
@@ -312,7 +321,7 @@ function create_figure_big_simulation(results_dir, figures_dir)
         layers =  AOG.visual(CM.Scatter; markersize = 20) * AOG.mapping(marker = :prior) + AOG.visual(CM.Lines, linestyle = :solid, alpha = .5, linewidth = 4)
         # familywise_error_plt = AOG.draw(aog_data * mapping * layers, aog_scales, axis = axis_args, figure = figure_args)
 
-        familywise_error_plt = CM.with_theme(; theme_args...) do
+        familywise_error_plt = CM.with_theme(get_theme(); theme_args...) do
 
             familywise_error_plt = CM.Figure(; figure_args...)
             AOG.draw!(familywise_error_plt, aog_data * mapping * layers, aog_scales, axis = merge(axis_args, extra_axis_args[(:family, k)]))
@@ -328,7 +337,7 @@ function create_figure_big_simulation(results_dir, figures_dir)
         # layers =  AOG.visual(CM.Scatter) * AOG.mapping(marker = :prior) + AOG.visual(CM.Lines, linestyle = :solid, alpha = .5)
         # prop_error_plt = AOG.draw(aog_data * mapping * layers, aog_scales, axis = axis_args, figure = figure_args)
 
-        prop_error_plt = CM.with_theme(; theme_args...) do
+        prop_error_plt = CM.with_theme(get_theme(); theme_args...) do
             prop_error_plt = CM.Figure(; figure_args...)
             AOG.draw!(prop_error_plt, aog_data * mapping * layers, aog_scales, axis = merge(axis_args, extra_axis_args[(:alpha, k)]))
             ord = [3, 1, 4, 2]
@@ -343,7 +352,7 @@ function create_figure_big_simulation(results_dir, figures_dir)
         # layers =  AOG.visual(CM.Scatter) * AOG.mapping(marker = :prior) + AOG.visual(CM.Lines, linestyle = :solid, alpha = .5)
         # power_plt = AOG.draw(aog_data * mapping * layers, aog_scales, axis = axis_args, figure = figure_args)
 
-        power_plt = CM.with_theme(; theme_args...) do
+        power_plt = CM.with_theme(get_theme(); theme_args...) do
             power_plt = CM.Figure(; figure_args...)
             AOG.draw!(power_plt, aog_data * mapping * layers, aog_scales, axis = merge(axis_args, extra_axis_args[(:power, k)]))
             ord = [3, 1, 4, 2]
@@ -447,7 +456,7 @@ function create_figure_pitman_yor_simulation(results_dir, figures_dir)
     end
 
 
-    # d_vals = unique_ds[d_idx]
+    d_vals = unique_ds[d_idx]
     # [10^v for v in -3:.5:1]
     # d_syms = [Symbol("10^$(v)") for v in -3:.5:1]
     # d_syms = [CM.L"10^{%$v}" for v in -3:.5:1]
@@ -542,7 +551,7 @@ end
 
 main(
     results_dir = joinpath(pwd(), "simulations", "saved_objects"),
-    figures_dir = joinpath(pwd(), "simulations", "revision_figures")
+    figures_dir = joinpath(pwd(), "simulations", "revision2_figures")
 )
 
 #=
