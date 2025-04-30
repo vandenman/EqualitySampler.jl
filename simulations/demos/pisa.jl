@@ -291,6 +291,8 @@ end
 function main(; data_file::String, results_dir::String, figures_dir::String, force::Bool = false)
 
     !isfile(data_file) && error("Data file not found: $data_file")
+    !isdir(results_dir) && error("results dir does not exist: $results_dir")
+    !isdir(figures_dir) && mkpath(figures_dir)
     analysis_results = run_analyses(results_dir, data_file, force)
     produce_figures(figures_dir, analysis_results)
 end

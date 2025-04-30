@@ -597,6 +597,12 @@ fig
 figures_dir = joinpath(pwd(), "simulations", "revision2_figures")
 save(joinpath(figures_dir, "new_figure_1x3_4.pdf"), fig)
 
+# specific numbers in the manuscript
+@chain results_df begin
+    DF.subset(:k => x -> x .== 10, :model => x -> x .== "BetaBinomial1k"  .|| x .== "BetaBinomial1binomk2")
+    DF.select(:model, :k, :logprior_odds_ratio)
+end
+
 
 # TODO: group per prior
 legend_elements = [
